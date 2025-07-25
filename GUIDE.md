@@ -78,25 +78,25 @@
 
 ## Add memory to the agent
 
-We will create two functions:
-(a) Load the previous chat history
-(b) Save the current chat history
+    We will create two functions:
+    (i) Load the previous chat history
+    (ii) Save the current chat history
 
 
 # 2. LLM
 
-### GEMINI ###  
-(i) We create a client from google.genai
-(ii) We create a tool for google search 
-(iii) We create a function for RAG
-(iv) We insert the functions into the google client through config parameter
-(v) We add the chat history through the contents parameter
-(vi) We generate the answer
+## GEMINI 
+    (i) We create a client from google.genai
+    (ii) We create a tool for google search 
+    (iii) We create a function for RAG
+    (iv) We insert the functions into the google client through config parameter
+    (v) We add the chat history through the contents parameter
+    (vi) We generate the answer
 
-### OpenAI ###
-(i) We create the OpenAI model 
-(ii) We use the responses API function to generate a response
-(iii) We add web_search_preview into the tools parameter 
-(iv) We create a function for RAG 
-(v) We insert the function into the tools parameter 
-(vi) We generate the answer
+## OpenAI 
+    (i) We create the OpenAI model 
+    (ii) We use the responses API function to generate a response
+    (iii) We add web_search_preview into the tools parameter 
+    (iv) We create a function for RAG 
+    (v) We insert the function into the tools parameter 
+    (vi) We generate the answer

@@ -49,29 +49,29 @@
     (ii) Store them locally: - ChromaDB
                              - FAISS
 
-If the user wants to store them to Pinecone:
- - First, we intialize the client
- - We create or connect to an index
- - We embed and upsert vectors
- - Search for the right index based on the user's query
-*  There are 3 ways of searching: 1. Semantic [similar meaning or context to the query]
-*                                 2. Lexical [matching words or phrases of the query]
-*                                 3. Hybrid [a combination of Semantic and Lexical]
- - Extract the text
- - Insert it into the LLM
+    If the user wants to store them to Pinecone:
+    - First, we intialize the client
+    - We create or connect to an index
+    - We embed and upsert vectors
+    - Search for the right index based on the user's query
+    *  There are 3 ways of searching: 1. Semantic [similar meaning or context to the query]
+    *                                 2. Lexical [matching words or phrases of the query]
+    *                                 3. Hybrid [a combination of Semantic and Lexical]
+    - Extract the text
+    - Insert it into the LLM
 
-If the user wants to store them on ChromaDB or FAISS:
- - We will intialize the client
- - We will create a collection
- - We add the embeddings 
- - We make the vector store persistent
- - We make a function for searching the vector store
-    * It takes as input 1. The user's query and 2. The number of the documents that it will retrieve.
-    * It will search the vector store based on the similarity
-    * The output will be the retrieved documents 
-    **If the function is unable to retrieve the documents, we will desplay an error**
- - Extract the text
- - Insert it into the LLM
+    If the user wants to store them on ChromaDB or FAISS:
+    - We will intialize the client
+    - We will create a collection
+    - We add the embeddings 
+    - We make the vector store persistent
+    - We make a function for searching the vector store
+        * It takes as input 1. The user's query and 2. The number of the documents that it will retrieve.
+        * It will search the vector store based on the similarity
+        * The output will be the retrieved documents 
+        **If the function is unable to retrieve the documents, we will desplay an error**
+    - Extract the text
+    - Insert it into the LLM
 
 
 # 3. Chat History 

@@ -1,0 +1,5 @@
+langchain 
+langgraph
+openai
+gemini
+pinecone

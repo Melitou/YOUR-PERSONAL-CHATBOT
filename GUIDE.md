@@ -54,9 +54,9 @@ If the user wants to store them to Pinecone:
  - We create or connect to an index
  - We embed and upsert vectors
  - Search for the right index based on the user's query
-#  There are 3 ways of searching: 1. Semantic [similar meaning or context to the query]
-#                                 2. Lexical [matching words or phrases of the query]
-#                                 3. Hybrid [a combination of Semantic and Lexical]
+*  There are 3 ways of searching: 1. Semantic [similar meaning or context to the query]
+*                                 2. Lexical [matching words or phrases of the query]
+*                                 3. Hybrid [a combination of Semantic and Lexical]
  - Extract the text
  - Insert it into the LLM
 
@@ -86,20 +86,17 @@ We will create two functions:
 # 2. LLM
 
 ### GEMINI ###  
-(a) We create a client from google.genai
-(b) We create a tool for google search 
-(c) We create a function for RAG
-(d) We insert the functions into the google client through config parameter
-(e) We add the chat history through the contents parameter
-(f) We generate the answer
+(i) We create a client from google.genai
+(ii) We create a tool for google search 
+(iii) We create a function for RAG
+(iv) We insert the functions into the google client through config parameter
+(v) We add the chat history through the contents parameter
+(vi) We generate the answer
 
 ### OpenAI ###
-(a) We create the OpenAI model 
-(b) We use the responses API function to generate a response
-(c) We add web_search_preview into the tools parameter 
-(d) We create a function for RAG 
-(e) We insert the function into the tools parameter 
-(f) We generate the answer
-
-
-Tell the agent to save the mermaid file
+(i) We create the OpenAI model 
+(ii) We use the responses API function to generate a response
+(iii) We add web_search_preview into the tools parameter 
+(iv) We create a function for RAG 
+(v) We insert the function into the tools parameter 
+(vi) We generate the answer

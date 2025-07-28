@@ -4,7 +4,7 @@ This is a UI step functionality, because the user chooses what type of embedding
 |         **Model Name**          | **Provider** |            **Description**            | **User Availability (User - U & Developer - D)** |
 | :-----------------------------: | :----------: | :-----------------------------------: | :----------------------------------------------: |
 |     text-embedding-ada-002      |    OpenAI    |              Older model              |                        D                         |
-|     text-embedding-ada-002      |    OpenAI    |             Smaller model             |                      U - D                       |
+|     text-embedding-3-small     |    OpenAI    |             Smaller model             |                      U - D                       |
 |     text-embedding-3-large      |    OpenAI    |          Most capable model           |                        D                         |
 |      gemini-embedding-001       |    Google    |          Good for most tasks          |                      U - D                       |
 |       text-embedding-005        |    Google    | Specialized in English and code tasks |                        D                         |

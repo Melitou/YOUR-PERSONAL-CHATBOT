@@ -156,7 +156,7 @@ Return:
 ### store_vector_in_db
 
 <pre>
-store_vector_in_db(prefered_db: str, summary: str, vector_list: ...) -> bool
+store_vector_in_db(preferred_db: str, summary: str, vector_list: ...) -> bool
 
 Params:
 	prefered_db: Possble values {'Pipecone', 'ChromaDB', 'FAISS'}

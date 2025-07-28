@@ -70,10 +70,10 @@ Return:
 * 
 	**Exception Handling**: We define a variable number, called max_tries and we count the number of times the function failed to complete with success. If the function totally fails (3 out of 3) then the function will **return an empty List**. The caller must handle it appropriately: Maybe skipping the particular chunk file or cancel the whole execution.
 
-### create_chunk_hash
+### create_and_store_chunk_hash
 
 <pre>
-create_chunk_hash(chunks: List[str]) -> Optional[str]
+create_and_store_chunk_hash(chunks: List[str]) -> Optional[str]
 
 Params:
 	chunks: List of text strings
@@ -83,9 +83,13 @@ Return:
 </pre>
 
 * How it will work:
-	**Basic Overview**: Takes a file chunk and create the corresponding hash, using `SHA256`.
+	**Basic Overview**: Takes a file chunk and create the corresponding hash, using `SHA256`. Here also we will
+store it in a database which can be any type of database (TinyDB, Redis, Supabase etc.) to keep track of the hashes 
+that have been created. This is important because we will use this hash to check if the embedding already exists in the Vector DB.
+Note that we will store only the hash of the chunk.
 * 
-	**Exception Handing**: If an error occurred (`try/except`) return None, caller must handle the next steps accordingly.
+	**Exception Handing**: If an error occurred (`try/except`) return None, caller must handle the next steps accordingly. 
+if None returned, that means the creation or the storing of the hash failed.
 	
 ### check_embedding_cache
 

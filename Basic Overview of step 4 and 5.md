@@ -18,12 +18,12 @@ GET https://api.openai.com/v1/models
 </pre>
 
 # Step 5: Initialize the embedding and cache them
-The user has selected the required params and also loaded the documents, in this part the embedding process starts.
+The user has selected the required params and also created the chunks, in this part the embedding process starts.
 ### get_embedding_model
 <pre>
 get_embedding_model(model_name: str, max_fallbacks: int = 3) -> str
 Params:
-	model_name: The model that will be used in the procces (ex. gemini-embedding-001, text-embedding-3-large etc.).
+	model_name: The model that will be used in the process (ex. gemini-embedding-001, text-embedding-3-large etc.).
 	max_fallbacks: Maximum number of fallback attempts (default: 3).
 
 Return:
@@ -102,10 +102,9 @@ Return:
 </pre>
 
 * How it will work:
-	**Basic Overview**: Takes a file chunk and create the corresponding hash, using `SHA256`.
+	**Basic Overview**: Takes a hash value and stores it in a local database (like TinyDB, SQLite, etc.).
 *
-
-**Exception Handing**: If an error occurred (`try/except`) keep trying until the max_tries is reached.
+	**Exception Handing**: The function will retry storing the hash if it fails, up to a maximum number of attempts (`max_tries`).
 
 ### check_embedding_cache
 

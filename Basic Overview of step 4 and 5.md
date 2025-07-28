@@ -43,12 +43,13 @@ Usage example:
 
 <pre>
 		fallback_models = {
-        "text-embedding-3-large": "text-embedding-005",
-        "text-embedding-005": "text-embedding-ada-002",
-        "text-embedding-ada-002": "gemini-embedding-001",
-        "gemini-embedding-001": "text-multilingual-embedding-002",
-        "text-multilingual-embedding-002": "text-embedding-ada-002"
-    }
+            "text-embedding-3-large": "text-embedding-3-small",
+            "text-embedding-3-small": "text-embedding-005",
+            "text-embedding-005": "text-embedding-ada-002",
+            "text-embedding-ada-002": "gemini-embedding-001",
+            "gemini-embedding-001": "text-multilingual-embedding-002",
+            "text-multilingual-embedding-002": "text-embedding-ada-002"
+        }
 </pre>
 
 ### create_vectors_of_chunks

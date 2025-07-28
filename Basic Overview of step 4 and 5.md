@@ -156,12 +156,13 @@ Return:
 ### store_vector_in_db
 
 <pre>
-store_vector_in_db(preferred_db: str, summary: str, vector_list: ...) -> bool
+store_vector_in_db(preferred_db: str, hash: str, summary: str, vector_list: ...) -> bool
 
 Params:
-	preferred_db: Possible values {'Pipecone', 'ChromaDB', 'FAISS'}
-	summary: The summary of the document
-	vector_list: The vector that the system will store in the preferred DB\
+	preferred_db: str the DB to store the vector in
+	hash: str the hash of the chunks
+	summary: str the summary of the chunks
+	vector_list: List[List[float]] the vector of the chunks
 Return:
 	True if everything works correct or False if not
 </pre>

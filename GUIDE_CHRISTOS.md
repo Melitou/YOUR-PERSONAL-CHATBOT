@@ -2,15 +2,15 @@
 This is a UI step functionality, because the user chooses what type of embedding the Agent must use, bellow we can see the provided models for the users to decide.
 
 |         **Model Name**          | **Provider** |            **Description**            | **User Availability (User - U & Developer - D)** |
-| :-----------------------------: | :----------: | :-----------------------------------: | :----------------------------------------------: |
-|     text-embedding-ada-002      |    OpenAI    |              Older model              |                        D                         |
-|     text-embedding-3-small     |    OpenAI    |             Smaller model             |                      U - D                       |
+|:-------------------------------:| :----------: | :-----------------------------------: | :----------------------------------------------: |
+|             REMOVE              |    OpenAI    |              Older model              |                        D                         |
+|     text-embedding-3-small      |    OpenAI    |             Smaller model             |                      U - D                       |
 |     text-embedding-3-large      |    OpenAI    |          Most capable model           |                        D                         |
 |      gemini-embedding-001       |    Google    |          Good for most tasks          |                      U - D                       |
 |       text-embedding-005        |    Google    | Specialized in English and code tasks |                        D                         |
 | text-multilingual-embedding-002 |    Google    |   Specialized in multilingual tasks   |                        D                         |
 	Note: The mode `text-embedding-005` and `text-multilingual-embedding-002` are both consolidated into `gemini-embedding-001`, as stated from Google.
-	
+	Note: Add also the model 'multilingual-e5-large' from Pipecone
 Note: To view all the models of OpenAI: 
 
 <pre>
@@ -125,22 +125,6 @@ Return:
 
 # 6. Store the chunks in a vector store
 In this part the embeddings have been created with success and we procced with the storing of each of them in the Vector DB.
-
-### generate_summary
-
-<pre>
-generate_summary(contents: str, summary_model: "gpt-4o-mini", max_fallbacks=3) -> str
-
-Params:
-	chunks: A list with chunks of a document.
-	summary_model: The model the system will use to create the summary
-Return:
-	The summary itself in string format.
-</pre>
-* How it works:
-	**Basic Overview**: It will use a model that is good at summarizing and it will create a summary based on the contents of the file (not the chunks).	
-* 
-	**Exception Handling**: We define a dict of fallback models and we "play" with each of them if one fails. In this function the idea is to is to **automatically switch to a backup model** if the primary model fails. Note that here we fallback to cheaper models.
 
 <pre>
 	fallback_chains = {

@@ -116,13 +116,13 @@ Params:
 	create_hash: The hash of the chunks of a file
 
 Return:
-	Boolean value, if True the hagh already exists else (False) the hash does not exists.
+	Boolean value, if True the high already exists else (False) the hash does not exists.
 </pre>
 
 * How it will work:
 	**Basic Overview**: Takes the newly generate hash of a chunk of file data and iterates through the Hash DB to see if the hash is already created. The database can be TinyDB, Redis, Supabase or whatever.
 * 
-	**Exception Handling**: If the function (`try/except`) fails, return False, so the caller can procced with the creation and storing of the embeddings. This approach is better than returning True because if the process fails and we return True then the system will think that the Vector DB already has the vector of the particular file and procced with the next steps, but when we reach the final steps and the agent is created there is a possibility that the Vector of that file **never existed** and that would be catastrophic. So it is better to return False, in order for the system to create and store  the embeddings even if we result in duplicate vector data. That way, we ensure the service will work for the user. Later we can write a procedure to check for any duplicate vectors in the Vector DB.
+	**Exception Handling**: If the function (`try/except`) fails, return False, so the caller can proceed with the creation and storing of the embeddings. This approach is better than returning True because if the process fails and we return True then the system will think that the Vector DB already has the vector of the particular file and proceed with the next steps, but when we reach the final steps and the agent is created there is a possibility that the Vector of that file **never existed** and that would be catastrophic. So it is better to return False, in order for the system to create and store  the embeddings even if we result in duplicate vector data. That way, we ensure the service will work for the user. Later we can write a procedure to check for any duplicate vectors in the Vector DB.
 
 # 6. Store the chunks in a vector store
 In this part the embeddings have been created with success and we procced with the storing of each of them in the Vector DB.
@@ -159,9 +159,9 @@ Return:
 store_vector_in_db(preferred_db: str, summary: str, vector_list: ...) -> bool
 
 Params:
-	prefered_db: Possble values {'Pipecone', 'ChromaDB', 'FAISS'}
+	preferred_db: Possible values {'Pipecone', 'ChromaDB', 'FAISS'}
 	summary: The summary of the document
-	vector_list: The vector that the system will store in the prefered DB\
+	vector_list: The vector that the system will store in the preferred DB\
 Return:
 	True if everything works correct or False if not
 </pre>
@@ -186,7 +186,7 @@ For each name, chunk, contents in FilesInfo:
 		
 		if vectors_list is not empty:
 			summary = generate_summary(contents)
-			success = store_vector_in_db(prefered_db, summary, vector_list)
+			success = store_vector_in_db(preferred_db, summary, vector_list)
 			if success is True:
 				return SuccessResponse
 			else

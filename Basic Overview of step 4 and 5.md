@@ -129,7 +129,7 @@ In this part the embeddings have been created with success and we procced with t
 ### generate_summary
 
 <pre>
-generate_summary(contents: str, summary_model: "gpt-4o", max_fallbacks=3) -> str
+generate_summary(contents: str, summary_model: "gpt-4o-mini", max_fallbacks=3) -> str
 
 Params:
 	chunks: A list with chunks of a document.
@@ -137,19 +137,18 @@ Params:
 Return:
 	The summary itself in string format.
 </pre>
-* 
 * How it works:
 	**Basic Overview**: It will use a model that is good at summarizing and it will create a summary based on the contents of the file (not the chunks).	
 * 
 	**Exception Handling**: We define a dict of fallback models and we "play" with each of them if one fails. In this function the idea is to is to **automatically switch to a backup model** if the primary model fails. Note that here we fallback to cheaper models.
-* 
 
 <pre>
 	fallback_chains = {
-        "gpt-4o": ["gpt-4-turbo-preview", "gpt-3.5-turbo-0125"],
-        "gpt-4-turbo-preview": ["gpt-3.5-turbo-0125", "text-davinci-003"],
-        "gemini-1.5-pro": ["gemini-1.0-pro", "text-bison-001"],
-    }
+            "gpt-4o": ["gpt-4-turbo-preview", "gpt-3.5-turbo-0125"],
+            "gpt-4-turbo-preview": ["gpt-3.5-turbo-0125", "text-davinci-003"],
+            "gpt-4o-mini": ["gpt-3.5-turbo-0125"],
+            "gemini-1.5-pro": ["gemini-1.0-pro", "text-bison-001"],
+        }
 </pre>
 
 ### store_vector_in_db

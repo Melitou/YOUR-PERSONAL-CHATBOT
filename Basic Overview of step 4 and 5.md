@@ -21,46 +21,43 @@ GET https://api.openai.com/v1/models
 The user has selected the required params and also loaded the documents, in this part the embedding process starts.
 ### get_embedding_model
 <pre>
-get_embedding_model(model_name: str)
-
+get_embedding_model(model_name: str, max_fallbacks: int = 3) -> str
 Params:
 	model_name: The model that will be used in the procces (ex. gemini-embedding-001, text-embedding-3-large etc.).
+	max_fallbacks: Maximum number of fallback attempts (default: 3).
 
 Return:
-	EmbModel A callable function (or client object) that embeds input text.
-
-Usage example:
-	embed_fn = get_embedding_model("text-embedding-3-large")
+	The embedding model name for later use, or None if all attempts fail
 </pre>
 
 * How it will work:
-	**Basic Overview**: It will return the appropriate embedding object depending on the user's selection (from the UI), also it abstracts provider differences. Because of the abstraction, here we can handle the exception (`try/except`) if something goes wrong with the initialization of the embedding model.
+	**Basic Overview**: It will return embedding model in string type, depending on the user's selection (from the UI), also it abstracts provider differences. Because of the abstraction, here we can handle the exception (`try/except`) if something goes wrong with the initialization of the embedding model.
 * 
-	**Exception handling**: We define a dict of fallback models and we "play" with each of them if one fails. This can be done with a while loop that we try at first the model the user requested and if it fails we use some other model.
-* 
-	**If all models failed: Then raise an exception, cancel the whole operation and inform the user in the UI with an appropriate message, such as "Agent creation failed, cannot instantiated the embedding model, please try again."**
+	**Exception handling**: We define a dict of fallback models and we "play" with each of them if one fails. This can be done with a while loop, and also we have a counter to count the numnber of times we will try to initialize the mode if it keeps failing. If the model is initialized successfully, we return the model name, else we will try to initialize the next model in the fallback list.
+*
 	The fallback list is:
 
 <pre>
-		fallback_models = {
+fallback_models = {
             "text-embedding-3-large": "text-embedding-3-small",
             "text-embedding-3-small": "text-embedding-005",
             "text-embedding-005": "text-embedding-ada-002",
             "text-embedding-ada-002": "gemini-embedding-001",
             "gemini-embedding-001": "text-multilingual-embedding-002",
             "text-multilingual-embedding-002": "text-embedding-ada-002"
-        }
+}
 </pre>
 
 ### create_vectors_of_chunks
 
 <pre>
-create_vectors_of_chunks(chunks: List[str], emb_mode: Callable, max_retries=3) -> List[List[float]]
+create_vectors_of_chunks(chunks: List[str], model_name: str,  max_tries: int = 3, use_fallbacks: bool = True) -> List[List[float]]
 
 Params:
 	chucks: The chucks of a document, list of text strings.
-	emb_mode: Callabale object, the embedding model the user choose.
-	max_retries: How many time the system will try to handle an exception, default value 3.
+	model_name: The model that will be used to create the vectors.
+	max_tries: Maximum number of attempts to create vectors (default: 3).
+	use_fallbacks: Whether to use fallback models if the primary fails (default: True).
 
 Return: 
 	The corresponding vectors of the file.
@@ -69,7 +66,8 @@ Return:
 * How it will work:
 	**Basic Overview**: Feeds each chunk into the embedding model and returns the corresponding vector.
 * 
-	**Exception Handling**: We define a variable number, called max_tries and we count the number of times the function failed to complete with success. If the function totally fails (3 out of 3) then the function will **return an empty List**. The caller must handle it appropriately: Maybe skipping the particular chunk file or cancel the whole execution.
+	**Exception Handling**: We define a variable number, called max_tries, and we count the number of times the function failed to complete with success. If the function totally fails (3 out of 3) then the function will **return an empty List**. The caller must handle it appropriately: Maybe skipping the particular chunk file or cancel the whole execution.
+* Also, like in the previous function, we define the same dict of fallback models, and we try each of them if the preferred fails.
 
 ### create_and_store_chunk_hash
 

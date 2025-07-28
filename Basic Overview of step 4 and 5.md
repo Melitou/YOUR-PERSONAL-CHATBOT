@@ -69,27 +69,44 @@ Return:
 	**Exception Handling**: We define a variable number, called max_tries, and we count the number of times the function failed to complete with success. If the function totally fails (3 out of 3) then the function will **return an empty List**. The caller must handle it appropriately: Maybe skipping the particular chunk file or cancel the whole execution.
 * Also, like in the previous function, we define the same dict of fallback models, and we try each of them if the preferred fails.
 
-### create_and_store_chunk_hash
+### create_chunk_hash
 
 <pre>
-create_and_store_chunk_hash(chunks: List[str]) -> Optional[str]
+create_chunk_hash(chunks: List[str]) -> Optional[str]
 
 Params:
-	chunks: List of text strings
+	chunks: List of chunks strings
 
 Return:
 	The created hash for the particular file chunk.
 </pre>
 
 * How it will work:
-	**Basic Overview**: Takes a file chunk and create the corresponding hash, using `SHA256`. Here also we will
-store it in a database which can be any type of database (TinyDB, Redis, Supabase etc.) to keep track of the hashes 
-that have been created. This is important because we will use this hash to check if the embedding already exists in the Vector DB.
-Note that we will store only the hash of the chunk.
+	**Basic Overview**: Takes a file chunk and create the corresponding hash, using `SHA256`.
 * 
 	**Exception Handing**: If an error occurred (`try/except`) return None, caller must handle the next steps accordingly. 
 if None returned, that means the creation or the storing of the hash failed.
-	
+
+### store_chunk_hash
+
+<pre>
+store_chunk_hash(hash_value: str, db_path: str, max_tries: int = 3, retry_delay: float = 1.0) -> Optional[str]
+
+Params:
+	hash_value: str the hash to store
+	db_path: str the path to the database file (default: "hash_db.json")
+	max_tries: int maximum number of retry attempts (default: 3)
+	retry_delay: float delay in seconds between retries (default: 1.0)
+Return:
+	The created hash for the particular file chunk.
+</pre>
+
+* How it will work:
+	**Basic Overview**: Takes a file chunk and create the corresponding hash, using `SHA256`.
+*
+
+**Exception Handing**: If an error occurred (`try/except`) keep trying until the max_tries is reached.
+
 ### check_embedding_cache
 
 <pre>

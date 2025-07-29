@@ -2,15 +2,15 @@
 This is a UI step functionality, because the user chooses what type of embedding the Agent must use, bellow we can see the provided models for the users to decide.
 
 |         **Model Name**          | **Provider** |            **Description**            | **User Availability (User - U & Developer - D)** |
-|:-------------------------------:| :----------: | :-----------------------------------: | :----------------------------------------------: |
+|:-------------------------------:|:------------:|:-------------------------------------:| :----------------------------------------------: |
 |             REMOVE              |    OpenAI    |              Older model              |                        D                         |
 |     text-embedding-3-small      |    OpenAI    |             Smaller model             |                      U - D                       |
 |     text-embedding-3-large      |    OpenAI    |          Most capable model           |                        D                         |
 |      gemini-embedding-001       |    Google    |          Good for most tasks          |                      U - D                       |
 |       text-embedding-005        |    Google    | Specialized in English and code tasks |                        D                         |
-| text-multilingual-embedding-002 |    Google    |   Specialized in multilingual tasks   |                        D                         |
+| text-multilingual-embedding-002 |    Google    |   Specialized in multilingual tasks   |                        D                         |'
+|  multilingual-e5-large          |   Pipecone   |                   -                   |                      U - D                       |
 	Note: The mode `text-embedding-005` and `text-multilingual-embedding-002` are both consolidated into `gemini-embedding-001`, as stated from Google.
-	Note: Add also the model 'multilingual-e5-large' from Pipecone
 Note: To view all the models of OpenAI: 
 
 <pre>

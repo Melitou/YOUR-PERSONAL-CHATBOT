@@ -25,3 +25,29 @@ def doc_type_check(file_bytes: bytes) -> str:
 
     # Default to plain text
     return "The document provided is a TXT file"
+
+
+
+
+def get_file_type_and_size(file_name: str, file_bytes: bytes) -> list:
+    """
+    Extract file type and size from file name and bytes.
+    
+    Args:
+        file_name (str): Full file name with extension
+        file_bytes (bytes): File content as bytes
+        
+    Returns:
+        list: [file_extension, size_in_mb]
+    """
+    # Extract file extension
+    if '.' in file_name:
+        file_type = file_name.split('.')[-1].lower()
+    else:
+        file_type = 'unknown'
+        
+        # Calculate file size in MB
+    size_mb = round(len(file_bytes) / (1024 * 1024), 2)
+        
+    return [file_type, size_mb]
+

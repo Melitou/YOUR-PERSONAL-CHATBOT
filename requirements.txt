@@ -1,5 +1,6 @@
-langchain 
-langgraph
-openai
-gemini
-pinecone
+llama-parse
+python-dotenv
+docx
+pypdf
+csv
+tempfile

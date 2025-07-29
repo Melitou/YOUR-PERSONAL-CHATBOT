@@ -23,7 +23,7 @@
         - we will use the temo_file.flush function to enure that all bytes are written
     - We will initialize Llama parse and store it into a variable called parser
     - We will load the file into the parser using the parser.load_data function that takes as input the tmp_file.name and store it into a variable called docs
-    - This variable is a llama_index.core.schema.Document so to get the text we will join the text of all the docs in the docs variable and store it into a variable called full text.
+    - This variable is a llama_index.core.schema.Document so to get the text we will join the text of all the docs in the docs variable and store it into a variable called full_text.
     
     - If llama parse fails then we will raise an error to let the user know and we will be trying fallbacks. For our fallback for pdfs will be using the pypdf.PDFReader function from pypdf library
     - First, we will read the pdf file using the PdfReader class that takes as input the temporary file path and store it in a variable called reader
@@ -166,3 +166,8 @@
     (iv) We create a function for RAG 
     (v) We insert the function into the tools parameter 
     (vi) We generate the answer
+
+
+
+function to type of document 
+function pdf to llama parse to md 

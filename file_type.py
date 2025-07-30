@@ -25,3 +25,6 @@ def doc_type_check(file_bytes: bytes) -> str:
 
     # Default to plain text
     return "The document provided is a TXT file"
+
+
+# add mb size

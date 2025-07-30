@@ -14,16 +14,16 @@ def initialize_db(db_url: str = "mongodb://localhost:27017/"):
         # Connect to MongoDB with PyMongo
         client = MongoClient(db_url)
         db = client[database_name]
-        
+
         # Connect MongoEngine to the same database
         connect(db=database_name, host=db_url)
-        
+
         # Initialize GridFS
         fs = GridFS(db)
-        
+
         print("Database initialized successfully!")
         return client, db, fs
-        
+
     except Exception as e:
         print(f"Error initializing database: {e}")
         return None, None, None
@@ -51,11 +51,13 @@ class User_Auth_Table(Document):
 
 
 class Documents(Document):
-    user = ReferenceField(User_Auth_Table, required=True)   
+    user = ReferenceField(User_Auth_Table, required=True)
     file_name = StringField(required=True)
     file_type = StringField(required=True)
-    gridfs_file_id = ObjectIdField(required=True, unique=True)  # Link to GridFS ObjectId   
-    status = StringField(required=True, choices=['pending', 'processed', 'failed'])
+    gridfs_file_id = ObjectIdField(
+        required=True, unique=True)  # Link to GridFS ObjectId
+    status = StringField(required=True, choices=[
+                         'pending', 'processed', 'failed'])
     full_hash = StringField(required=True)  # SHA256 hash
     namespace = StringField(required=True)
     created_at = DateTimeField(required=True)
@@ -68,7 +70,8 @@ class Documents(Document):
             {'fields': ['full_hash']},
             {'fields': ['status']},
             # Composite unique index
-            {'fields': [('user', 1), ('full_hash', 1)], 'unique': True}  # Same user can't upload same file twice
+            # Same user can't upload same file twice
+            {'fields': [('user', 1), ('full_hash', 1)], 'unique': True}
         ]
     }
 
@@ -89,10 +92,12 @@ class Chunks(Document):
     document = ReferenceField(Documents, required=True)
     user = ReferenceField(User_Auth_Table, required=True)
     namespace = StringField(required=True)
-    chunk_index = IntField(required=True)  # The sequential order of the chunk within the document
+    # The sequential order of the chunk within the document
+    chunk_index = IntField(required=True)
     content = StringField(required=True)
     summary = StringField(required=True)
-    vector_id = StringField(required=False)  # Pinecone vector ID, Initially null, populated after embedding
+    # Pinecone vector ID, Initially null, populated after embedding
+    vector_id = StringField(required=False)
     created_at = DateTimeField(required=True)
 
     meta = {
@@ -101,7 +106,8 @@ class Chunks(Document):
             {'fields': ['document']},
             {'fields': ['user']},
             {'fields': ['vector_id']},
-            {'fields': [('document', 1), ('chunk_index', 1)]} # query by both document and chunk_index
+            # query by both document and chunk_index
+            {'fields': [('document', 1), ('chunk_index', 1)]}
         ]
     }
 
@@ -115,7 +121,7 @@ def upload_file_to_gridfs(fs: GridFS, file_content: bytes, filename: str, conten
         file_id = fs.put(
             file_content,
             filename=filename,
-            contentType=content_type, # default is text/plain
+            contentType=content_type,  # default is text/plain
             length=len(file_content),
             uploadDate=datetime.now()
         )
@@ -124,16 +130,17 @@ def upload_file_to_gridfs(fs: GridFS, file_content: bytes, filename: str, conten
         print(f"Error uploading file to GridFS: {e}")
         return None
 
+
 def create_sample_data(client, db, fs):
     """Create sample data to test the database structure, THIS IS FOR TESTING ONLY"""
     if not client:
         return
-    
+
     try:
         # Create a sample user
         user = User_Auth_Table(
             user_name="test_user",
-            password="hashed_password_here", 
+            password="hashed_password_here",
             first_name="John",
             last_name="Doe",
             email="john.doe@example.com",
@@ -143,7 +150,7 @@ def create_sample_data(client, db, fs):
         print(f"Created user: {user}")
 
         # List of test files
-        test_files = [ # Add your txt files for testing here
+        test_files = [  # Add your txt files for testing here
             "./alice_in_wonderland.txt",
             "./1. Eastern Philosophy Author J.S.R.L. Narayana Moorty.txt"
         ]
@@ -153,11 +160,13 @@ def create_sample_data(client, db, fs):
             with open(file_path, 'r') as file:
                 file_content = file.read()
 
-            file_hash = hashlib.sha256(file_content.encode('utf-8')).hexdigest()
-            
+            file_hash = hashlib.sha256(
+                file_content.encode('utf-8')).hexdigest()
+
             # Upload file to GridFS
-            gridfs_file_id = upload_file_to_gridfs(fs, file_content.encode('utf-8'), file_path, "text/plain")
-            
+            gridfs_file_id = upload_file_to_gridfs(
+                fs, file_content.encode('utf-8'), file_path, "text/plain")
+
             document = Documents(
                 user=user,  # Reference to the user object
                 file_name=file_path,
@@ -181,21 +190,24 @@ def create_sample_data(client, db, fs):
                         namespace="test_namespace",
                         chunk_index=i,
                         content=sentence.strip(),
-                        summary=sentence.strip()[:100] + "..." if len(sentence.strip()) > 100 else sentence.strip(),  # Simple summary
+                        summary=sentence.strip()[
+                            # Simple summary
+                            :100] + "..." if len(sentence.strip()) > 100 else sentence.strip(),
                         vector_id=None,  # Initially null, will be populated after embedding
                         created_at=datetime.now()
                     )
                     chunk.save()
                     print(f"Created chunk {i}: {chunk}")
 
-            print(f"\n=== Sample Data Created Successfully for {file_path} ===")
+            print(
+                f"\n=== Sample Data Created Successfully for {file_path} ===")
             print(f"User ID: {user.id}")
             print(f"Document ID: {document.id}")
             print(f"GridFS File ID: {gridfs_file_id}")
             print(f"Number of chunks created: {len(sentences)}")
 
         return user.id, document.id, gridfs_file_id
-        
+
     except Exception as e:
         print(f"Error creating sample data: {e}")
     finally:
@@ -204,17 +216,18 @@ def create_sample_data(client, db, fs):
 ##############################################################################################################################
 ##############################################################################################################################
 
+
 if __name__ == "__main__":
     print("=== MongoDB Database Initialization Script ===")
-    
-    client, db, fs = initialize_db() # call this to initialize the database
+
+    client, db, fs = initialize_db()  # call this to initialize the database
     # MongoDB will when data are added to it
     if client:
         print("Database connection established")
-        
-        # print("\nCreating sample data...")
-        # create_sample_data(client, db, fs)
-    
+
+        print("\nCreating sample data...")
+        create_sample_data(client, db, fs)
+
         client.close()
         print("\nDatabase initialization complete!")
 

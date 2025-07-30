@@ -45,3 +45,8 @@ if type_doc == "The document provided is a CSV file":
     print(md[:100])
 else:
     print("Unsupported document type for this script.")
+
+
+# text to sql llama index
+# smolAgents
+# if 60% is numbers to sql lite database

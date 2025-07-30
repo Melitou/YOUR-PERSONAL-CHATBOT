@@ -1,9 +1,10 @@
 import os
-import pinecone
+from pinecone import Pinecone, ServerlessSpec
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from bson import ObjectId
 import logging
+import time
 
 # Load environment variables
 load_dotenv()
@@ -18,12 +19,13 @@ class PineconeService:
     
     def __init__(self):
         self.index = None
-        self.initialized = False
+        self.pc = None
         
     def initialize_pinecone(self,
                           api_key: Optional[str] = None,
                           environment: Optional[str] = None,
-                          index_name: str = "your-personal-chatbot") -> bool:
+                          index_name: str = "your-personal-chatbot",
+                          model_name: str = "text-embedding-3-large") -> bool:
         """
         Initialize Pinecone client and connect to index
         
@@ -35,6 +37,17 @@ class PineconeService:
         Returns:
             bool: True if initialization successful, False otherwise
         """
+
+        models_dimensions = {
+            "text-embedding-3-large": 3072,
+            "text-embedding-3-small": 1536,
+            "text-embedding-ada-002": 1536,
+            "gemini-embedding-001": 3072,
+            "text-embedding-005": 1536,
+            "text-multilingual-embedding-002": 1536,
+            "multilingual-e5-large": 1536,
+        }
+
         try:
             # Get API key and environment from parameters or environment variables
             api_key = api_key or os.getenv("PINECONE_API_KEY")
@@ -49,21 +62,40 @@ class PineconeService:
                 return False
             
             # Initialize Pinecone client
-            pinecone.init(api_key=api_key, environment=environment)
+            self.pc = Pinecone(api_key=api_key)
+
+            # Check if the index exists and delete it
+            if index_name in self.pc.list_indexes().names():
+                self.pc.delete_index(index_name)
+                logger.info(f"Deleted old index: {index_name}")
+            else:
+                logger.info(f"Index does not exist, nothing to delete: {index_name}")
+
+            logger.info(f"Model name: {model_name}")
+            logger.info(f"Model dimension: {models_dimensions[model_name]}")
             
             # Check if index exists, create if it doesn't
-            if index_name not in pinecone.list_indexes():
+            if not self.pc.has_index(index_name):
                 logger.info(f"Creating Pinecone index: {index_name}")
-                pinecone.create_index(
+                self.pc.create_index(
                     name=index_name,
-                    dimension=1536,  # Default dimension for OpenAI embeddings
-                    metric="cosine"
+                    dimension=models_dimensions[model_name],
+                    metric="cosine",
+                    spec=ServerlessSpec(cloud="aws", region="us-east-1"),
                 )
-                logger.info(f"Index {index_name} created successfully")
+                logger.info(f"\nIndex {index_name} created successfully\n")
+
+                # Wait for index to be ready
+                while not self.pc.has_index(index_name):
+                    time.sleep(1)
+                    logger.info(f"Waiting for index {index_name} to be ready...")
+
+                index_info = self.pc.describe_index(index_name)
+                logger.info(f"Index info: {index_info}")
+
             
             # Connect to the index
-            self.index = pinecone.Index(index_name)
-            self.initialized = True
+            self.index = self.pc.Index(index_name)
             
             logger.info(f"Pinecone initialized successfully with index: {index_name}")
             return True
@@ -72,53 +104,55 @@ class PineconeService:
             logger.error(f"Error initializing Pinecone: {e}")
             return False
     
-    def store_embedding(self, 
-                       user_id: str, 
-                       document_id: str, 
-                       chunk_id: str,
-                       chunk_index: int,
-                       embedding: List[float],
-                       summary: str) -> bool:
-        """
-        Store an embedding in Pinecone with the specified metadata structure
+    # def store_embedding(self, 
+    #                    user_id: str, 
+    #                    document_id: str, 
+    #                    chunk_id: str,
+    #                    chunk_index: int,
+    #                    embedding: List[float],
+    #                    summary: str,
+    #                    text: str) -> bool:
+    #     """
+    #     Store an embedding in Pinecone with the specified metadata structure
         
-        Args:
-            user_id: User ID from the database
-            document_id: Document ID from the database
-            chunk_id: The string representation of the chunk's _id from MongoDB
-            chunk_index: The sequential order of the chunk within the document
-            embedding: The embedding vector (list of floats)
-            summary: The summary of the chunk content
+    #     Args:
+    #         user_id: User ID from the database
+    #         document_id: Document ID from the database
+    #         chunk_id: The string representation of the chunk's _id from MongoDB
+    #         chunk_index: The sequential order of the chunk within the document
+    #         embedding: The embedding vector (list of floats)
+    #         summary: The summary of the chunk content
             
-        Returns:
-            bool: True if storage successful, False otherwise
-        """
-        if not self.initialized or not self.index:
-            logger.error("Pinecone not initialized. Call initialize_pinecone() first.")
-            return False
+    #     Returns:
+    #         bool: True if storage successful, False otherwise
+    #     """
+    #     if not self.pc or not self.index:
+    #         logger.error("Pinecone not initialized. Call initialize_pinecone() first.")
+    #         return False
         
-        try:
-            # Create the record structure as specified
-            record = {
-                "id": chunk_id,  # The string representation of the chunk's _id
-                "values": embedding,  # Embeddings from the chunk content
-                "metadata": {
-                    "user_id": user_id,
-                    "document_id": document_id,
-                    "chunk_index": chunk_index,
-                    "summary": summary
-                }
-            }
+    #     try:
+    #         # Create the record structure as specified
+    #         record = {
+    #             "id": chunk_id,  # The string representation of the chunk's _id
+    #             "values": embedding,  # Embeddings from the chunk content
+    #             "metadata": {
+    #                 "user_id": user_id,
+    #                 "document_id": document_id,
+    #                 "chunk_index": chunk_index,
+    #                 "summary": summary,
+    #                 "text": text
+    #             }
+    #         }
             
-            # Upsert the record to Pinecone
-            self.index.upsert(vectors=[record])
+    #         # Upsert the record to Pinecone
+    #         self.index.upsert(vectors=[record])
             
-            logger.info(f"Successfully stored embedding for chunk {chunk_id}")
-            return True
+    #         logger.info(f"Successfully stored embedding for chunk {chunk_id}")
+    #         return True
             
-        except Exception as e:
-            logger.error(f"Error storing embedding for chunk {chunk_id}: {e}")
-            return False
+    #     except Exception as e:
+    #         logger.error(f"Error storing embedding for chunk {chunk_id}: {e}")
+    #         return False
     
     def store_multiple_embeddings(self, 
                                 user_id: str,
@@ -135,7 +169,7 @@ class PineconeService:
         Returns:
             bool: True if all storage operations successful, False otherwise
         """
-        if not self.initialized or not self.index:
+        if not self.pc or not self.index:
             logger.error("Pinecone not initialized. Call initialize_pinecone() first.")
             return False
         
@@ -146,9 +180,16 @@ class PineconeService:
                 chunk_id = chunk_data.get('chunk_id')
                 chunk_index = chunk_data.get('chunk_index')
                 embedding = chunk_data.get('embedding')
-                summary = chunk_data.get('summary')  # Add summary field
+                summary = chunk_data.get('summary')
+                text = chunk_data.get('text')
+
+                logger.info(f"\nChunk ID: {chunk_id}")
+                logger.info(f"Chunk index: {chunk_index}")
+                logger.info(f"Embedding: {embedding}")
+                logger.info(f"Summary: {summary}")
+                logger.info(f"Text: {text}\n")
                 
-                if not all([chunk_id, chunk_index is not None, embedding, summary]):
+                if not all([chunk_id, chunk_index is not None, embedding, summary, text]):
                     logger.warning(f"Missing required data for chunk: {chunk_data}")
                     continue
                 
@@ -159,7 +200,8 @@ class PineconeService:
                         "user_id": user_id,
                         "document_id": document_id,
                         "chunk_index": chunk_index,
-                        "summary": summary  # Include summary in metadata
+                        "summary": summary,
+                        "text": text
                     }
                 }
                 records.append(record)
@@ -193,7 +235,7 @@ class PineconeService:
         Returns:
             List of similar documents with scores
         """
-        if not self.initialized or not self.index:
+        if not self.pc or not self.index:
             logger.error("Pinecone not initialized. Call initialize_pinecone() first.")
             return []
         
@@ -227,7 +269,7 @@ class PineconeService:
         Returns:
             bool: True if deletion successful, False otherwise
         """
-        if not self.initialized or not self.index:
+        if not self.pc or not self.index:
             logger.error("Pinecone not initialized. Call initialize_pinecone() first.")
             return False
         
@@ -251,7 +293,7 @@ class PineconeService:
         Returns:
             bool: True if deletion successful, False otherwise
         """
-        if not self.initialized or not self.index:
+        if not self.pc or not self.index:
             logger.error("Pinecone not initialized. Call initialize_pinecone() first.")
             return False
         
@@ -272,7 +314,7 @@ class PineconeService:
         Returns:
             Dictionary containing index statistics
         """
-        if not self.initialized or not self.index:
+        if not self.pc or not self.index:
             logger.error("Pinecone not initialized. Call initialize_pinecone() first.")
             return {}
         

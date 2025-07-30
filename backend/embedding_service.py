@@ -128,6 +128,11 @@ class EmbeddingService:
         Returns:
             List of embedding vectors for the batch, or None if failed
         """
+
+        if not model_name:
+            logger.error("Model name is required")
+            return None
+
         for attempt in range(1, max_retries + 1):
             try:
                 if model_name.startswith("text-embedding"):
@@ -178,18 +183,3 @@ class EmbeddingService:
             return self.google_initialized
         else:
             return False
-
-# Example usage and testing
-if __name__ == "__main__":
-    # Initialize the embedding service
-    embedding_service = EmbeddingService()
-    
-    # Test with a sample chunk
-    test_chunk = "Summary: This is a test chunk for embedding generation. \nText: This is a test chunk for embedding generation."
-    
-    # Create embedding for single chunk
-    embedding = embedding_service._create_embeddings_batch([test_chunk], "text-embedding-3-small", 3)
-    if embedding:
-        print(f"Successfully created embedding with dimension: {len(embedding)} \nand embedding: {embedding}")
-    else:
-        print("Failed to create embedding")

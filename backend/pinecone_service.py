@@ -20,7 +20,7 @@ class PineconeService:
         self.index = None
         self.initialized = False
         
-    def initialize_pinecone(self, 
+    def initialize_pinecone(self,
                           api_key: Optional[str] = None,
                           environment: Optional[str] = None,
                           index_name: str = "your-personal-chatbot") -> bool:
@@ -75,20 +75,20 @@ class PineconeService:
     def store_embedding(self, 
                        user_id: str, 
                        document_id: str, 
-                       file_name: str,
                        chunk_id: str,
                        chunk_index: int,
-                       embedding: List[float]) -> bool:
+                       embedding: List[float],
+                       summary: str) -> bool:
         """
         Store an embedding in Pinecone with the specified metadata structure
         
         Args:
             user_id: User ID from the database
             document_id: Document ID from the database
-            file_name: Name of the uploaded file
             chunk_id: The string representation of the chunk's _id from MongoDB
             chunk_index: The sequential order of the chunk within the document
             embedding: The embedding vector (list of floats)
+            summary: The summary of the chunk content
             
         Returns:
             bool: True if storage successful, False otherwise
@@ -106,14 +106,14 @@ class PineconeService:
                     "user_id": user_id,
                     "document_id": document_id,
                     "chunk_index": chunk_index,
-                    "file_name": file_name
+                    "summary": summary
                 }
             }
             
             # Upsert the record to Pinecone
             self.index.upsert(vectors=[record])
             
-            logger.info(f"Successfully stored embedding for chunk {chunk_id} from file {file_name}")
+            logger.info(f"Successfully stored embedding for chunk {chunk_id}")
             return True
             
         except Exception as e:
@@ -123,7 +123,6 @@ class PineconeService:
     def store_multiple_embeddings(self, 
                                 user_id: str,
                                 document_id: str,
-                                file_name: str,
                                 chunks_data: List[Dict[str, Any]]) -> bool:
         """
         Store multiple embeddings in a batch operation
@@ -131,8 +130,7 @@ class PineconeService:
         Args:
             user_id: User ID from the database
             document_id: Document ID from the database
-            file_name: Name of the uploaded file
-            chunks_data: List of dictionaries containing chunk_id, chunk_index, and embedding
+            chunks_data: List of dictionaries containing chunk_id, chunk_index, embedding, and summary
             
         Returns:
             bool: True if all storage operations successful, False otherwise
@@ -148,8 +146,9 @@ class PineconeService:
                 chunk_id = chunk_data.get('chunk_id')
                 chunk_index = chunk_data.get('chunk_index')
                 embedding = chunk_data.get('embedding')
+                summary = chunk_data.get('summary')  # Add summary field
                 
-                if not all([chunk_id, chunk_index is not None, embedding]):
+                if not all([chunk_id, chunk_index is not None, embedding, summary]):
                     logger.warning(f"Missing required data for chunk: {chunk_data}")
                     continue
                 
@@ -160,21 +159,21 @@ class PineconeService:
                         "user_id": user_id,
                         "document_id": document_id,
                         "chunk_index": chunk_index,
-                        "file_name": file_name
+                        "summary": summary  # Include summary in metadata
                     }
                 }
                 records.append(record)
             
             if records:
                 self.index.upsert(vectors=records)
-                logger.info(f"Successfully stored {len(records)} embeddings for file {file_name}")
+                logger.info(f"Successfully stored {len(records)} embeddings")
                 return True
             else:
                 logger.warning("No valid records to store")
                 return False
                 
         except Exception as e:
-            logger.error(f"Error storing multiple embeddings for file {file_name}: {e}")
+            logger.error(f"Error storing multiple embeddings: {e}")
             return False
     
     def query_similar(self, 
@@ -283,15 +282,5 @@ class PineconeService:
         except Exception as e:
             logger.error(f"Error getting index stats: {e}")
             return {}
-
-if __name__ == "__main__":
-    pinecone_service = PineconeService()
-
-    pinecone_service.initialize_pinecone(
-        api_key=os.getenv("PINECONE_API_KEY"),
-        environment=os.getenv("PINECONE_ENVIRONMENT"),
-        index_name="your-personal-chatbot" # This might be different based on the user logged in
-    )
-    
 
 

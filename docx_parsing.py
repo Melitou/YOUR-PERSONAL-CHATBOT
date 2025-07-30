@@ -1,11 +1,8 @@
-from file_type import doc_type_check
-import os
+
 from dotenv import load_dotenv
 import tempfile
 from docx import Document
 load_dotenv()
-
-file_bytes = open("", "rb").read()
 
 
 def docx_to_md(file_bytes: bytes) -> str:
@@ -39,12 +36,17 @@ def docx_to_md(file_bytes: bytes) -> str:
         return None
 
 
-type_doc = doc_type_check(file_bytes)
-print(type_doc[0])
-print(f"File size: {type_doc[1]} bytes")
-
-if type_doc[0] == "The document provided is a DOCX file":
-    md = docx_to_md(file_bytes)
-    print(md[:100])
-else:
-    print("Unsupported document type for this script.")
+# Test code - only runs when script is executed directly
+if __name__ == "__main__":
+    # Example usage (commented out to prevent file not found errors)
+    # file_bytes = open("example.docx", "rb").read()
+    # type_doc = doc_type_check(file_bytes)
+    # print(type_doc[0])
+    # print(f"File size: {type_doc[1]} bytes")
+    #
+    # if type_doc[0] == "The document provided is a DOCX file":
+    #     md = docx_to_md(file_bytes)
+    #     print(md[:100])
+    # else:
+    #     print("Unsupported document type for this script.")
+    print("DOCX parser module loaded successfully")

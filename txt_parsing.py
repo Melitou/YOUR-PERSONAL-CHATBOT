@@ -1,8 +1,5 @@
 from file_type import doc_type_check
 
-file_bytes = open(
-    "./test_files_for_local_db/alice_in_wonderland.txt", "rb").read()
-
 
 def txt_to_md(file_bytes: bytes) -> str:
     """
@@ -27,12 +24,17 @@ def txt_to_md(file_bytes: bytes) -> str:
     return markdown_content
 
 
-type_doc = doc_type_check(file_bytes)
-print(type_doc[0])
-print(f"File size: {type_doc[1]} bytes")
-
-if type_doc[0] == "The document provided is a TXT file":
-    md = txt_to_md(file_bytes)
-    print(md[:100])
-else:
-    print("Unsupported document type for this script.")
+# Test code - only runs when script is executed directly
+if __name__ == "__main__":
+    # Example usage (commented out to prevent file not found errors)
+    # file_bytes = open("./test_files_for_local_db/alice_in_wonderland.txt", "rb").read()
+    # type_doc = doc_type_check(file_bytes)
+    # print(type_doc[0])
+    # print(f"File size: {type_doc[1]} bytes")
+    #
+    # if type_doc[0] == "The document provided is a TXT file":
+    #     md = txt_to_md(file_bytes)
+    #     print(md[:100])
+    # else:
+    #     print("Unsupported document type for this script.")
+    print("TXT parser module loaded successfully")

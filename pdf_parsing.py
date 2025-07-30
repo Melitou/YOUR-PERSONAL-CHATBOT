@@ -5,8 +5,6 @@ from dotenv import load_dotenv
 from file_type import doc_type_check
 load_dotenv()
 
-file_bytes = open("DeepSeek_V3.pdf", "rb").read()
-
 
 def pdf_to_md(file_bytes: bytes) -> str:
     """
@@ -127,12 +125,17 @@ def pdf_to_md(file_bytes: bytes) -> str:
         return None
 
 
-type_doc = doc_type_check(file_bytes)
-print(type_doc[0])
-print(f"File size: {type_doc[1]} bytes")
-
-if type_doc[0] == "The document provided is a PDF file":
-    md = pdf_to_md(file_bytes)
-    print(md[:100])
-else:
-    print("Unsupported document type for this script.")
+# Test code - only runs when script is executed directly
+if __name__ == "__main__":
+    # Example usage (commented out to prevent file not found errors)
+    # file_bytes = open("example.pdf", "rb").read()
+    # type_doc = doc_type_check(file_bytes)
+    # print(type_doc[0])
+    # print(f"File size: {type_doc[1]} bytes")
+    #
+    # if type_doc[0] == "The document provided is a PDF file":
+    #     md = pdf_to_md(file_bytes)
+    #     print(md[:100])
+    # else:
+    #     print("Unsupported document type for this script.")
+    print("PDF parser module loaded successfully")

@@ -1,9 +1,15 @@
-llama-parse==0.6.52
-python-dotenv==1.1.1
-python-docx==1.2.0
-pypdf==5.9.0
-pymongo==4.6.1
-mongoengine==0.27.0
+llama-parse
+python-dotenv
+python-docx
+pypdf
+pymongo
+mongoengine
+
+# Document processor dependencies
+openai
+aiolimiter
+backoff
+tiktoken
 
 # Requirements for db_service.py
 # MongoDB and related dependencies

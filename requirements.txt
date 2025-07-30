@@ -11,6 +11,9 @@ aiolimiter
 backoff
 tiktoken
 
+# Chunking methods dependencies
+langchain-experimental
+
 # Requirements for db_service.py
 # MongoDB and related dependencies
 

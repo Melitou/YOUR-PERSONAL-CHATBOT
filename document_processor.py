@@ -45,16 +45,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Chunking methods imports
+try:
+    from chunking_methods import token_chunk, semantic_chunk, line_chunk, recursive_chunk
+    CHUNKING_METHODS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Could not import chunking methods: {e}")
+    CHUNKING_METHODS_AVAILABLE = False
+
 
 class DocumentProcessor:
     """Document processing pipeline that converts GridFS documents to chunked content with summaries"""
 
-    def __init__(self, max_workers: int = 4, rate_limit_delay: float = 0.2):
+    def __init__(self, max_workers: int = 4, rate_limit_delay: float = 0.2,
+                 chunking_method: str = "token", chunking_params: dict = None):
         """Initialize the document processor
 
         Args:
             max_workers: Maximum number of parallel workers (default: 4)
             rate_limit_delay: Delay between database operations in seconds (default: 0.2)
+            chunking_method: Chunking method to use ('token', 'semantic', 'line', 'recursive') (default: 'token')
+            chunking_params: Parameters for the chunking method (default: None, uses method defaults)
         """
         # Initialize database connections
         self.client, self.db, self.fs = initialize_db()
@@ -91,7 +102,23 @@ class DocumentProcessor:
         self.openai_client = AsyncOpenAI(api_key=self.openai_api_key)
         self.summary_rate_limiter = AsyncLimiter(self.summary_rpm, 60)
 
-        # Chunking parameters (from split_and_upload_md.py)
+        # Chunking method configuration
+        self.chunking_method = chunking_method.lower()
+        if self.chunking_method not in ['token', 'semantic', 'line', 'recursive']:
+            raise ValueError(
+                f"Invalid chunking method: {chunking_method}. Must be one of: token, semantic, line, recursive")
+
+        # Validate chunking methods availability
+        if not CHUNKING_METHODS_AVAILABLE:
+            logger.warning(
+                "Chunking methods not available, falling back to built-in token chunking")
+            self.chunking_method = 'token'
+
+        # Set default parameters for each chunking method
+        self.chunking_params = chunking_params or {}
+        self._set_default_chunking_params()
+
+        # Legacy chunking parameters (for backward compatibility)
         self.max_tokens = 7000
         self.overlap = 300
 
@@ -125,6 +152,36 @@ Answer only with the succinct context and nothing else.
             f"DocumentProcessor initialized with {self.max_workers} workers")
         logger.info(
             f"Rate limit: {self.rate_limit_delay}s delay, Summary RPM: {self.summary_rpm}")
+        logger.info(
+            f"Chunking method: {self.chunking_method} with params: {self.chunking_params}")
+
+    def _set_default_chunking_params(self):
+        """Set default parameters for each chunking method"""
+        defaults = {
+            'token': {
+                'token_count': 7000,
+                'overlap': 300,
+                'encoding_name': 'cl100k_base'
+            },
+            'semantic': {
+                'embedding_model': 'text-embedding-3-small',
+                'breakpoint_threshold_type': 'percentile'
+            },
+            'line': {
+                'line_count': 100,
+                'overlap': 10
+            },
+            'recursive': {
+                'chunk_size': 1000,
+                'overlap': 100
+            }
+        }
+
+        # Merge defaults with user-provided parameters
+        method_defaults = defaults.get(self.chunking_method, {})
+        for key, value in method_defaults.items():
+            if key not in self.chunking_params:
+                self.chunking_params[key] = value
 
     def _update_stats(self, result_type: str, count: int = 1):
         """Thread-safe statistics update"""
@@ -136,27 +193,102 @@ Answer only with the succinct context and nothing else.
         """Returns the number of tokens in a text string using the configured encoding."""
         return len(self.encoding.encode(string))
 
-    def chunk_markdown(self, text: str) -> List[str]:
-        """Chunks markdown text into smaller pieces based on token count.
+    def chunk_text(self, text: str) -> List[str]:
+        """Chunk text using the configured chunking method.
 
-        Adapted from split_and_upload_md.py
+        Args:
+            text: The text to chunk
+
+        Returns:
+            List of text chunks
+
+        Raises:
+            Exception: If chunking fails or method is not available
         """
-        tokens = self.encoding.encode(text)
-        chunks = []
-        start = 0
-        total_tokens = len(tokens)
+        try:
+            if self.chunking_method == 'token':
+                return self._chunk_token(text)
+            elif self.chunking_method == 'semantic':
+                return self._chunk_semantic(text)
+            elif self.chunking_method == 'line':
+                return self._chunk_line(text)
+            elif self.chunking_method == 'recursive':
+                return self._chunk_recursive(text)
+            else:
+                raise ValueError(
+                    f"Unknown chunking method: {self.chunking_method}")
+        except Exception as e:
+            logger.error(
+                f"Chunking failed with method {self.chunking_method}: {e}")
+            # Fallback to token chunking
+            logger.info("Falling back to token chunking")
+            return self._chunk_token(text)
 
-        while start < total_tokens:
-            end = min(start + self.max_tokens, total_tokens)
-            chunk_tokens = tokens[start:end]
-            chunk_text = self.encoding.decode(chunk_tokens)
-            chunks.append(chunk_text)
+    def _chunk_token(self, text: str) -> List[str]:
+        """Token-based chunking (built-in method)"""
+        if CHUNKING_METHODS_AVAILABLE:
+            return token_chunk(
+                text,
+                token_count=self.chunking_params.get('token_count', 7000),
+                overlap=self.chunking_params.get('overlap', 300),
+                encoding_name=self.chunking_params.get(
+                    'encoding_name', 'cl100k_base')
+            )
+        else:
+            # Fallback to legacy implementation
+            tokens = self.encoding.encode(text)
+            chunks = []
+            start = 0
+            total_tokens = len(tokens)
+            max_tokens = self.chunking_params.get(
+                'token_count', self.max_tokens)
+            overlap = self.chunking_params.get('overlap', self.overlap)
 
-            if end == total_tokens:
-                break
-            start = end - self.overlap  # Recalculate start for the next chunk, considering overlap
+            while start < total_tokens:
+                end = min(start + max_tokens, total_tokens)
+                chunk_tokens = tokens[start:end]
+                chunk_text = self.encoding.decode(chunk_tokens)
+                chunks.append(chunk_text)
 
-        return chunks
+                if end == total_tokens:
+                    break
+                start = end - overlap
+
+            return chunks
+
+    def _chunk_semantic(self, text: str) -> List[str]:
+        """Semantic chunking using langchain"""
+        if not CHUNKING_METHODS_AVAILABLE:
+            raise Exception(
+                "langchain-experimental not available for semantic chunking")
+        return semantic_chunk(
+            text,
+            embedding_model=self.chunking_params.get(
+                'embedding_model', 'text-embedding-3-small'),
+            breakpoint_threshold_type=self.chunking_params.get(
+                'breakpoint_threshold_type', 'percentile')
+        )
+
+    def _chunk_line(self, text: str) -> List[str]:
+        """Line-based chunking"""
+        if not CHUNKING_METHODS_AVAILABLE:
+            raise Exception("chunking_methods not available for line chunking")
+        return line_chunk(
+            text,
+            line_count=self.chunking_params.get('line_count', 100),
+            overlap=self.chunking_params.get('overlap', 10)
+        )
+
+    def _chunk_recursive(self, text: str) -> List[str]:
+        """Recursive character-based chunking using langchain"""
+        if not CHUNKING_METHODS_AVAILABLE:
+            raise Exception(
+                "langchain-experimental not available for recursive chunking")
+        return recursive_chunk(
+            text,
+            chunk_size=self.chunking_params.get('chunk_size', 1000),
+            overlap=self.chunking_params.get('overlap', 100)
+        )
 
     @backoff.on_exception(backoff.expo,
                           OpenAIError,
@@ -227,8 +359,8 @@ Answer only with the succinct context and nothing else.
     async def chunk_and_summarize(self, markdown_content: str, document: Documents) -> List[Dict]:
         """Chunk the markdown content and generate summaries for each chunk"""
         try:
-            # Generate chunks
-            chunks = self.chunk_markdown(markdown_content)
+            # Generate chunks using the configured method
+            chunks = self.chunk_text(markdown_content)
             logger.info(
                 f"Generated {len(chunks)} chunks for document {document.file_name}")
 
@@ -316,6 +448,7 @@ Answer only with the succinct context and nothing else.
                         chunk_index=chunk_info['chunk_index'],
                         content=chunk_info['content'],
                         summary=chunk_info['summary'],
+                        chunking_method=self.chunking_method,
                         vector_id=None,  # Initially null, populated later by embedding pipeline
                         created_at=datetime.now()
                     )
@@ -347,6 +480,7 @@ Answer only with the succinct context and nothing else.
             # Shorter delay for status updates
             time.sleep(self.rate_limit_delay / 2)
             document.status = status
+            document.chunking_method = self.chunking_method
             if hasattr(document, 'error_message') and error_message:
                 document.error_message = error_message
             document.save()

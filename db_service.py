@@ -60,6 +60,9 @@ class Documents(Document):
                          'pending', 'processed', 'failed'])
     full_hash = StringField(required=True)  # SHA256 hash
     namespace = StringField(required=True)
+    # Chunking method used for processing this document
+    chunking_method = StringField(required=False, choices=[
+        'token', 'semantic', 'line', 'recursive'], default='token')
     created_at = DateTimeField(required=True)
 
     meta = {
@@ -69,6 +72,7 @@ class Documents(Document):
             {'fields': ['gridfs_file_id'], 'unique': True},
             {'fields': ['full_hash']},
             {'fields': ['status']},
+            {'fields': ['chunking_method']},
             # Composite unique index
             # Same user can't upload same file twice
             {'fields': [('user', 1), ('full_hash', 1)], 'unique': True}
@@ -84,7 +88,7 @@ class Documents(Document):
             return None
 
     def __str__(self) -> str:
-        return f"Documents(user={self.user}, file_name={self.file_name}, file_type={self.file_type}, status={self.status}, namespace={self.namespace}, created_at={self.created_at})"
+        return f"Documents(user={self.user}, file_name={self.file_name}, file_type={self.file_type}, status={self.status}, namespace={self.namespace}, chunking_method={self.chunking_method}, created_at={self.created_at})"
 
 
 class Chunks(Document):
@@ -96,6 +100,9 @@ class Chunks(Document):
     chunk_index = IntField(required=True)
     content = StringField(required=True)
     summary = StringField(required=True)
+    # Chunking method used to generate this chunk
+    chunking_method = StringField(required=False, choices=[
+        'token', 'semantic', 'line', 'recursive'], default='token')
     # Pinecone vector ID, Initially null, populated after embedding
     vector_id = StringField(required=False)
     created_at = DateTimeField(required=True)
@@ -106,13 +113,14 @@ class Chunks(Document):
             {'fields': ['document']},
             {'fields': ['user']},
             {'fields': ['vector_id']},
+            {'fields': ['chunking_method']},
             # query by both document and chunk_index
             {'fields': [('document', 1), ('chunk_index', 1)]}
         ]
     }
 
     def __str__(self) -> str:
-        return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, chunk_index={self.chunk_index}, vector_id={self.vector_id}, created_at={self.created_at})"
+        return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, vector_id={self.vector_id}, created_at={self.created_at})"
 
 
 def upload_file_to_gridfs(fs: GridFS, file_content: bytes, filename: str, content_type: str = "text/plain") -> ObjectId:

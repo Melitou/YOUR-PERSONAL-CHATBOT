@@ -16,7 +16,6 @@ if __name__ == "__main__":
     embedding_service = EmbeddingService()
     pinecone_service = PineconeService()
 
-    PREFERRED_DB = "PINECONE"
     USER_CREATED_INDEX_NAME = "your-personal-chatbot"
     SUMMARY_EXAMPLE = "This is a summary of the text"
     TEXT_EXAMPLE = "This is the text of the chunk"
@@ -67,44 +66,41 @@ if __name__ == "__main__":
             logger.error(f"Error embedding chunk summaries: {e}")
             continue
         
-        # Upsert the embeddings to Pinecone with correct data structure
+        # Store embeddings in Pinecone
         try:
-            if PREFERRED_DB == "PINECONE":
-                # Initialize Pinecone
-                pinecone_service.initialize_pinecone(
-                    api_key=os.getenv("PINECONE_API_KEY"),
-                    environment=os.getenv("PINECONE_ENVIRONMENT"),
-                    index_name=USER_CREATED_INDEX_NAME,
-                    model_name=model_name
-                )
+            # Initialize Pinecone
+            pinecone_service.initialize_pinecone(
+                api_key=os.getenv("PINECONE_API_KEY"),
+                environment=os.getenv("PINECONE_ENVIRONMENT"),
+                index_name=USER_CREATED_INDEX_NAME,
+                model_name=model_name
+            )
                 
-                # Create proper chunks_data structure
-                chunks_data = []
-                for i, (chunk, embedding) in enumerate(zip(batch, embeddings)):
-                    chunks_data.append({
-                        "chunk_id": chunk["chunk_id"],
-                        "chunk_index": chunk["chunk_index"],
-                        "embedding": embedding,
-                        "summary": chunk["summary"],
-                        "text": chunk["text"]
-                    })
+            # Create proper chunks_data structure
+            chunks_data = []
+            for i, (chunk, embedding) in enumerate(zip(batch, embeddings)):
+                chunks_data.append({
+                    "chunk_id": chunk["chunk_id"],
+                    "chunk_index": chunk["chunk_index"],
+                    "embedding": embedding,
+                    "summary": chunk["summary"],
+                    "text": chunk["text"]
+                })
                 
                 # Store with correct function signature
                 success = pinecone_service.store_multiple_embeddings(
-                    user_id="example_user_id_12345",
-                    document_id="example_document_id_12345",
+                    user_id="user_id_12345",
+                    document_id="document_id_12345",
                     chunks_data=chunks_data
                 )
-                
+
                 if success:
-                    logger.info(f"Embeddings upserted to Pinecone for {len(embeddings)} chunks.")
+                    logger.info(f"Embeddings stored in Pinecone for {len(embeddings)} chunks.")
                 else:
                     logger.error("Failed to store embeddings in Pinecone.")
-            else:
-                logger.info(f"Embeddings upserted to Chroma for {len(embeddings)} chunks.")
-                # TODO: Implement Chroma upsert and FAISS upsert
+                    continue
         except Exception as e:
-            logger.error(f"Error upserting embeddings to Pinecone: {e}")
+            logger.error(f"Error storing embeddings in Pinecone: {e}")
             continue
 
         

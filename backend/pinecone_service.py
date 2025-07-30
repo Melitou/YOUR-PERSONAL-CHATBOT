@@ -42,10 +42,10 @@ class PineconeService:
             "text-embedding-3-large": 3072,
             "text-embedding-3-small": 1536,
             "text-embedding-ada-002": 1536,
-            "gemini-embedding-001": 3072,
             "text-embedding-005": 1536,
             "text-multilingual-embedding-002": 1536,
             "multilingual-e5-large": 1536,
+            "gemini-embedding-001": 3072
         }
 
         try:
@@ -103,56 +103,6 @@ class PineconeService:
         except Exception as e:
             logger.error(f"Error initializing Pinecone: {e}")
             return False
-    
-    # def store_embedding(self, 
-    #                    user_id: str, 
-    #                    document_id: str, 
-    #                    chunk_id: str,
-    #                    chunk_index: int,
-    #                    embedding: List[float],
-    #                    summary: str,
-    #                    text: str) -> bool:
-    #     """
-    #     Store an embedding in Pinecone with the specified metadata structure
-        
-    #     Args:
-    #         user_id: User ID from the database
-    #         document_id: Document ID from the database
-    #         chunk_id: The string representation of the chunk's _id from MongoDB
-    #         chunk_index: The sequential order of the chunk within the document
-    #         embedding: The embedding vector (list of floats)
-    #         summary: The summary of the chunk content
-            
-    #     Returns:
-    #         bool: True if storage successful, False otherwise
-    #     """
-    #     if not self.pc or not self.index:
-    #         logger.error("Pinecone not initialized. Call initialize_pinecone() first.")
-    #         return False
-        
-    #     try:
-    #         # Create the record structure as specified
-    #         record = {
-    #             "id": chunk_id,  # The string representation of the chunk's _id
-    #             "values": embedding,  # Embeddings from the chunk content
-    #             "metadata": {
-    #                 "user_id": user_id,
-    #                 "document_id": document_id,
-    #                 "chunk_index": chunk_index,
-    #                 "summary": summary,
-    #                 "text": text
-    #             }
-    #         }
-            
-    #         # Upsert the record to Pinecone
-    #         self.index.upsert(vectors=[record])
-            
-    #         logger.info(f"Successfully stored embedding for chunk {chunk_id}")
-    #         return True
-            
-    #     except Exception as e:
-    #         logger.error(f"Error storing embedding for chunk {chunk_id}: {e}")
-    #         return False
     
     def store_multiple_embeddings(self, 
                                 user_id: str,

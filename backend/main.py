@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
         # Batch-embed this chunk batch
         try:
-            model_name = embedding_service.initialize_embedding_model()
+            model_name = embedding_service.initialize_embedding_model("gemini-embedding-001")
 
             if not model_name:
                 logger.error("Model name is required")

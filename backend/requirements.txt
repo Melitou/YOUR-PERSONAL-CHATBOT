@@ -4,3 +4,4 @@ openai==1.97.1
 google-generativeai==0.3.0
 pinecone==7.3.0
 pymongo==4.6.0
+mongoengine==0.29.1

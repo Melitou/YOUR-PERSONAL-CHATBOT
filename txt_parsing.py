@@ -1,6 +1,7 @@
 from file_type import doc_type_check
 
-file_bytes = open("./Files/Σ21066.ΜΠΙΤΟΥ.txt", "rb").read()
+file_bytes = open(
+    "./test_files_for_local_db/alice_in_wonderland.txt", "rb").read()
 
 
 def txt_to_md(file_bytes: bytes) -> str:
@@ -27,9 +28,10 @@ def txt_to_md(file_bytes: bytes) -> str:
 
 
 type_doc = doc_type_check(file_bytes)
-print(type_doc)
+print(type_doc[0])
+print(f"File size: {type_doc[1]} bytes")
 
-if type_doc == "The document provided is a TXT file":
+if type_doc[0] == "The document provided is a TXT file":
     md = txt_to_md(file_bytes)
     print(md[:100])
 else:

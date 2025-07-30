@@ -151,8 +151,8 @@ def create_sample_data(client, db, fs):
 
         # List of test files
         test_files = [  # Add your txt files for testing here
-            "./alice_in_wonderland.txt",
-            "./1. Eastern Philosophy Author J.S.R.L. Narayana Moorty.txt"
+            "./test_files_for_local_db/alice_in_wonderland.txt",
+            "./test_files_for_local_db/1. Eastern Philosophy Author J.S.R.L. Narayana Moorty.txt"
         ]
 
         for file_path in test_files:

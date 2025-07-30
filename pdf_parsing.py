@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from file_type import doc_type_check
 load_dotenv()
 
-file_bytes = open("./Files/ai-book-huwaei.pdf", "rb").read()
+file_bytes = open("DeepSeek_V3.pdf", "rb").read()
 
 
 def pdf_to_md(file_bytes: bytes) -> str:
@@ -128,9 +128,10 @@ def pdf_to_md(file_bytes: bytes) -> str:
 
 
 type_doc = doc_type_check(file_bytes)
-print(type_doc)
+print(type_doc[0])
+print(f"File size: {type_doc[1]} bytes")
 
-if type_doc == "The document provided is a PDF file":
+if type_doc[0] == "The document provided is a PDF file":
     md = pdf_to_md(file_bytes)
     print(md[:100])
 else:

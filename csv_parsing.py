@@ -2,8 +2,7 @@ import csv
 import tempfile
 from file_type import doc_type_check
 
-file_bytes = open(
-    "./Files/ObesityDataSet_raw_and_data_sinthetic.csv", "rb").read()
+file_bytes = open("", "rb").read()
 
 
 def csv_to_md(file_bytes: bytes, delimiter: str = ",") -> str:
@@ -38,9 +37,10 @@ def csv_to_md(file_bytes: bytes, delimiter: str = ",") -> str:
 
 
 type_doc = doc_type_check(file_bytes)
-print(type_doc)
+print(type_doc[0])
+print(f"File size: {type_doc[1]} bytes")
 
-if type_doc == "The document provided is a CSV file":
+if type_doc[0] == "The document provided is a CSV file":
     md = csv_to_md(file_bytes)
     print(md[:100])
 else:

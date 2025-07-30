@@ -320,7 +320,7 @@ chroma_db/
 faiss_index/
 
 # Uploaded files
-uploads/
+Upload/
 documents/
 files/
 

@@ -28,8 +28,11 @@ class EmbeddingService:
         self.fallback_models = {
             "text-embedding-3-large": "text-embedding-3-small",
             "text-embedding-3-small": "text-embedding-ada-002",
-            "text-embedding-ada-002": "gemini-embedding-001",
-            "gemini-embedding-001": "text-embedding-ada-002"
+            "text-embedding-ada-002": "text-embedding-005",
+            "text-embedding-005": "text-multilingual-embedding-002",
+            "text-multilingual-embedding-002": "multilingual-e5-large",
+            "multilingual-e5-large": "gemini-embedding-001",
+            "gemini-embedding-001": "text-embedding-3-small"
         }
     
     def initialize_embedding_model(self, 

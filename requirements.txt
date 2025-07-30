@@ -2,3 +2,20 @@ llama-parse==0.6.52
 python-dotenv==1.1.1
 python-docx==1.2.0
 pypdf==5.9.0
+# Requirements for db_service.py
+# MongoDB and related dependencies
+
+# Core MongoDB driver
+pymongo>=4.0.0
+
+# MongoDB ODM (Object Document Mapper)
+mongoengine>=0.27.0
+
+# GridFS support (included with pymongo but listed for clarity)
+# No separate installation needed as it's part of pymongo
+
+# Standard library modules used (no installation needed):
+# - datetime
+# - hashlib  
+# - uuid
+# - bson (included with pymongo)

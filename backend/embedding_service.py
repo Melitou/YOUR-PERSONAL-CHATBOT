@@ -33,7 +33,7 @@ class EmbeddingService:
         }
     
     def initialize_embedding_model(self, 
-                                 model_name: str = "text-embedding-3-small",
+                                 model_name: str = "text-embedding-3-large",
                                  max_fallbacks: int = 3) -> Optional[str]:
         """
         Initialize the embedding model with fallback support.

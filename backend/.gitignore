@@ -5,6 +5,10 @@ ENV/
 .venv/
 .env/
 
+# Notes folder
+Notes/
+
+
 # Environment Variables
 .env
 .env.local

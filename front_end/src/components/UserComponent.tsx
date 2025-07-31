@@ -1,4 +1,8 @@
+import UserAuthStore from "../stores/UserAuthStore";
+
 const UserComponent = () => {
+    const user = UserAuthStore((state: any) => state.user);
+    
     return (
         <>
             {/* User settings section - fixed at bottom */}
@@ -13,8 +17,8 @@ const UserComponent = () => {
                     </div>
                     {/* User name and type of user */}
                     <div className="flex flex-col">
-                        <div className="text-black text-xs sm:text-sm">John Doe</div>
-                        <div className="text-gray-500 text-xs sm:text-sm">Developer</div>
+                        <div className="text-black text-xs sm:text-sm">{user?.name}</div>
+                        <div className="text-gray-500 text-xs sm:text-sm">{user?.role}</div>
                     </div>
                 </div>
             </div>

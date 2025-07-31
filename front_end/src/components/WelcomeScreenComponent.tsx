@@ -1,7 +1,6 @@
 import { useState } from "react";
 import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
 import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent";
-import { agentApi } from "../utils/api";
 import UserAuthStore from "../stores/UserAuthStore";
 
 const WelcomeScreenComponent = () => {
@@ -16,7 +15,7 @@ const WelcomeScreenComponent = () => {
                 </h1>
                 {/*Basic options choices*/}
                 <div className="flex flex-row gap-5 w-full justify-center items-center">
-                    <div className="flex flex-row w-50 gap-2 bg-[#efefef] rounded-lg shadow-md border border-gray-200 hover:shadow-lg hover:scale-105 transition-all duration-200">
+                    <div className="flex flex-row w-50 h-30 gap-2 bg-[#efefef] rounded-lg shadow-md border border-gray-200 hover:shadow-lg hover:scale-105 transition-all duration-200">
                         <button 
                         onClick={() => setCreateBotModalOpen(true)}
                         className="p-3 w-full  rounded-md hover:bg-[#d5d5d5] transition-colors flex flex-col items-start justify-start text-left gap-2 text-black text-xs sm:text-sm">
@@ -26,12 +25,12 @@ const WelcomeScreenComponent = () => {
                             Start by creating a new chatbot
                         </button>
                     </div>
-                    <div className="flex flex-row w-50 gap-2 bg-[#efefef] rounded-lg shadow-md border border-gray-200 hover:shadow-lg hover:scale-105 transition-all duration-200">
+                    <div className="flex flex-row w-50 h-30 gap-2 bg-[#efefef] rounded-lg shadow-md border border-gray-200 hover:shadow-lg hover:scale-105 transition-all duration-200">
                         <button className="p-3 w-full  rounded-md hover:bg-[#d5d5d5] transition-colors flex flex-col items-start justify-start text-left gap-2 text-black text-xs sm:text-sm">
                             <span className="material-symbols-outlined">
-                                help
+                                chat
                             </span>
-                            See technical guides of what you can achieve here
+                            Load an existing chatbot
                         </button>
                     </div>
                 </div>

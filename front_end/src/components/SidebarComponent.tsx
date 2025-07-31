@@ -1,178 +1,113 @@
 import { useState } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
 import UserComponent from "./UserComponent";
+import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
+import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent";
+import UserAuthStore from "../stores/UserAuthStore";
+import ManageChatbotsModalComponent from "./ManageChatbotsModalComponent";
+import ChatbotStore from "../stores/LoadedChatbotStore";
 
 const SidebarComponent = () => {
+    const user = UserAuthStore((state: any) => state.user);
+    //const loadedChatbotHistory = ChatbotStore((state: any) => state.loadedChatbotHistory);
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [createBotModalOpen, setCreateBotModalOpen] = useState(false);
+    const [existingChatbotsModalOpen, setExistingChatbotsModalOpen] = useState(false);
 
-    // Fake chatbots
-    const chatbots = [
+    //Fake conversation of a chatbot
+    const chatBotConversationHistory = [
         {
             chatbot_id: 1,
-            chatbot_title: "ChatBot 1"
+            name: "Conversation 1"
         },
         {
             chatbot_id: 2,
-            chatbot_title: "ChatBot 2"
+            name: "Conversation 2"
         },
         {
             chatbot_id: 3,
-            chatbot_title: "ChatBot 3"
+            name: "Conversation 3"
         },
         {
             chatbot_id: 4,
-            chatbot_title: "ChatBot 4"
+            name: "Conversation 4"
         },
         {
             chatbot_id: 5,
-            chatbot_title: "ChatBot 5"
+            name: "Conversation 5"
         },
         {
             chatbot_id: 6,
-            chatbot_title: "ChatBot 6"
+            name: "Conversation 6"
         },
         {
             chatbot_id: 7,
-            chatbot_title: "ChatBot 7"
+            name: "Conversation 7"
         },
         {
             chatbot_id: 8,
-            chatbot_title: "ChatBot 8"
+            name: "Conversation 8"
         },
         {
             chatbot_id: 9,
-            chatbot_title: "ChatBot 9"
+            name: "Conversation 9"
         },
         {
             chatbot_id: 10,
-            chatbot_title: "ChatBot 10"
+            name: "Conversation 10"
         },
         {
             chatbot_id: 11,
-            chatbot_title: "ChatBot 11"
+            name: "Conversation 11"
         },
         {
             chatbot_id: 12,
-            chatbot_title: "ChatBot 12"
+            name: "Conversation 12"
         },
         {
             chatbot_id: 13,
-            chatbot_title: "ChatBot 13"
+            name: "Conversation 13"
         },
         {
             chatbot_id: 14,
-            chatbot_title: "ChatBot 14"
+            name: "Conversation 14"
         },
         {
             chatbot_id: 15,
-            chatbot_title: "ChatBot 15"
+            name: "Conversation 15"
         },
         {
             chatbot_id: 16,
-            chatbot_title: "ChatBot 16"
+            name: "Conversation 16"
         },
         {
             chatbot_id: 17,
-            chatbot_title: "ChatBot 17"
+            name: "Conversation 17"
         },
         {
             chatbot_id: 18,
-            chatbot_title: "ChatBot 18"
+            name: "Conversation 18"
         },
         {
             chatbot_id: 19,
-            chatbot_title: "ChatBot 19"
+            name: "Conversation 19"
         },
         {
             chatbot_id: 20,
-            chatbot_title: "ChatBot 20"
+            name: "Conversation 20"
         },
-        {
-            chatbot_id: 21,
-            chatbot_title: "ChatBot 21"
-        },
-        {
-            chatbot_id: 22,
-            chatbot_title: "ChatBot 22"
-        },
-        {
-            chatbot_id: 23,
-            chatbot_title: "ChatBot 23"
-        },
-        {
-            chatbot_id: 24,
-            chatbot_title: "ChatBot 24"
-        },
-        {
-            chatbot_id: 25,
-            chatbot_title: "ChatBot 25"
-        },
-        {
-            chatbot_id: 26,
-            chatbot_title: "ChatBot 26"
-        },
-        {
-            chatbot_id: 27,
-            chatbot_title: "ChatBot 27"
-        },
-        {
-            chatbot_id: 28,
-            chatbot_title: "ChatBot 28"
-        },
-        {
-            chatbot_id: 29,
-            chatbot_title: "ChatBot 29"
-        },
-        {
-            chatbot_id: 30,
-            chatbot_title: "ChatBot 30"
-        },
-        {
-            chatbot_id: 31,
-            chatbot_title: "ChatBot 31"
-        },
-        {
-            chatbot_id: 32,
-            chatbot_title: "ChatBot 32"
-        },
-        {
-            chatbot_id: 33,
-            chatbot_title: "ChatBot 33"
-        },
-        {
-            chatbot_id: 34,
-            chatbot_title: "ChatBot 34"
-        },
-        {
-            chatbot_id: 35,
-            chatbot_title: "ChatBot 35"
-        },
-        {
-            chatbot_id: 36,
-            chatbot_title: "ChatBot 36"
-        },
-        {
-            chatbot_id: 37,
-            chatbot_title: "ChatBot 37"
-        },
-        {
-            chatbot_id: 38,
-            chatbot_title: "ChatBot 38"
-        },
-        {
-            chatbot_id: 39,
-            chatbot_title: "ChatBot 39"
-        },
-        {
-            chatbot_id: 40,
-            chatbot_title: "ChatBot 40"
-        },
-        {
-            chatbot_id: 41,
-            chatbot_title: "ChatBot 41"
-        }, 
     ]
+
+    const handleNewChatbotClick = () => {
+        // Open the create bot modal
+        setCreateBotModalOpen(true);
+    }
+
+    const handleExistingChatbotsClick = () => {
+        // Open the existing chatbots modal
+        setExistingChatbotsModalOpen(true);
+    }
 
     return (
         <>
@@ -206,13 +141,13 @@ const SidebarComponent = () => {
 
                 {/* Chatbots action buttons */}
                 <div className="flex-shrink-0 p-3 pt-16 sm:pt-3 border-b border-gray-200 flex flex-col gap-2">
-                    <button className="p-3 w-full rounded-md hover:bg-[#efefef] transition-colors flex items-center justify-start gap-2 text-black text-xs sm:text-sm">
+                    <button className="p-3 w-full rounded-md hover:bg-[#efefef] transition-colors flex items-center justify-start gap-2 text-black text-xs sm:text-sm" onClick={handleNewChatbotClick}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
                         </svg>
                         New Chatbot
                     </button>
-                    <button className="p-3 w-full rounded-md hover:bg-[#efefef] transition-colors flex items-center justify-start gap-2 text-black text-xs sm:text-sm">
+                    <button className="p-3 w-full rounded-md hover:bg-[#efefef] transition-colors flex items-center justify-start gap-2 text-black text-xs sm:text-sm" onClick={handleExistingChatbotsClick}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
                         </svg>
@@ -220,14 +155,15 @@ const SidebarComponent = () => {
                     </button>
                 </div>
 
-                {/* Scrollable chatbot list */}
+                {/* Scrollable chatbot conversation history list */}
                 <div className="flex-1 min-h-0 overflow-y-auto pt-3 px-3 pb-3">
                     <div className="flex flex-col gap-2">
-                        {chatbots.map((item) => (
-                            <div key={item.chatbot_id} className="p-2 rounded-md hover:bg-[#efefef] cursor-pointer transition-colors flex items-center text-black" onClick={() => {
-                                setSidebarOpen(false); // Close sidebar on mobile after selecting
-                            }}>
-                                <div className="truncate text-black text-xs sm:text-sm">{item.chatbot_title}</div>
+                        {(!chatBotConversationHistory || chatBotConversationHistory.length === 0) && (
+                            <div className="text-center text-gray-500 text-xs sm:text-sm">You have not any conversations yet</div>
+                        )}
+                        {chatBotConversationHistory && chatBotConversationHistory.map((item: any) => (
+                            <div key={item.chatbot_id} className="p-2 rounded-md hover:bg-[#efefef] cursor-pointer transition-colors flex items-center text-black">
+                                <div className="truncate text-black text-xs sm:text-sm">{item.name}</div>
                             </div>
                         ))}
                     </div>
@@ -244,6 +180,29 @@ const SidebarComponent = () => {
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
+
+            {/* Show appropriate modal based on permissions (frontend convenience only) */}
+            {/* Backend will still verify permissions on API calls */}
+            {user?.role === 'Super User' ? (
+                <CreateBotSuperUserModalComponent 
+                    open={createBotModalOpen} 
+                    onClose={() => setCreateBotModalOpen(false)} 
+                    onSubmit={() => {}}
+                />
+            ) : (
+                <CreateBotUserModalComponent 
+                    open={createBotModalOpen} 
+                    onClose={() => setCreateBotModalOpen(false)} 
+                    onSubmit={() => {}}
+                />
+            )}
+
+            {/* Manage chatbots modal */}
+            <ManageChatbotsModalComponent
+                open={existingChatbotsModalOpen}
+                onClose={() => setExistingChatbotsModalOpen(false)}
+                onSelectChatbot={() => {}}
+            />
         </> 
     );
 }

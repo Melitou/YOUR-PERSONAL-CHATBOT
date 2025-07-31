@@ -113,7 +113,7 @@ export const agentApi = {
         formData.append('description', data.description);
         formData.append('aiProvider', data.aiProvider);
         
-        data.files.forEach((file, index) => {
+        data.files.forEach((file) => {
             formData.append(`files`, file);
         });
 
@@ -134,7 +134,7 @@ export const agentApi = {
         formData.append('chunkingMethod', data.chunkingMethod);
         formData.append('embeddingModel', data.embeddingModel);
         
-        data.files.forEach((file, index) => {
+        data.files.forEach((file) => {
             formData.append(`files`, file);
         });
 
@@ -147,4 +147,32 @@ export const agentApi = {
     
     getChunkingMethods: () =>
         apiClient.get('/agents/chunking-methods'),
+    
+    // Chatbot management endpoints
+    getUserAgents: () =>
+        apiClient.get('/agents/user/list'),
+    
+    deleteAgent: (agentId: string) =>
+        apiClient.delete(`/agents/${agentId}`),
+    
+    updateAgent: (agentId: string, data: {
+        name?: string;
+        description?: string;
+        isActive?: boolean;
+    }) =>
+        apiClient.put(`/agents/${agentId}`, data),
+    
+    getAgentById: (agentId: string) =>
+        apiClient.get(`/agents/${agentId}`),
+};
+
+export const chatApi = {
+    sendMessage: (data: { message: string; agentId?: string }) =>
+        apiClient.post('/chat/message', data),
+    
+    getChatHistory: (agentId?: string) =>
+        apiClient.get(`/chat/history${agentId ? `?agentId=${agentId}` : ''}`),
+    
+    clearChatHistory: (agentId?: string) =>
+        apiClient.delete(`/chat/history${agentId ? `?agentId=${agentId}` : ''}`),
 };

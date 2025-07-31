@@ -174,7 +174,8 @@ class EmbeddingService:
                         contents=chunks
                     )
 
-                    embeddings = result.embeddings
+                    # Extract the values from each embedding object
+                    embeddings = [embedding.values for embedding in result.embeddings]
                     return embeddings
 
                 else:

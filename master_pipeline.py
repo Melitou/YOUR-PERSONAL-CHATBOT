@@ -260,7 +260,6 @@ class MasterPipeline:
     def process_directory_complete_with_embeddings(self, directory_path: str, namespace: str,
                                                    user_id: str = None,
                                                    embedding_model: str = "text-embedding-3-small",
-                                                   pinecone_index: str = "chatbot-vectors",
                                                    use_parallel_upload: bool = True,
                                                    use_parallel_processing: bool = True) -> Dict:
         """Complete workflow: upload → process → chunk → summarize → embed → store in Pinecone
@@ -270,13 +269,19 @@ class MasterPipeline:
             namespace: Namespace for organizing documents
             user_id: User ID for embedding processing (if None, will use default)
             embedding_model: Embedding model to use ('text-embedding-3-small' or 'gemini-embedding-001')
-            pinecone_index: Pinecone index name
             use_parallel_upload: Use parallel processing for uploads
             use_parallel_processing: Use parallel processing for document processing
 
         Returns:
             Dict with complete workflow statistics including embeddings
         """
+        # Auto-determine Pinecone index based on embedding model
+        if "gemini" in embedding_model.lower():
+            pinecone_index = "chatbot-vectors-google"
+        else:
+            # Default to OpenAI index for all OpenAI models
+            pinecone_index = "chatbot-vectors-openai"
+        
         workflow_start_time = time.time()
 
         logger.info("=" * 80)
@@ -285,7 +290,7 @@ class MasterPipeline:
         logger.info(f"📁 Source Directory: {directory_path}")
         logger.info(f"🏷️  Namespace: {namespace}")
         logger.info(f"🤖 Embedding Model: {embedding_model}")
-        logger.info(f"📊 Pinecone Index: {pinecone_index}")
+        logger.info(f"📊 Pinecone Index: {pinecone_index} (auto-selected)")
         logger.info(f"⚡ Upload Parallel: {use_parallel_upload}")
         logger.info(f"⚡ Processing Parallel: {use_parallel_processing}")
         logger.info(f"👥 Max Workers: {self.max_workers}")
@@ -321,11 +326,15 @@ class MasterPipeline:
 
         embedding_results = None
         try:
-            # Use provided user_id or default
+            # Use provided user_id or get from upload pipeline to ensure consistency
             if not user_id:
-                user_id = "6889c26368f5b07f9550e806"  # Default to test user from database
-                logger.warning(
-                    f"No user_id provided, using default: {user_id}")
+                # Get the user ID from the upload pipeline to ensure consistency
+                upload_pipeline_user_id = str(self.upload_pipeline.user.id)
+                user_id = upload_pipeline_user_id
+                logger.info(
+                    f"No user_id provided, using upload pipeline user: {user_id} ({self.upload_pipeline.user.user_name})")
+            else:
+                logger.info(f"👤 Using provided user_id: {user_id}")
 
             logger.info(f"👤 Processing embeddings for user: {user_id}")
 
@@ -550,12 +559,12 @@ def main():
             print("⚠️  Invalid selection, using OpenAI text-embedding-3-small")
             embedding_model = "text-embedding-3-small"
 
-        # Pinecone index configuration
-        pinecone_index = input(
-            "\n📊 Pinecone index name (default 'chatbot-vectors'): ").strip()
-        if not pinecone_index:
-            pinecone_index = "chatbot-vectors"
-        print(f"✅ Selected: {pinecone_index}")
+        # Auto-determine Pinecone index based on embedding model
+        if "gemini" in embedding_model.lower():
+            pinecone_index = "chatbot-vectors-google"
+        else:
+            pinecone_index = "chatbot-vectors-openai"
+        print(f"✅ Pinecone Index (auto-selected): {pinecone_index}")
 
         # Processing options
         print("\n⚙️  Processing Options:")
@@ -585,7 +594,7 @@ def main():
         print(f"   🏷️  Namespace: {namespace}")
         print(f"   ✂️  Chunking: {chunking_method}")
         print(f"   🤖 Embedding Model: {embedding_model}")
-        print(f"   📊 Pinecone Index: {pinecone_index}")
+        print(f"   📊 Pinecone Index: {pinecone_index} (auto-selected)")
         print(f"   📤 Upload parallel: {use_parallel_upload}")
         print(f"   🔄 Processing parallel: {use_parallel_processing}")
         print(f"   👥 Workers: {max_workers}")
@@ -603,13 +612,12 @@ def main():
             chunking_method=chunking_method
         )
 
-        # Run complete workflow with embeddings
+        # Run complete workflow with embeddings (user_id will be auto-determined from upload pipeline)
         results = master_pipeline.process_directory_complete_with_embeddings(
             directory_path=folder_path,
             namespace=namespace,
-            user_id="6889c26368f5b07f9550e806",  # Real user ID from database
+            user_id=None,  # Will auto-use the same user from upload pipeline
             embedding_model=embedding_model,
-            pinecone_index=pinecone_index,
             use_parallel_upload=use_parallel_upload,
             use_parallel_processing=use_parallel_processing
         )

@@ -1,5 +1,12 @@
 llama-parse
 python-dotenv
+docx
+pypdf
+mongoengine
+pymongo
+
+llama-parse
+python-dotenv
 python-docx
 pypdf
 pymongo
@@ -27,7 +34,7 @@ langchain-experimental
 # No separate installation needed as it's part of pymongo
 
 # Embedding and vector database dependencies
-pinecone-client
+pinecone
 
 # Standard library modules used (no installation needed):
 # - datetime

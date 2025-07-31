@@ -14,23 +14,5 @@ tiktoken
 # Chunking methods dependencies
 langchain-experimental
 
-# Requirements for db_service.py
-# MongoDB and related dependencies
-
-# Core MongoDB driver
-# pymongo>=4.0.0 (using specific version 4.6.1 above)
-
-# MongoDB ODM (Object Document Mapper)
-# mongoengine>=0.27.0 (using specific version 0.27.0 above)
-
-# GridFS support (included with pymongo but listed for clarity)
-# No separate installation needed as it's part of pymongo
-
 # Embedding and vector database dependencies
 pinecone-client
-
-# Standard library modules used (no installation needed):
-# - datetime
-# - hashlib  
-# - uuid
-# - bson (included with pymongo)

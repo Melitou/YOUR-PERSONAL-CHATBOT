@@ -96,6 +96,8 @@ class Chunks(Document):
     document = ReferenceField(Documents, required=True)
     user = ReferenceField(User_Auth_Table, required=True)
     namespace = StringField(required=True)
+    # Denormalized from documents collection for performance
+    file_name = StringField(required=True)
     # The sequential order of the chunk within the document
     chunk_index = IntField(required=True)
     content = StringField(required=True)
@@ -120,7 +122,7 @@ class Chunks(Document):
     }
 
     def __str__(self) -> str:
-        return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, vector_id={self.vector_id}, created_at={self.created_at})"
+        return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, file_name={self.file_name}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, vector_id={self.vector_id}, created_at={self.created_at})"
 
 
 def upload_file_to_gridfs(fs: GridFS, file_content: bytes, filename: str, content_type: str = "text/plain") -> ObjectId:
@@ -196,6 +198,7 @@ def create_sample_data(client, db, fs):
                         document=document,  # Reference to the document object
                         user=user,  # Reference to the user object
                         namespace="test_namespace",
+                        file_name=document.file_name,  # Denormalized for performance
                         chunk_index=i,
                         content=sentence.strip(),
                         summary=sentence.strip()[

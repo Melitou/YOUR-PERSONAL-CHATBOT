@@ -168,8 +168,8 @@ Answer only with the succinct context and nothing else.
                 'breakpoint_threshold_type': 'percentile'
             },
             'line': {
-                'line_count': 100,
-                'overlap': 10
+                'line_count': 300,
+                'overlap': 100
             },
             'recursive': {
                 'chunk_size': 1000,
@@ -445,6 +445,7 @@ Answer only with the succinct context and nothing else.
                         document=document,
                         user=document.user,
                         namespace=document.namespace,
+                        file_name=document.file_name,  # Denormalized for performance
                         chunk_index=chunk_info['chunk_index'],
                         content=chunk_info['content'],
                         summary=chunk_info['summary'],

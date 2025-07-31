@@ -54,6 +54,7 @@
   "document_id": ObjectId("..."), // Foreign key to the `documents` collection
   "user_id": ObjectId("..."),
   "namespace": "user123_support_bot",
+  "file_name": "manual.pdf", // Denormalized from documents collection for performance
   "chunk_index": 0, // The sequential order of the chunk within the document
   "content": "This is the first paragraph of text extracted from the PDF...",
   "summary":"the chunk summary from AI",
@@ -120,6 +121,7 @@
   "document_id": "document_id_from_step_2",
   "user_id": "...",
   "namespace": "user123_support_bot",
+  "file_name": "manual.pdf", // Retrieved from the parent document
   "chunk_index": 0,
   "content": "Text of the first chunk...",
   "vector_id": null

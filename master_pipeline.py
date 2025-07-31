@@ -20,6 +20,7 @@ from typing import Dict, Optional
 # Import both pipeline components
 from document_pipeline import DocumentPipeline
 from document_processor import DocumentProcessor
+from embeddings import EmbeddingService
 
 # Configure logging
 logging.basicConfig(
@@ -48,7 +49,7 @@ class MasterPipeline:
         self.chunking_method = chunking_method
         self.chunking_params = chunking_params or {}
 
-        # Initialize both pipelines
+        # Initialize all pipelines
         logger.info("Initializing master pipeline...")
         logger.info(
             f"Chunking method: {chunking_method} with params: {self.chunking_params}")
@@ -69,6 +70,10 @@ class MasterPipeline:
                 chunking_params=chunking_params
             )
             logger.info("✓ Document processing pipeline initialized")
+
+            # Embedding pipeline (embeddings.py)
+            self.embedding_service = EmbeddingService()
+            logger.info("✓ Embedding service initialized")
 
             logger.info("🚀 Master pipeline ready!")
 
@@ -252,6 +257,189 @@ class MasterPipeline:
                 'message': f'Workflow failed: {str(e)}'
             }
 
+    def process_directory_complete_with_embeddings(self, directory_path: str, namespace: str,
+                                                   user_id: str = None,
+                                                   embedding_model: str = "text-embedding-3-small",
+                                                   pinecone_index: str = "chatbot-vectors",
+                                                   use_parallel_upload: bool = True,
+                                                   use_parallel_processing: bool = True) -> Dict:
+        """Complete workflow: upload → process → chunk → summarize → embed → store in Pinecone
+
+        Args:
+            directory_path: Path to directory containing documents
+            namespace: Namespace for organizing documents
+            user_id: User ID for embedding processing (if None, will use default)
+            embedding_model: Embedding model to use ('text-embedding-3-small' or 'gemini-embedding-001')
+            pinecone_index: Pinecone index name
+            use_parallel_upload: Use parallel processing for uploads
+            use_parallel_processing: Use parallel processing for document processing
+
+        Returns:
+            Dict with complete workflow statistics including embeddings
+        """
+        workflow_start_time = time.time()
+
+        logger.info("=" * 80)
+        logger.info("🚀 STARTING COMPLETE DOCUMENT + EMBEDDING WORKFLOW")
+        logger.info("=" * 80)
+        logger.info(f"📁 Source Directory: {directory_path}")
+        logger.info(f"🏷️  Namespace: {namespace}")
+        logger.info(f"🤖 Embedding Model: {embedding_model}")
+        logger.info(f"📊 Pinecone Index: {pinecone_index}")
+        logger.info(f"⚡ Upload Parallel: {use_parallel_upload}")
+        logger.info(f"⚡ Processing Parallel: {use_parallel_processing}")
+        logger.info(f"👥 Max Workers: {self.max_workers}")
+
+        # First run the standard document processing workflow
+        processing_results = self.process_directory_complete(
+            directory_path=directory_path,
+            namespace=namespace,
+            use_parallel_upload=use_parallel_upload,
+            use_parallel_processing=use_parallel_processing
+        )
+
+        # Check if document processing was successful
+        if not processing_results['workflow_success']:
+            logger.error(
+                "❌ Document processing failed, skipping embedding phase")
+            return {
+                **processing_results,
+                'embedding_results': None,
+                'complete_workflow_success': False,
+                'message': 'Document processing failed, embedding skipped'
+            }
+
+        # PHASE 3: EMBEDDING PHASE
+        logger.info("\n" + "=" * 60)
+        logger.info("🧠 PHASE 3: EMBEDDING PROCESSING")
+        logger.info("=" * 60)
+        logger.info("🔍 Finding unembedded chunks...")
+        logger.info(f"🤖 Creating embeddings using {embedding_model}...")
+        logger.info(
+            f"📊 Storing vectors in Pinecone index '{pinecone_index}'...")
+        logger.info("💾 Updating MongoDB with vector IDs...")
+
+        embedding_results = None
+        try:
+            # Use provided user_id or default
+            if not user_id:
+                user_id = "6889c26368f5b07f9550e806"  # Default to test user from database
+                logger.warning(
+                    f"No user_id provided, using default: {user_id}")
+
+            logger.info(f"👤 Processing embeddings for user: {user_id}")
+
+            # Run embedding processing
+            embedding_results = self.embedding_service.process_user_embeddings_by_namespace(
+                user_id=user_id,
+                embedding_model=embedding_model,
+                pinecone_index=pinecone_index,
+                batch_size=50
+            )
+
+            # Log embedding summary
+            if embedding_results and embedding_results['success']:
+                logger.info(f"\n✅ Embedding Phase Complete:")
+                logger.info(
+                    f"   📋 Total chunks found: {embedding_results['total_chunks_found']}")
+                logger.info(
+                    f"   🤖 Chunks embedded: {embedding_results['total_chunks_embedded']}")
+                logger.info(
+                    f"   💾 Chunks updated: {embedding_results['total_chunks_updated']}")
+                logger.info(
+                    f"   🏷️  Namespaces processed: {embedding_results['namespaces_processed']}")
+                logger.info(
+                    f"   ⏱️  Embedding time: {embedding_results['processing_time']:.2f}s")
+            else:
+                logger.warning("⚠️  Embedding phase completed with issues")
+
+        except Exception as e:
+            logger.error(f"❌ Embedding phase failed: {e}")
+            embedding_results = {
+                'success': False,
+                'error': str(e),
+                'message': f'Embedding processing failed: {str(e)}'
+            }
+
+        # Calculate final workflow statistics
+        total_workflow_time = time.time() - workflow_start_time
+
+        # Determine overall success
+        complete_workflow_success = (
+            processing_results['workflow_success'] and
+            embedding_results and
+            embedding_results.get('success', False)
+        )
+
+        # FINAL SUMMARY
+        logger.info("\n" + "=" * 80)
+        logger.info("🏁 COMPLETE WORKFLOW FINISHED")
+        logger.info("=" * 80)
+        logger.info(
+            f"✅ Workflow Status: {'SUCCESS' if complete_workflow_success else 'PARTIAL SUCCESS'}")
+        logger.info(f"📁 Directory: {directory_path}")
+        logger.info(f"🏷️  Namespace: {namespace}")
+        logger.info(f"🤖 Embedding Model: {embedding_model}")
+        logger.info("")
+
+        # Document processing summary
+        logger.info("📤 DOCUMENT PROCESSING:")
+        if processing_results.get('upload_results'):
+            ur = processing_results['upload_results']
+            logger.info(f"   📊 Files found: {ur['total_files']}")
+            logger.info(f"   ✅ Uploaded: {ur['processed']}")
+            logger.info(f"   ⚠️  Skipped: {ur['skipped']}")
+            logger.info(f"   ❌ Failed: {ur['failed']}")
+
+        if processing_results.get('processing_results'):
+            pr = processing_results['processing_results']
+            logger.info(f"   📊 Documents processed: {pr['total_documents']}")
+            logger.info(f"   ✅ Successful: {pr['processed']}")
+            logger.info(f"   ❌ Failed: {pr['failed']}")
+            logger.info(f"   📝 Chunks created: {pr['chunks_created']}")
+
+        # Embedding summary
+        logger.info("")
+        logger.info("🧠 EMBEDDING PROCESSING:")
+        if embedding_results:
+            logger.info(
+                f"   📋 Chunks found: {embedding_results.get('total_chunks_found', 0)}")
+            logger.info(
+                f"   🤖 Chunks embedded: {embedding_results.get('total_chunks_embedded', 0)}")
+            logger.info(
+                f"   💾 Chunks updated: {embedding_results.get('total_chunks_updated', 0)}")
+            logger.info(
+                f"   🏷️  Namespaces processed: {embedding_results.get('namespaces_processed', 0)}")
+        else:
+            logger.info("   ❌ Embedding processing skipped or failed")
+
+        # Timing summary
+        logger.info("")
+        logger.info("⏱️  TIMING:")
+        logger.info(
+            f"   📤 Document processing: {processing_results.get('total_workflow_time', 0):.2f}s")
+        if embedding_results:
+            logger.info(
+                f"   🧠 Embedding processing: {embedding_results.get('processing_time', 0):.2f}s")
+        logger.info(f"   🏁 Total workflow time: {total_workflow_time:.2f}s")
+
+        # Performance metrics
+        if embedding_results and embedding_results.get('total_chunks_embedded', 0) > 0:
+            embedding_throughput = embedding_results['total_chunks_embedded'] / \
+                embedding_results.get('processing_time', 1) * 60
+            logger.info(
+                f"   📈 Embedding throughput: {embedding_throughput:.1f} embeddings/minute")
+
+        logger.info("=" * 80)
+
+        return {
+            **processing_results,
+            'embedding_results': embedding_results,
+            'complete_workflow_success': complete_workflow_success,
+            'total_complete_workflow_time': total_workflow_time,
+            'message': 'Complete workflow finished successfully' if complete_workflow_success else 'Workflow completed with some issues'
+        }
+
     def close(self):
         """Close all pipeline connections"""
         try:
@@ -272,14 +460,17 @@ class MasterPipeline:
 def main():
     """CLI interface for the master document processing pipeline"""
     print("=" * 80)
-    print("🚀 MASTER DOCUMENT PROCESSING PIPELINE")
+    print("🚀 COMPLETE RAG PIPELINE - DOCUMENTS TO VECTOR SEARCH")
     print("=" * 80)
-    print("This tool provides complete document processing workflow:")
+    print("This tool provides the complete RAG pipeline workflow:")
     print("• 📤 Upload documents to GridFS")
     print("• 🔍 Parse documents (PDF, DOCX, TXT, CSV)")
     print("• ✂️  Chunk content with multiple methods (token, semantic, line, recursive)")
     print("• 🤖 Generate AI summaries for each chunk")
-    print("• 💾 Store everything in MongoDB ready for embedding")
+    print("• 💾 Store chunks in MongoDB")
+    print("• 🧠 Create embeddings (OpenAI or Gemini)")
+    print("• 📊 Store vectors in Pinecone with namespacing")
+    print("• 🔗 Link MongoDB chunks to Pinecone vectors")
     print("=" * 80)
     print()
 
@@ -340,6 +531,32 @@ def main():
 
         print(f"✅ Selected: {chunking_method} chunking")
 
+        # Embedding model selection
+        print("\n🤖 Embedding Model:")
+        print("1. OpenAI (text-embedding-3-small) - High quality, requires OpenAI API key")
+        print("2. Gemini (gemini-embedding-001) - Google's model, requires Google API key")
+
+        embedding_model = "text-embedding-3-small"  # default
+        embedding_input = input(
+            "Select embedding model (1-2, default 1): ").strip()
+
+        if embedding_input == "1" or embedding_input == "":
+            embedding_model = "text-embedding-3-small"
+            print("✅ Selected: OpenAI text-embedding-3-small")
+        elif embedding_input == "2":
+            embedding_model = "gemini-embedding-001"
+            print("✅ Selected: Gemini embedding-001")
+        else:
+            print("⚠️  Invalid selection, using OpenAI text-embedding-3-small")
+            embedding_model = "text-embedding-3-small"
+
+        # Pinecone index configuration
+        pinecone_index = input(
+            "\n📊 Pinecone index name (default 'chatbot-vectors'): ").strip()
+        if not pinecone_index:
+            pinecone_index = "chatbot-vectors"
+        print(f"✅ Selected: {pinecone_index}")
+
         # Processing options
         print("\n⚙️  Processing Options:")
 
@@ -367,6 +584,8 @@ def main():
         print(f"   📁 Directory: {folder_path}")
         print(f"   🏷️  Namespace: {namespace}")
         print(f"   ✂️  Chunking: {chunking_method}")
+        print(f"   🤖 Embedding Model: {embedding_model}")
+        print(f"   📊 Pinecone Index: {pinecone_index}")
         print(f"   📤 Upload parallel: {use_parallel_upload}")
         print(f"   🔄 Processing parallel: {use_parallel_processing}")
         print(f"   👥 Workers: {max_workers}")
@@ -384,17 +603,20 @@ def main():
             chunking_method=chunking_method
         )
 
-        # Run complete workflow
-        results = master_pipeline.process_directory_complete(
+        # Run complete workflow with embeddings
+        results = master_pipeline.process_directory_complete_with_embeddings(
             directory_path=folder_path,
             namespace=namespace,
+            user_id="6889c26368f5b07f9550e806",  # Real user ID from database
+            embedding_model=embedding_model,
+            pinecone_index=pinecone_index,
             use_parallel_upload=use_parallel_upload,
             use_parallel_processing=use_parallel_processing
         )
 
         # Show detailed results
-        if results['workflow_success']:
-            print(f"\n🎉 SUCCESS! Workflow completed successfully!")
+        if results.get('complete_workflow_success'):
+            print(f"\n🎉 SUCCESS! Complete workflow finished successfully!")
         else:
             print(f"\n⚠️  PARTIAL SUCCESS: {results['message']}")
 
@@ -411,8 +633,17 @@ def main():
                 f"   🔄 Processing: {pr['processed']} processed, {pr['failed']} failed")
             print(f"   📝 Chunks: {pr['chunks_created']} total chunks created")
 
+        if results.get('embedding_results'):
+            er = results['embedding_results']
+            print(
+                f"   🤖 Embedding: {er.get('total_chunks_embedded', 0)} chunks embedded")
+            print(
+                f"   💾 Updated: {er.get('total_chunks_updated', 0)} chunks updated in MongoDB")
+            print(
+                f"   🏷️  Namespaces: {er.get('namespaces_processed', 0)} processed")
+
         print(
-            f"   ⏱️  Total time: {results['total_workflow_time']:.2f} seconds")
+            f"   ⏱️  Total time: {results.get('total_complete_workflow_time', results.get('total_workflow_time', 0)):.2f} seconds")
 
         # Close pipeline
         master_pipeline.close()

@@ -26,6 +26,9 @@ langchain-experimental
 # GridFS support (included with pymongo but listed for clarity)
 # No separate installation needed as it's part of pymongo
 
+# Embedding and vector database dependencies
+pinecone-client
+
 # Standard library modules used (no installation needed):
 # - datetime
 # - hashlib  

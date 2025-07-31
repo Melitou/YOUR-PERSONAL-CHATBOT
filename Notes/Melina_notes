@@ -1,1 +1,7 @@
 1. Add the option for the user to select which documents to chunk and how to chunk.
+
+2. Change to gemini-2.5-flash-lite summarizing 
+
+3. document processor and master problem with api calling, very slow (agent)
+
+4. Let the namespace be a concatenation of user id and the desired namespace

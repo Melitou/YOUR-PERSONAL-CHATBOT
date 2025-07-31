@@ -4,11 +4,9 @@ import UserComponent from "./UserComponent";
 
 const SidebarComponent = () => {
 
-    {/* Sidebar Component */}
-
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    // Fake conversations
+    // Fake chatbots
     const chatbots = [
         {
             chatbot_id: 1,
@@ -235,7 +233,7 @@ const SidebarComponent = () => {
                     </div>
                 </div>
 
-                {/* User settings section - fixed at bottom */}
+                {/* User settings section */}
                 <UserComponent />
             </aside>
 

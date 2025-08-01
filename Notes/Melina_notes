@@ -1,12 +1,17 @@
 1. Add the option for the user to select which documents to chunk and how to chunk.
 
-2. Change to gemini-2.5-flash-lite summarizing 
+2. Add documents' version to pinecone
 
 3. document processor and master problem with api calling, very slow (agent)
+Answer:
+--------------------------
+During summarization, each chunk gets its own POST /chat/completions call.
 
-4. Let the namespace be a concatenation of user id and the desired namespace
+With 15 chunks and 4 workers, you’ll likely hit 4 requests at once repeatedly until all are done.
 
+Your retry logic may compound this (e.g. 4 retrying + 4 new ones).
 
+Your embedding step is batched, so it doesn’t contribute to request spikes.
 
 
 

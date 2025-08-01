@@ -88,7 +88,7 @@ class MasterPipeline:
 
         Args:
             directory_path: Path to directory containing documents
-            namespace: Namespace for organizing documents
+            namespace: Unique namespace (already concatenated with user ID)
             use_parallel_upload: Use parallel processing for uploads
             use_parallel_processing: Use parallel processing for document processing
 
@@ -266,7 +266,7 @@ class MasterPipeline:
 
         Args:
             directory_path: Path to directory containing documents
-            namespace: Namespace for organizing documents
+            namespace: Unique namespace (already concatenated with user ID)
             user_id: User ID for embedding processing (if None, will use default)
             embedding_model: Embedding model to use ('text-embedding-3-small' or 'gemini-embedding-001')
             use_parallel_upload: Use parallel processing for uploads
@@ -281,7 +281,7 @@ class MasterPipeline:
         else:
             # Default to OpenAI index for all OpenAI models
             pinecone_index = "chatbot-vectors-openai"
-        
+
         workflow_start_time = time.time()
 
         logger.info("=" * 80)
@@ -504,10 +504,27 @@ def main():
                 print("⚠️  Please enter a valid folder path.")
 
         # Get namespace
+        print("\n🏷️  Namespace Configuration:")
+        print("   Your namespace will be made unique by adding your user ID")
+        print("   Format: your_input_userid")
+        print("   Examples: 'company_docs' → 'company_docs_507f1f77bcf86cd799439011'")
+        print("   Note: Cannot contain underscores (reserved for user ID separation)")
+
+        namespace = None
         while True:
-            namespace = input(
-                "🏷️  Enter the namespace (e.g., 'company_docs', 'user_manuals'): ").strip()
-            if namespace:
+            user_namespace = input(
+                "🏷️  Enter namespace prefix (e.g., 'company_docs', 'user_manuals'): ").strip()
+            if user_namespace:
+                # We'll create the unique namespace after initializing the pipeline
+                # For now, just validate basic input
+                if '_' in user_namespace:
+                    print("⚠️  Namespace cannot contain underscores. Please try again.")
+                    continue
+                if len(user_namespace) > 50:
+                    print(
+                        "⚠️  Namespace too long (max 50 characters). Please try again.")
+                    continue
+                namespace = user_namespace  # Store user input, will be made unique later
                 break
             else:
                 print("⚠️  Please enter a valid namespace.")
@@ -589,9 +606,29 @@ def main():
         if workers_input.isdigit():
             max_workers = max(2, min(5, int(workers_input)))
 
-        print(f"\n🔧 Configuration:")
+        # Initialize master pipeline first to get access to user info
+        print("\n⚙️  Initializing master pipeline...")
+        master_pipeline = MasterPipeline(
+            max_workers=max_workers,
+            chunking_method=chunking_method
+        )
+
+        # Create unique namespace using the upload pipeline's user
+        try:
+            unique_namespace = master_pipeline.upload_pipeline.create_unique_namespace(
+                namespace)
+            print(f"✅ Created unique namespace: {unique_namespace}")
+        except ValueError as e:
+            print(f"❌ Namespace error: {e}")
+            return
+        except Exception as e:
+            print(f"❌ Error creating unique namespace: {e}")
+            return
+
+        print(f"\n🔧 Final Configuration:")
         print(f"   📁 Directory: {folder_path}")
-        print(f"   🏷️  Namespace: {namespace}")
+        print(f"   🏷️  Namespace prefix: {namespace}")
+        print(f"   🏷️  Unique namespace: {unique_namespace}")
         print(f"   ✂️  Chunking: {chunking_method}")
         print(f"   🤖 Embedding Model: {embedding_model}")
         print(f"   📊 Pinecone Index: {pinecone_index} (auto-selected)")
@@ -605,17 +642,10 @@ def main():
             print("❌ Operation cancelled by user.")
             return
 
-        # Initialize master pipeline
-        print("\n⚙️  Initializing master pipeline...")
-        master_pipeline = MasterPipeline(
-            max_workers=max_workers,
-            chunking_method=chunking_method
-        )
-
         # Run complete workflow with embeddings (user_id will be auto-determined from upload pipeline)
         results = master_pipeline.process_directory_complete_with_embeddings(
             directory_path=folder_path,
-            namespace=namespace,
+            namespace=unique_namespace,  # Use the unique namespace
             user_id=None,  # Will auto-use the same user from upload pipeline
             embedding_model=embedding_model,
             use_parallel_upload=use_parallel_upload,

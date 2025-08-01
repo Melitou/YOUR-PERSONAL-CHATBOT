@@ -60,6 +60,33 @@ class DocumentPipeline:
         """Generate SHA256 hash for the file content"""
         return hashlib.sha256(file_bytes).hexdigest()
 
+    def create_unique_namespace(self, user_namespace: str) -> str:
+        """Create unique namespace by concatenating user input with user ID
+
+        Args:
+            user_namespace: User-provided namespace prefix
+
+        Returns:
+            Unique namespace in format: {user_namespace}_{user_id}
+
+        Raises:
+            ValueError: If user_namespace contains underscores or is too long
+        """
+        # Validate user input
+        if '_' in user_namespace:
+            raise ValueError(
+                "Namespace cannot contain underscores (used for user ID separation)")
+
+        if len(user_namespace) > 50:  # Leave room for user ID
+            raise ValueError("Namespace prefix too long (max 50 characters)")
+
+        if not user_namespace.strip():
+            raise ValueError("Namespace cannot be empty")
+
+        # Create unique namespace
+        unique_namespace = f"{user_namespace.strip()}_{self.user.id}"
+        return unique_namespace
+
     def check_file_exists(self, file_hash: str) -> bool:
         """Check if a file with this hash already exists for this user (thread-safe)"""
         try:
@@ -380,10 +407,24 @@ def main():
             else:
                 print("Please enter a valid folder path.")
 
+        print("\n🏷️  Namespace Configuration:")
+        print("   Your namespace will be made unique by adding your user ID")
+        print("   Format: your_input_userid")
+        print("   Note: Cannot contain underscores (reserved for user ID separation)")
+
+        namespace = None
         while True:
-            namespace = input(
-                "Enter the namespace (e.g., 'examples'): ").strip()
-            if namespace:
+            user_namespace = input(
+                "Enter namespace prefix (e.g., 'examples'): ").strip()
+            if user_namespace:
+                if '_' in user_namespace:
+                    print("⚠️  Namespace cannot contain underscores. Please try again.")
+                    continue
+                if len(user_namespace) > 50:
+                    print(
+                        "⚠️  Namespace too long (max 50 characters). Please try again.")
+                    continue
+                namespace = user_namespace  # Store user input, will be made unique later
                 break
             else:
                 print("Please enter a valid namespace.")
@@ -411,9 +452,20 @@ def main():
         print("\nInitializing pipeline...")
         pipeline = DocumentPipeline(max_workers=max_workers)
 
+        # Create unique namespace
+        try:
+            unique_namespace = pipeline.create_unique_namespace(namespace)
+            print(f"✅ Created unique namespace: {unique_namespace}")
+        except ValueError as e:
+            print(f"❌ Namespace error: {e}")
+            return
+        except Exception as e:
+            print(f"❌ Error creating unique namespace: {e}")
+            return
+
         # Process directory
         results = pipeline.process_directory(
-            folder_path, namespace, use_parallel)
+            folder_path, unique_namespace, use_parallel)
 
         # Show detailed results if any files were processed
         if results['results']:

@@ -100,7 +100,8 @@ def create_user(user_data: dict) -> User_Auth_Table:
             first_name=user_data["first_name"],
             last_name=user_data["last_name"],
             email=user_data["email"],
-            created_at=datetime.now()
+            created_at=datetime.now(),
+            role=user_data.get("role", "User")  # Default to "User" if not specified
         )
         
         # Save to database

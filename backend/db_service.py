@@ -36,17 +36,19 @@ class User_Auth_Table(Document):
     last_name = StringField(required=True)
     email = StringField(required=True, unique=True)
     created_at = DateTimeField(required=True)
+    role = StringField(required=True, choices=['User', 'Super User'])
 
     meta = {
         'collection': 'user_auth_table',
         'indexes': [
             {'fields': ['email'], 'unique': True},
-            {'fields': ['user_name'], 'unique': True}
+            {'fields': ['user_name'], 'unique': True},
+            {'fields': ['role']}
         ]
     }
 
     def __str__(self) -> str:
-        return f"User_Auth_Table(user_name={self.user_name}, first_name={self.first_name}, last_name={self.last_name}, email={self.email})"
+        return f"User_Auth_Table(user_name={self.user_name}, first_name={self.first_name}, last_name={self.last_name}, email={self.email}, role={self.role})"
 
 class ChatBots(Document):
     """ChatBots table to store chatbot configurations"""
@@ -66,7 +68,6 @@ class ChatBots(Document):
             {'fields': ['date_created']},
             {'fields': ['embedding_model']},
             {'fields': ['chunking_method']},
-            # Composite index for user queries
             {'fields': [('user_id', 1), ('date_created', -1)]}
         ]
     }
@@ -208,7 +209,8 @@ def create_sample_data(client, db, fs):
             first_name="John",
             last_name="Doe",
             email="john.doe@example.com",
-            created_at=datetime.now()
+            created_at=datetime.now(),
+            role="User"
         )
         user.save()
         print(f"Created user: {user}")

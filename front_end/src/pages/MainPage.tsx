@@ -12,7 +12,7 @@ const MainPage = () => {
     return (
         <div className="h-screen flex flex-row overflow-hidden w-screen">
             {/* Sidebar */}
-            {!chatbot && (
+            {chatbot && (
                 <div className={`flex-none w-min ${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300`}>
                     <SidebarComponent />
                 </div>
@@ -21,7 +21,7 @@ const MainPage = () => {
             <div className="flex-grow flex flex-col p-2">
                 <HeaderComponent />
                 <div className="flex flex-col flex-1 min-h-0 justify-center items-center">
-                    {!chatbot ? (
+                    {chatbot ? (
                         <ChatComponent />
                     ) : (
                         <WelcomeScreenComponent />

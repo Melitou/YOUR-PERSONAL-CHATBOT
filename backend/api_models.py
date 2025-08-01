@@ -72,6 +72,7 @@ class UserResponse(BaseModel):
     last_name: str = Field(..., description="Last name")
     email: EmailStr = Field(..., description="Email address")
     created_at: datetime = Field(..., description="Account creation date")
+    role: UserRole = Field(..., description="User role")
 
 
 class LoginResponse(BaseModel):

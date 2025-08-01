@@ -63,7 +63,8 @@ class DocumentPipeline:
                         first_name="Test",
                         last_name="User",
                         email="test@example.com",
-                        created_at=datetime.now()
+                        created_at=datetime.now(),
+                        role="User"
                     )
                     self.user.save()
                     print(f"Created test user: {self.user.user_name} (ID: {self.user.id})")

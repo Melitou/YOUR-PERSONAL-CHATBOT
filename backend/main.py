@@ -113,7 +113,8 @@ def user_to_response(user: User_Auth_Table) -> UserResponse:
         first_name=user.first_name,
         last_name=user.last_name,
         email=user.email,
-        created_at=user.created_at
+        created_at=user.created_at,
+        role=user.role
     )
 
 
@@ -182,7 +183,8 @@ async def signin(request: SigninRequest):
             "password": request.password,
             "first_name": request.first_name,
             "last_name": request.last_name,
-            "email": request.email
+            "email": request.email,
+            "role": request.role
         }
         
         # Create user

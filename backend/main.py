@@ -114,7 +114,7 @@ def user_to_response(user: User_Auth_Table) -> UserResponse:
         last_name=user.last_name,
         email=user.email,
         created_at=user.created_at,
-        role=user.role
+        role=user.role if user.role else "User"  # Default to "User" if role is None
     )
 
 

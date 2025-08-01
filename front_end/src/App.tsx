@@ -6,7 +6,7 @@ import UserAuthStore from './stores/UserAuthStore'
 import { authApi } from './utils/api'
 
 function App() {
-  const { isLoggedIn, login, logout } = UserAuthStore() as any;
+  const { isLoggedIn, login, logout } = UserAuthStore();
 
   useEffect(() => {
     // Check if user is already authenticated on app load
@@ -15,10 +15,9 @@ function App() {
       if (token) {
         try {
           const userData = await authApi.getCurrentUser();
-          login(userData);
+          login(userData, token);
         } catch (error) {
           // Token is invalid, remove it
-          localStorage.removeItem('authToken');
           logout();
         }
       }
@@ -29,7 +28,7 @@ function App() {
 
   return (
     <div>
-      {!isLoggedIn ? <MainPage /> : <AuthPage />}
+      {isLoggedIn ? <MainPage /> : <AuthPage />}
     </div>
   )
 }

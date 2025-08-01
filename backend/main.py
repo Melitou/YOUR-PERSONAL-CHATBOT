@@ -1,7 +1,3 @@
-"""
-FastAPI Server for RAG Chatbot Pipeline
-Provides endpoints for user management and agent creation with document processing
-"""
 import os
 import logging
 from datetime import datetime, timedelta
@@ -131,12 +127,12 @@ async def root():
     }
 
 
-@app.get("/login", response_model=LoginResponse, tags=["Authentication"])
-async def login(username: str, password: str):
+@app.post("/login", response_model=LoginResponse, tags=["Authentication"])
+async def login(request: LoginRequest):
     """Authenticate user and return JWT token"""
     try:
         # Authenticate user
-        user = authenticate_user(username, password)
+        user = authenticate_user(request.username, request.password)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

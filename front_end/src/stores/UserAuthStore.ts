@@ -1,25 +1,37 @@
 import { create } from "zustand";
 
-const UserAuthStore = create((set) => ({
-    user: {
-        name: "Test User",
-        role: "Super User"
-    },
+interface User {
+    name: string;
+    email?: string;
+    role?: string;
+}
+
+interface UserAuthState {
+    user: User | null;
+    isLoggedIn: boolean;
+    login: (userData: User, token: string) => void;
+    logout: () => void;
+}
+
+const UserAuthStore = create<UserAuthState>((set) => ({
+    user: null,
     isLoggedIn: false,
 
-    login: (userData: any) => set({ 
-        user: userData,
-        isLoggedIn: true
-    }),
+    login: (userData: User, token: string) => {
+        localStorage.setItem('authToken', token);
+        set({ 
+            user: userData,
+            isLoggedIn: true
+        });
+    },
 
-    logout: () => set({
-        user: null,
-        isLoggedIn: false
-    }),
-
-    setRole: (role: string) => set((state: any) => ({
-        user: state.user ? { ...state.user, role } : null
-    }))
+    logout: () => {
+        localStorage.removeItem('authToken');
+        set({
+            user: null,
+            isLoggedIn: false
+        });
+    }
 }));
 
 export default UserAuthStore;

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { agentApi } from "../utils/api";
+import { apiClient } from "../utils/api";
 
 export interface ChatbotFile {
     id: string;
@@ -119,7 +119,7 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
         try {
             set({ isLoading: true, error: null });
             
-            const response = await agentApi.getUserAgents();
+            const response = await apiClient.getUserAgents();
             set({ chatbots: response.data || [], isLoading: false });
         } catch (error) {
             console.error('Failed to fetch chatbots:', error);

@@ -29,7 +29,7 @@ function App() {
 
   return (
     <div>
-      {isLoggedIn ? <MainPage /> : <AuthPage />}
+      {!isLoggedIn ? <MainPage /> : <AuthPage />}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 from datetime import datetime
-from mongoengine import connect, Document, StringField, DateTimeField, IntField, ReferenceField, ObjectIdField
+from mongoengine import connect, Document, StringField, DateTimeField, IntField, ReferenceField, ObjectIdField, ListField, DictField
 from bson import ObjectId
 from pymongo import MongoClient
 from gridfs import GridFS
@@ -71,6 +71,43 @@ class ChatBots(Document):
         ]
     }
 
+    def __str__(self) -> str:
+        return f"ChatBots(name={self.name}, description={self.description}, embedding_model={self.embedding_model}, chunking_method={self.chunking_method}, date_created={self.date_created}, user_id={self.user_id}, namespace={self.namespace})"
+
+class Conversation(Document):
+    """A conversation made between a user and a chatbot, it belongs to the chatbot"""
+    chatbot = ReferenceField(ChatBots, required=True)
+    created_at = DateTimeField(required=True)
+    updated_at = DateTimeField(required=True)
+    meta = {
+        'collection': 'conversations',
+        'indexes': [
+            {'fields': ['chatbot']},
+            {'fields': ['created_at']},
+            {'fields': ['updated_at']}
+        ]
+    }
+
+    def __str__(self) -> str:
+        return f"Conversation(chatbot={self.chatbot}, created_at={self.created_at}, updated_at={self.updated_at})"
+
+class Messages(Document):
+    """A message made between a user and a chatbot, it belongs to the conversation"""
+    conversation_id = ReferenceField(Conversation, required=True)
+    message = StringField(required=True)
+    created_at = DateTimeField(required=True)
+
+    meta = {
+        'collection': 'messages',
+        'indexes': [
+            {'fields': ['conversation_id']},
+            {'fields': ['created_at']},
+        ]
+    }
+
+    def __str__(self) -> str:
+        return f"Messages(conversation_id={self.conversation_id}, message={self.message}, created_at={self.created_at})"
+
 class Documents(Document):
     user = ReferenceField(User_Auth_Table, required=True)
     file_name = StringField(required=True)
@@ -92,8 +129,6 @@ class Documents(Document):
             {'fields': ['status']},
             {'fields': ['chunking_method']},
             {'fields': ['namespace']},
-            # Composite unique index
-            # Same user can't upload same file twice
             {'fields': [('user', 1), ('full_hash', 1)], 'unique': True}
         ]
     }

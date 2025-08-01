@@ -251,9 +251,9 @@ class PipelineHandler:
             # If processing was successful, create ChatBot record
             if success:
                 try:
-                    chatbot_name = self.generate_chatbot_name(agent_description)
+                    #chatbot_name = self.generate_chatbot_name(agent_description)
                     chatbot = ChatBots(
-                        name=chatbot_name,
+                        name=user_namespace,
                         description=agent_description,
                         embedding_model=embedding_model.value,
                         chunking_method=chunking_method.value,
@@ -262,7 +262,7 @@ class PipelineHandler:
                         namespace=namespace
                     )
                     chatbot.save()
-                    logger.info(f"✅ ChatBot record created: {chatbot_name} (namespace: {namespace})")
+                    logger.info(f"✅ ChatBot record created: {user_namespace} (namespace: {namespace})")
                 except Exception as e:
                     logger.error(f"❌ Error creating ChatBot record: {e}")
                     # Don't fail the entire process if ChatBot creation fails

@@ -45,7 +45,7 @@ const AuthPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br to-indigo-100 p-4">
             <Paper 
                 elevation={10} 
                 className="w-full max-w-md p-8 bg-white/95 backdrop-blur-sm"

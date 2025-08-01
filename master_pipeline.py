@@ -467,224 +467,169 @@ class MasterPipeline:
 
 
 def main():
-    """CLI interface for the master document processing pipeline"""
+    """Complete CLI interface: Document Processing + RAG Chatbot"""
     print("=" * 80)
-    print("🚀 COMPLETE RAG PIPELINE - DOCUMENTS TO VECTOR SEARCH")
+    print("🚀 COMPLETE RAG CHATBOT PIPELINE")
     print("=" * 80)
-    print("This tool provides the complete RAG pipeline workflow:")
-    print("• 📤 Upload documents to GridFS")
-    print("• 🔍 Parse documents (PDF, DOCX, TXT, CSV)")
-    print("• ✂️  Chunk content with multiple methods (token, semantic, line, recursive)")
-    print("• 🤖 Generate AI summaries for each chunk")
-    print("• 💾 Store chunks in MongoDB")
-    print("• 🧠 Create embeddings (OpenAI or Gemini)")
-    print("• 📊 Store vectors in Pinecone with namespacing")
-    print("• 🔗 Link MongoDB chunks to Pinecone vectors")
+    print("Complete workflow: Documents → Processing → Embeddings → Chat")
+    print("• 📤 Upload and process your documents")
+    print("• 🧠 Create embeddings and store in vector database")
+    print("• 🤖 Start chatting with your personal document assistant")
     print("=" * 80)
     print()
 
     try:
-        # Get user input for directory path
+        # STEP 1: Get folder path
         while True:
-            folder_path = input(
-                "📁 Enter the folder path containing documents: ").strip()
+            folder_path = input("📁 Enter folder path containing documents: ").strip()
             if folder_path:
-                # Handle quotes if user includes them
                 folder_path = folder_path.strip('"\'')
                 if os.path.exists(folder_path):
                     file_count = len([f for f in Path(folder_path).iterdir()
                                       if f.is_file() and f.suffix.lower() in {'.pdf', '.docx', '.txt', '.csv'}])
-                    print(
-                        f"✅ Found {file_count} supported files in {folder_path}")
+                    print(f"✅ Found {file_count} supported files in {folder_path}")
                     break
                 else:
-                    print(
-                        f"❌ Error: Folder '{folder_path}' does not exist. Please try again.")
+                    print(f"❌ Folder '{folder_path}' does not exist. Please try again.")
             else:
                 print("⚠️  Please enter a valid folder path.")
 
-        # Get namespace
-        print("\n🏷️  Namespace Configuration:")
-        print("   Your namespace will be made unique by adding your user ID")
-        print("   Format: your_input_userid")
-        print("   Examples: 'company_docs' → 'company_docs_507f1f77bcf86cd799439011'")
-        print("   Note: Cannot contain underscores (reserved for user ID separation)")
-
-        namespace = None
+        # STEP 2: Get namespace 
         while True:
-            user_namespace = input(
-                "🏷️  Enter namespace prefix (e.g., 'company_docs', 'user_manuals'): ").strip()
-            if user_namespace:
-                # We'll create the unique namespace after initializing the pipeline
-                # For now, just validate basic input
-                if '_' in user_namespace:
+            namespace = input("🏷️  Enter namespace (e.g., 'my_docs', 'company'): ").strip()
+            if namespace:
+                if '_' in namespace:
                     print("⚠️  Namespace cannot contain underscores. Please try again.")
                     continue
-                if len(user_namespace) > 50:
-                    print(
-                        "⚠️  Namespace too long (max 50 characters). Please try again.")
+                if len(namespace) > 50:
+                    print("⚠️  Namespace too long (max 50 characters). Please try again.")
                     continue
-                namespace = user_namespace  # Store user input, will be made unique later
                 break
             else:
                 print("⚠️  Please enter a valid namespace.")
 
-        # Chunking method selection
-        print("\n✂️  Chunking Method:")
+        # STEP 3: Get embedding model
+        print("\n🤖 Select embedding provider:")
+        print("1. OpenAI (text-embedding-3-small)")
+        print("2. Gemini (gemini-embedding-001)")
+        
+        while True:
+            choice = input("Choose provider (1 or 2): ").strip()
+            if choice == "1":
+                embedding_model = "text-embedding-3-small"
+                print("✅ Selected: OpenAI")
+                break
+            elif choice == "2":
+                embedding_model = "gemini-embedding-001"
+                print("✅ Selected: Gemini")
+                break
+            else:
+                print("⚠️  Please enter 1 or 2.")
+
+        # STEP 4: Get chunking strategy
+        print("\n✂️  Select chunking strategy:")
         print("1. Token-based (default) - Split by token count, good for general use")
         print("2. Semantic - Split by meaning, requires OpenAI embeddings")
         print("3. Line-based - Split by line count, good for structured text")
         print("4. Recursive - Character-based recursive splitting")
-
+        
         chunking_method = "token"  # default
-        method_input = input(
-            "Select chunking method (1-4, default 1): ").strip()
+        while True:
+            choice = input("Choose chunking strategy (1-4, default 1): ").strip()
+            if choice == "1" or choice == "":
+                chunking_method = "token"
+                print("✅ Selected: Token-based chunking")
+                break
+            elif choice == "2":
+                chunking_method = "semantic"
+                print("✅ Selected: Semantic chunking")
+                break
+            elif choice == "3":
+                chunking_method = "line"
+                print("✅ Selected: Line-based chunking")
+                break
+            elif choice == "4":
+                chunking_method = "recursive"
+                print("✅ Selected: Recursive chunking")
+                break
+            else:
+                print("⚠️  Please enter 1, 2, 3, or 4.")
 
-        method_map = {
-            "1": "token",
-            "2": "semantic",
-            "3": "line",
-            "4": "recursive"
-        }
-
-        if method_input in method_map:
-            chunking_method = method_map[method_input]
-        elif method_input == "":
-            chunking_method = "token"
-        else:
-            print("⚠️  Invalid selection, using token-based chunking")
-            chunking_method = "token"
-
-        print(f"✅ Selected: {chunking_method} chunking")
-
-        # Embedding model selection
-        print("\n🤖 Embedding Model:")
-        print("1. OpenAI (text-embedding-3-small) - High quality, requires OpenAI API key")
-        print("2. Gemini (gemini-embedding-001) - Google's model, requires Google API key")
-
-        embedding_model = "text-embedding-3-small"  # default
-        embedding_input = input(
-            "Select embedding model (1-2, default 1): ").strip()
-
-        if embedding_input == "1" or embedding_input == "":
-            embedding_model = "text-embedding-3-small"
-            print("✅ Selected: OpenAI text-embedding-3-small")
-        elif embedding_input == "2":
-            embedding_model = "gemini-embedding-001"
-            print("✅ Selected: Gemini embedding-001")
-        else:
-            print("⚠️  Invalid selection, using OpenAI text-embedding-3-small")
-            embedding_model = "text-embedding-3-small"
-
-        # Auto-determine Pinecone index based on embedding model
-        if "gemini" in embedding_model.lower():
-            pinecone_index = "chatbot-vectors-google"
-        else:
-            pinecone_index = "chatbot-vectors-openai"
-        print(f"✅ Pinecone Index (auto-selected): {pinecone_index}")
-
-        # Processing options
-        print("\n⚙️  Processing Options:")
-
-        # Parallel processing for upload
-        use_parallel_upload = True
-        upload_parallel_input = input(
-            "📤 Use parallel processing for uploads? (Y/n): ").strip().lower()
-        if upload_parallel_input in ['n', 'no']:
-            use_parallel_upload = False
-
-        # Parallel processing for document processing
-        use_parallel_processing = True
-        processing_parallel_input = input(
-            "🔄 Use parallel processing for document processing? (Y/n): ").strip().lower()
-        if processing_parallel_input in ['n', 'no']:
-            use_parallel_processing = False
-
-        # Worker count
-        max_workers = 4
-        workers_input = input("👥 Number of workers (2-5, default 4): ").strip()
-        if workers_input.isdigit():
-            max_workers = max(2, min(5, int(workers_input)))
-
-        # Initialize master pipeline first to get access to user info
-        print("\n⚙️  Initializing master pipeline...")
-        master_pipeline = MasterPipeline(
-            max_workers=max_workers,
-            chunking_method=chunking_method
-        )
-
-        # Create unique namespace using the upload pipeline's user
-        try:
-            unique_namespace = master_pipeline.upload_pipeline.create_unique_namespace(
-                namespace)
-            print(f"✅ Created unique namespace: {unique_namespace}")
-        except ValueError as e:
-            print(f"❌ Namespace error: {e}")
-            return
-        except Exception as e:
-            print(f"❌ Error creating unique namespace: {e}")
-            return
-
-        print(f"\n🔧 Final Configuration:")
-        print(f"   📁 Directory: {folder_path}")
-        print(f"   🏷️  Namespace prefix: {namespace}")
-        print(f"   🏷️  Unique namespace: {unique_namespace}")
+        print(f"\n🔧 Configuration:")
+        print(f"   📁 Folder: {folder_path}")
+        print(f"   🏷️  Namespace: {namespace}")
+        print(f"   🤖 Embedding: {embedding_model}")
         print(f"   ✂️  Chunking: {chunking_method}")
-        print(f"   🤖 Embedding Model: {embedding_model}")
-        print(f"   📊 Pinecone Index: {pinecone_index} (auto-selected)")
-        print(f"   📤 Upload parallel: {use_parallel_upload}")
-        print(f"   🔄 Processing parallel: {use_parallel_processing}")
-        print(f"   👥 Workers: {max_workers}")
 
         # Confirmation
         confirm = input("\n🚀 Start processing? (Y/n): ").strip().lower()
         if confirm in ['n', 'no']:
-            print("❌ Operation cancelled by user.")
+            print("❌ Operation cancelled.")
             return
 
-        # Run complete workflow with embeddings (user_id will be auto-determined from upload pipeline)
-        results = master_pipeline.process_directory_complete_with_embeddings(
-            directory_path=folder_path,
-            namespace=unique_namespace,  # Use the unique namespace
-            user_id=None,  # Will auto-use the same user from upload pipeline
-            embedding_model=embedding_model,
-            use_parallel_upload=use_parallel_upload,
-            use_parallel_processing=use_parallel_processing
+        print("\n" + "=" * 80)
+        print("🔄 STARTING DOCUMENT PROCESSING...")
+        print("=" * 80)
+
+        # Initialize master pipeline with user-selected chunking method
+        master_pipeline = MasterPipeline(
+            max_workers=4,
+            chunking_method=chunking_method
         )
 
-        # Show detailed results
-        if results.get('complete_workflow_success'):
-            print(f"\n🎉 SUCCESS! Complete workflow finished successfully!")
-        else:
-            print(f"\n⚠️  PARTIAL SUCCESS: {results['message']}")
+        # Create unique namespace
+        try:
+            unique_namespace = master_pipeline.upload_pipeline.create_unique_namespace(namespace)
+            print(f"✅ Created namespace: {unique_namespace}")
+        except Exception as e:
+            print(f"❌ Error creating namespace: {e}")
+            return
 
-        # Performance summary
-        print(f"\n📊 FINAL SUMMARY:")
-        if results.get('upload_results'):
-            ur = results['upload_results']
-            print(
-                f"   📤 Upload: {ur['processed']} processed, {ur['skipped']} skipped, {ur['failed']} failed")
+        # Run complete workflow with embeddings
+        results = master_pipeline.process_directory_complete_with_embeddings(
+            directory_path=folder_path,
+            namespace=unique_namespace,
+            user_id=None,  # Auto-determined
+            embedding_model=embedding_model,
+            use_parallel_upload=True,
+            use_parallel_processing=True
+        )
 
+        # Check if processing was successful
+        if not results.get('complete_workflow_success'):
+            print(f"\n❌ Processing failed: {results.get('message', 'Unknown error')}")
+            master_pipeline.close()
+            return
+
+        # Show results summary
+        print(f"\n✅ PROCESSING COMPLETE!")
         if results.get('processing_results'):
             pr = results['processing_results']
-            print(
-                f"   🔄 Processing: {pr['processed']} processed, {pr['failed']} failed")
-            print(f"   📝 Chunks: {pr['chunks_created']} total chunks created")
-
+            print(f"   📝 Created {pr['chunks_created']} chunks")
         if results.get('embedding_results'):
             er = results['embedding_results']
-            print(
-                f"   🤖 Embedding: {er.get('total_chunks_embedded', 0)} chunks embedded")
-            print(
-                f"   💾 Updated: {er.get('total_chunks_updated', 0)} chunks updated in MongoDB")
-            print(
-                f"   🏷️  Namespaces: {er.get('namespaces_processed', 0)} processed")
+            print(f"   🤖 Embedded {er.get('total_chunks_embedded', 0)} chunks")
 
-        print(
-            f"   ⏱️  Total time: {results.get('total_complete_workflow_time', results.get('total_workflow_time', 0)):.2f} seconds")
-
-        # Close pipeline
+        # Get user ID for chatbot
+        user_id = str(master_pipeline.upload_pipeline.user.id)
+        
+        # Close the pipeline
         master_pipeline.close()
+
+        # PHASE 2: Start RAG Chatbot
+        print("\n" + "=" * 80)
+        print("🤖 INITIALIZING PERSONAL DOCUMENT ASSISTANT...")
+        print("=" * 80)
+
+        # Import and start the RAG chatbot
+        from LLM.rag_llm_call import start_rag_chat_session
+        
+        # Start the interactive chat session
+        start_rag_chat_session(
+            user_id=user_id,
+            namespace=namespace,  # Use original namespace (without user_id)
+            embedding_model=embedding_model
+        )
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Operation cancelled by user.")
@@ -692,7 +637,7 @@ def main():
         print(f"\n❌ Error: {e}")
         logger.exception("Full error traceback:")
 
-    print("\n🏁 Master pipeline finished.")
+    print("\n🏁 Complete pipeline finished.")
 
 
 if __name__ == "__main__":

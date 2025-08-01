@@ -224,6 +224,65 @@ def create_sample_data(client, db, fs):
     finally:
         client.close()
 
+def get_user_id_by_email(email: str):
+    """Get user_id by email address"""
+    try:
+        user = User_Auth_Table.objects(email=email).first()
+        return str(user.id) if user else None
+    except Exception as e:
+        print(f"Error getting user by email: {e}")
+        return None
+
+
+def get_user_id_by_username(username: str):
+    """Get user_id by username"""
+    try:
+        user = User_Auth_Table.objects(user_name=username).first()
+        return str(user.id) if user else None
+    except Exception as e:
+        print(f"Error getting user by username: {e}")
+        return None
+
+
+def get_user_info(email: str):
+    """Get complete user info including user_id by email"""
+    try:
+        user = User_Auth_Table.objects(email=email).first()
+        if user:
+            return {
+                'user_id': str(user.id),
+                'user_name': user.user_name,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'created_at': user.created_at
+            }
+        return None
+    except Exception as e:
+        print(f"Error getting user info: {e}")
+        return None
+
+
+def get_all_users():
+    """Get all users with their user_ids"""
+    try:
+        users = User_Auth_Table.objects()
+        return [
+            {
+                'user_id': str(user.id),
+                'user_name': user.user_name,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'created_at': user.created_at
+            }
+            for user in users
+        ]
+    except Exception as e:
+        print(f"Error getting all users: {e}")
+        return []
+
+
 ##############################################################################################################################
 ##############################################################################################################################
 
@@ -238,6 +297,25 @@ if __name__ == "__main__":
 
         print("\nCreating sample data...")
         create_sample_data(client, db, fs)
+
+        # Test the new user_id retrieval functions
+        print("\n=== Testing User ID Retrieval Functions ===")
+        
+        # Test get_user_id_by_email
+        user_id = get_user_id_by_email("john.doe@example.com")
+        print(f"User ID by email: {user_id}")
+        
+        # Test get_user_id_by_username
+        user_id_username = get_user_id_by_username("test_user")
+        print(f"User ID by username: {user_id_username}")
+        
+        # Test get_user_info
+        user_info = get_user_info("john.doe@example.com")
+        print(f"Complete user info: {user_info}")
+        
+        # Test get_all_users
+        all_users = get_all_users()
+        print(f"All users: {all_users}")
 
         client.close()
         print("\nDatabase initialization complete!")

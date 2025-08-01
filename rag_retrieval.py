@@ -2,17 +2,19 @@
 """
 RAG Retrieval Module - Retrieves relevant chunks from user's documents using semantic search
 Automatically selects embedding model and Pinecone index based on user's choice in master pipeline
+Uses the same embedding functions as document indexing for consistency
 """
 
 import os
 import logging
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
-from openai import OpenAI
-from google import genai
 from pinecone import Pinecone
 from bson import ObjectId
 from db_service import Chunks
+from embeddings import EmbeddingService
+from LLM.search_rag_openai import search_rag as search_rag_openai
+from LLM.search_rag_google import search_rag as search_rag_google
 
 # Load environment variables
 load_dotenv()
@@ -25,17 +27,17 @@ logger = logging.getLogger(__name__)
 class RAGService:
     """
     Service class for RAG retrieval functionality
-    Automatically handles embedding model selection and Pinecone index routing
+    Uses EmbeddingService for consistent embedding generation
+    Automatically handles Pinecone index routing
     """
 
     def __init__(self):
-        self.openai_client = None
-        self.gemini_client = None
+        self.embedding_service = EmbeddingService()
         self.pinecone_client = None
 
     def initialize_embedding_client(self, embedding_model: str) -> bool:
         """
-        Initialize the appropriate embedding client based on model name
+        Initialize the embedding client using EmbeddingService
 
         Args:
             embedding_model: The embedding model to initialize
@@ -44,51 +46,18 @@ class RAGService:
             True if initialization successful, False otherwise
         """
         try:
-            if embedding_model.startswith("text-embedding"):
-                # Initialize OpenAI client
-                if not self.openai_client:
-                    api_key = os.getenv("OPENAI_API_KEY")
-                    if not api_key:
-                        raise ValueError(
-                            "OPENAI_API_KEY environment variable not set")
-
-                    self.openai_client = OpenAI(api_key=api_key)
-                    logger.info(
-                        f"✅ OpenAI client initialized for model: {embedding_model}")
-
-                # Test the connection
-                test_response = self.openai_client.embeddings.create(
-                    model=embedding_model,
-                    input=["test"]
-                )
+            # Use EmbeddingService for consistent initialization
+            initialized_model = self.embedding_service.initialize_embedding_model(embedding_model)
+            
+            if initialized_model:
+                logger.info(f"✅ Embedding client initialized for model: {initialized_model}")
                 return True
-
-            elif embedding_model.startswith("gemini"):
-                # Initialize Gemini client
-                if not self.gemini_client:
-                    api_key = os.getenv("GEMINI_API_KEY")
-                    if not api_key:
-                        raise ValueError(
-                            "GEMINI_API_KEY environment variable not set")
-
-                    self.gemini_client = genai.Client(api_key=api_key)
-                    logger.info(
-                        f"✅ Gemini client initialized for model: {embedding_model}")
-
-                # Test the connection
-                test_result = self.gemini_client.models.embed_content(
-                    model=embedding_model,
-                    contents=["test"]
-                )
-                return True
-
             else:
-                raise ValueError(
-                    f"Unsupported embedding model: {embedding_model}")
+                logger.error(f"Failed to initialize embedding model: {embedding_model}")
+                return False
 
         except Exception as e:
-            logger.error(
-                f"Failed to initialize embedding client for {embedding_model}: {e}")
+            logger.error(f"Failed to initialize embedding client for {embedding_model}: {e}")
             return False
 
     def initialize_pinecone_client(self) -> bool:
@@ -132,7 +101,8 @@ class RAGService:
 
     def create_query_embedding(self, query: str, embedding_model: str) -> List[float]:
         """
-        Generate embedding for the query using the specified model
+        Generate embedding for the query using EmbeddingService
+        Uses the same embedding generation pipeline as document indexing
 
         Args:
             query: The search query
@@ -145,25 +115,17 @@ class RAGService:
             Exception: If embedding generation fails
         """
         try:
-            if embedding_model.startswith("text-embedding"):
-                # Use OpenAI client
-                response = self.openai_client.embeddings.create(
-                    model=embedding_model,
-                    input=query
-                )
-                return response.data[0].embedding
-
-            elif embedding_model.startswith("gemini"):
-                # Use Gemini client
-                result = self.gemini_client.models.embed_content(
-                    model=embedding_model,
-                    contents=query
-                )
-                return result.embeddings[0].values
-
+            # Use EmbeddingService for consistent embedding generation
+            embeddings = self.embedding_service._create_embeddings_batch(
+                chunks=[query],  # Pass query as single item list
+                model_name=embedding_model,
+                max_retries=3
+            )
+            
+            if embeddings and len(embeddings) > 0:
+                return embeddings[0]  # Return first (and only) embedding
             else:
-                raise ValueError(
-                    f"Unsupported embedding model: {embedding_model}")
+                raise ValueError("Failed to generate query embedding")
 
         except Exception as e:
             logger.error(f"Failed to create query embedding: {e}")
@@ -293,14 +255,12 @@ class RAGService:
 def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, top_k: int = 5) -> str:
     """
     Main RAG search function that retrieves relevant document chunks for a user query
+    Now uses optimized search functions with Cohere reranking for better results
 
     This function:
-    1. Auto-determines the correct Pinecone index based on embedding model
-    2. Initializes the appropriate embedding client (OpenAI or Gemini)
-    3. Generates query embedding using the same model used for document chunks
-    4. Queries Pinecone for most similar vectors in user's namespace
-    5. Retrieves full chunk data from MongoDB using vector IDs
-    6. Returns formatted results for LLM consumption
+    1. Auto-determines the correct Pinecone index and search function based on embedding model
+    2. Routes to either OpenAI or Google search pipeline with reranking
+    3. Returns formatted results with relevance scores and metadata
 
     Args:
         query: User's search query
@@ -309,13 +269,13 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
         embedding_model: Embedding model from master pipeline choice
                         - "text-embedding-3-small" for OpenAI
                         - "gemini-embedding-001" for Gemini
-        top_k: Number of most relevant chunks to return (default: 5)
+        top_k: Number of most relevant chunks to return (default: 5, used as top_reranked)
 
     Returns:
         Formatted string containing relevant document chunks with:
         - Source file names
-        - Chunk summaries and content  
-        - Relevance scores
+        - Content and summary previews  
+        - Cohere rerank scores
         - Chunk metadata
 
     Example:
@@ -326,14 +286,15 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
         ...     embedding_model="text-embedding-3-small"
         ... )
         >>> print(result)
-        1.
-        **Source File**: employee_handbook.pdf
-        **Summary**: Remote work policy overview...
-        **Content**: Employees may work remotely...
-        ---
+        1
+        ##ID: 64f7b2...
+        ##content_preview: "Company policy states..."
+        ##summary_preview: "Remote work guidelines..."
+        ##source_file: "employee_handbook.pdf"
+        ##rerank_score: 0.8945
     """
     logger.info("=" * 60)
-    logger.info("🔍 STARTING RAG SEARCH")
+    logger.info("🔍 STARTING OPTIMIZED RAG SEARCH")
     logger.info("=" * 60)
     logger.info(f"📝 Query: {query}")
     logger.info(f"👤 User ID: {user_id}")
@@ -342,73 +303,43 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
     logger.info(f"📊 Top K: {top_k}")
 
     try:
-        # Initialize RAG service
-        rag_service = RAGService()
-
-        # Step 1: Auto-determine Pinecone index based on embedding model
-        pinecone_index = rag_service.determine_pinecone_index(embedding_model)
-        logger.info(f"📊 Auto-selected Pinecone Index: {pinecone_index}")
-
-        # Step 2: Initialize embedding client
-        if not rag_service.initialize_embedding_client(embedding_model):
-            return "Error: Failed to initialize embedding client. Please check your API keys."
-
-        # Step 3: Initialize Pinecone client
-        if not rag_service.initialize_pinecone_client():
-            return "Error: Failed to initialize Pinecone client. Please check your PINECONE_API_KEY."
-
-        # Step 4: Create user's full namespace (namespace_userid)
+        # Step 1: Create user's full namespace (namespace_userid)
         full_namespace = f"{namespace}_{user_id}"
         logger.info(f"🔗 Full namespace: {full_namespace}")
 
-        # Step 5: Generate query embedding
-        logger.info("🔄 Generating query embedding...")
-        query_embedding = rag_service.create_query_embedding(
-            query, embedding_model)
+        # Step 2: Auto-determine Pinecone index and route to correct search function
+        if "gemini" in embedding_model.lower():
+            # Use Google/Gemini search pipeline
+            pinecone_index = "chatbot-vectors-google"
+            logger.info(f"📊 Using Google/Gemini search pipeline with index: {pinecone_index}")
+            
+            result = search_rag_google(
+                query=query,
+                namespace=full_namespace,
+                index_name=pinecone_index,
+                embedding_model=embedding_model,
+                top_k=top_k * 2,  # Get more initial results for better reranking
+                top_reranked=top_k  # Return the requested number after reranking
+            )
+            
+        else:
+            # Use OpenAI search pipeline  
+            pinecone_index = "chatbot-vectors-openai"
+            logger.info(f"📊 Using OpenAI search pipeline with index: {pinecone_index}")
+            
+            result = search_rag_openai(
+                query=query,
+                namespace=full_namespace,
+                index_name=pinecone_index,
+                embedding_model=embedding_model,
+                top_k=top_k * 2,  # Get more initial results for better reranking
+                top_reranked=top_k  # Return the requested number after reranking
+            )
 
-        # Step 6: Query Pinecone for similar vectors
-        logger.info("🔍 Querying Pinecone for similar vectors...")
-        pinecone_matches = rag_service.query_pinecone(
-            query_embedding=query_embedding,
-            namespace=full_namespace,
-            pinecone_index=pinecone_index,
-            top_k=top_k
-        )
-
-        if not pinecone_matches:
-            logger.info("ℹ️  No matches found in Pinecone")
-            return f"No relevant documents found for your query in namespace '{namespace}'. Please check if you have uploaded documents to this namespace."
-
-        # Step 7: Extract vector IDs and create score mapping
-        vector_ids = [match['id'] for match in pinecone_matches]
-        score_mapping = {match['id']: match['score']
-                         for match in pinecone_matches}
-
-        # Step 8: Retrieve full chunk data from MongoDB
-        logger.info("🔄 Retrieving full chunk data from MongoDB...")
-        chunks = rag_service.retrieve_chunks_from_mongodb(vector_ids)
-
-        if not chunks:
-            logger.warning(
-                "⚠️  No chunks found in MongoDB for the retrieved vector IDs")
-            return "Found relevant document IDs but could not retrieve full content. Please contact support."
-
-        # Step 9: Sort chunks by Pinecone relevance score (highest first)
-        chunks_sorted = sorted(
-            chunks,
-            key=lambda chunk: score_mapping.get(str(chunk.id), 0),
-            reverse=True
-        )
-
-        # Step 10: Format results for LLM consumption
-        logger.info("📝 Formatting results for LLM...")
-        formatted_results = rag_service.format_rag_results(
-            chunks_sorted, score_mapping)
-
-        logger.info("✅ RAG search completed successfully")
+        logger.info("✅ RAG search completed successfully using optimized pipeline")
         logger.info("=" * 60)
 
-        return formatted_results
+        return result
 
     except Exception as e:
         error_msg = f"RAG search failed: {str(e)}"
@@ -424,7 +355,7 @@ def test_rag_search():
     print("=" * 50)
 
     # Example usage (would need real user data to work)
-    test_query = "Who is Alice?"
+    test_query = "summarise alice in wonderland?"
     test_user_id = "688b48416faad142f66ca95e"  # Example ObjectId
     test_namespace = "ex"
     test_embedding_model = "gemini-embedding-001"

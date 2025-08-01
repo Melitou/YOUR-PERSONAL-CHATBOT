@@ -1,5 +1,6 @@
 import { Modal } from "@mui/material";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { chatbotApi } from "../utils/api";
 
 const CreateBotSuperUserModalComponent = ({ 
     open, 
@@ -23,6 +24,21 @@ const CreateBotSuperUserModalComponent = ({
     const [chunkingMethod, setChunkingMethod] = useState("Fixed Token");
     const [embeddingModel, setEmbeddingModel] = useState("text-embedding-3-small");
     const [errorMessage, setErrorMessage] = useState("");
+
+    useEffect(() => {
+        if (open) {
+            setName("");
+            setDescription("");
+            setSelectedFiles([]);
+            setChunkingMethod("Fixed Token");
+            setEmbeddingModel("text-embedding-3-small");
+            setErrorMessage("");
+            
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    }, [open]);
 
     const chunkingOptions = [
         "Fixed Token",
@@ -77,31 +93,23 @@ const CreateBotSuperUserModalComponent = ({
         }
     };
 
-    const handleSubmit = () => {
-        console.log("Name (Namespace): ", name);
-        console.log("Description: ", description);
-        console.log("Selected Files: ", selectedFiles);
-        console.log("Chunking Method: ", chunkingMethod);
-        console.log("Embedding Model: ", embeddingModel);
-
-        // Check if any of the fields are empty
-        if (!name || !description || selectedFiles.length === 0) {
-            setErrorMessage("Please fill in all fields and select at least one file");
-            return;
+    const handleSubmit = async (name: string, description: string, files: File[], chunkingMethod: string, embeddingModel: string) => {
+        try {
+            console.log('Creating chatbot with name:', name, 'description:', description, 'files:', files, 'chunkingMethod:', chunkingMethod, 'embeddingModel:', embeddingModel);
+            const result = await chatbotApi.createSuperUserChatbot(
+                name, 
+                description, 
+                files, 
+                chunkingMethod, 
+                embeddingModel
+            );
+            console.log('Chatbot created successfully:', result);
+            onSubmit(name, description, files, chunkingMethod, embeddingModel);
+            onClose();
+        } catch (error) {
+            console.error('Failed to create chatbot:', error);
+            setErrorMessage('Failed to create chatbot. Please try again.');
         }
-
-        setErrorMessage("");
-
-        onSubmit(name, description, selectedFiles, chunkingMethod, embeddingModel);
-        
-        // Reset form
-        setName("");
-        setDescription("");
-        setSelectedFiles([]);
-        setChunkingMethod("Fixed Token");
-        setEmbeddingModel("text-embedding-3-small");
-        
-        onClose();
     }
     
     return (
@@ -202,7 +210,7 @@ const CreateBotSuperUserModalComponent = ({
                     <div className="flex justify-center">
                         <button 
                             className="px-8 py-3 bg-[#23272e] text-white rounded-md hover:bg-[#23272e]/80 transition-colors font-medium" 
-                            onClick={handleSubmit}
+                            onClick={() => handleSubmit(name, description, selectedFiles, chunkingMethod, embeddingModel)}
                         >
                             Create Agent
                         </button>

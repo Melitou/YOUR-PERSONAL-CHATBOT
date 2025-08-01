@@ -20,12 +20,13 @@ from file_type import doc_type_check
 class DocumentPipeline:
     """Main document processing pipeline with parallel processing support"""
 
-    def __init__(self, max_workers: int = 4, rate_limit_delay: float = 0.2):
+    def __init__(self, max_workers: int = 4, rate_limit_delay: float = 0.2, user: User_Auth_Table = None):
         """Initialize the pipeline with database connection and parallel processing settings
 
         Args:
             max_workers: Maximum number of parallel workers (default: 4, recommended: 3-5)
             rate_limit_delay: Delay between database operations in seconds (default: 0.2)
+            user: User object to use for processing (optional, will create/find test_user if not provided)
         """
         self.client, self.db, self.fs = initialize_db()
         if not self.client:
@@ -45,16 +46,33 @@ class DocumentPipeline:
         }
         self._stats_lock = Lock()
 
-        # Get the existing test user
-        try:
-            self.user = User_Auth_Table.objects(user_name="test_user").first()
-            if not self.user:
-                raise Exception("Test user not found in database")
-            print(f"Using user: {self.user.user_name} (ID: {self.user.id})")
-            print(
-                f"Parallel processing: {self.max_workers} workers, {self.rate_limit_delay}s rate limit")
-        except Exception as e:
-            raise Exception(f"Error getting user: {e}")
+        # Set user for processing
+        if user:
+            self.user = user
+            print(f"Using provided user: {self.user.user_name} (ID: {self.user.id})")
+        else:
+            # Get or create test user for backward compatibility
+            try:
+                self.user = User_Auth_Table.objects(user_name="test_user").first()
+                if not self.user:
+                    # Create test user if it doesn't exist
+                    from datetime import datetime
+                    self.user = User_Auth_Table(
+                        user_name="test_user",
+                        password="hashed_password_here",
+                        first_name="Test",
+                        last_name="User",
+                        email="test@example.com",
+                        created_at=datetime.now()
+                    )
+                    self.user.save()
+                    print(f"Created test user: {self.user.user_name} (ID: {self.user.id})")
+                else:
+                    print(f"Using existing test user: {self.user.user_name} (ID: {self.user.id})")
+            except Exception as e:
+                raise Exception(f"Error getting/creating user: {e}")
+        
+        print(f"Parallel processing: {self.max_workers} workers, {self.rate_limit_delay}s rate limit")
 
     def generate_file_hash(self, file_bytes: bytes) -> str:
         """Generate SHA256 hash for the file content"""

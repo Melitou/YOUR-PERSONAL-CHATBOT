@@ -6,7 +6,7 @@ from gridfs import GridFS
 import hashlib
 
 
-def initialize_db(db_url: str = "mongodb://localhost:27017/"):
+def initialize_db(db_url: str = "mongodb://localhost:50000/"):
     """Initialize MongoDB connection and create necessary indexes"""
     try:
         database_name = "your_personal_chatbot_db"
@@ -28,7 +28,6 @@ def initialize_db(db_url: str = "mongodb://localhost:27017/"):
         print(f"Error initializing database: {e}")
         return None, None, None
 
-
 class User_Auth_Table(Document):
     """User authentication table with user_id as main connector"""
     user_name = StringField(required=True, unique=True)
@@ -49,6 +48,28 @@ class User_Auth_Table(Document):
     def __str__(self) -> str:
         return f"User_Auth_Table(user_name={self.user_name}, first_name={self.first_name}, last_name={self.last_name}, email={self.email})"
 
+class ChatBots(Document):
+    """ChatBots table to store chatbot configurations"""
+    name = StringField(required=True)
+    description = StringField(required=True)
+    embedding_model = StringField(required=True)
+    chunking_method = StringField(required=True)
+    date_created = DateTimeField(required=True)
+    user_id = ReferenceField(User_Auth_Table, required=True)
+    namespace = StringField(required=True, unique=True)
+
+    meta = {
+        'collection': 'chatbots',
+        'indexes': [
+            {'fields': ['user_id']},
+            {'fields': ['namespace'], 'unique': True},
+            {'fields': ['date_created']},
+            {'fields': ['embedding_model']},
+            {'fields': ['chunking_method']},
+            # Composite index for user queries
+            {'fields': [('user_id', 1), ('date_created', -1)]}
+        ]
+    }
 
 class Documents(Document):
     user = ReferenceField(User_Auth_Table, required=True)
@@ -56,13 +77,10 @@ class Documents(Document):
     file_type = StringField(required=True)
     gridfs_file_id = ObjectIdField(
         required=True, unique=True)  # Link to GridFS ObjectId
-    status = StringField(required=True, choices=[
-                         'pending', 'processed', 'failed'])
-    full_hash = StringField(required=True)  # SHA256 hash
+    status = StringField(required=True, choices=['pending', 'processed', 'failed'])
+    full_hash = StringField(required=True) # SHA256 hash
     namespace = StringField(required=True)
-    # Chunking method used for processing this document
-    chunking_method = StringField(required=False, choices=[
-        'token', 'semantic', 'line', 'recursive'], default='token')
+    chunking_method = StringField(required=False, choices=['token', 'semantic', 'line', 'recursive'], default='token')
     created_at = DateTimeField(required=True)
 
     meta = {
@@ -73,6 +91,7 @@ class Documents(Document):
             {'fields': ['full_hash']},
             {'fields': ['status']},
             {'fields': ['chunking_method']},
+            {'fields': ['namespace']},
             # Composite unique index
             # Same user can't upload same file twice
             {'fields': [('user', 1), ('full_hash', 1)], 'unique': True}

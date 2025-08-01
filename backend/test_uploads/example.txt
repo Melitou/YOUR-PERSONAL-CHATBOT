@@ -1,0 +1,11 @@
+This is an example document for testing the RAG pipeline.
+
+The document contains multiple paragraphs to demonstrate text chunking and processing.
+
+It includes various topics:
+- Technical documentation
+- API usage examples  
+- Configuration details
+- Troubleshooting information
+
+This content will be processed, chunked, summarized, and embedded for vector search.

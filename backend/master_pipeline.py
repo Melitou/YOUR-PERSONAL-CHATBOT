@@ -35,7 +35,7 @@ class MasterPipeline:
     """Master pipeline that combines document upload and processing"""
 
     def __init__(self, max_workers: int = 4, rate_limit_delay: float = 0.2,
-                 chunking_method: str = "token", chunking_params: dict = None):
+                 chunking_method: str = "token", chunking_params: dict = None, user=None):
         """Initialize both upload and processing pipelines
 
         Args:
@@ -43,6 +43,7 @@ class MasterPipeline:
             rate_limit_delay: Delay between database operations in seconds (default: 0.2)
             chunking_method: Chunking method to use ('token', 'semantic', 'line', 'recursive') (default: 'token')
             chunking_params: Parameters for the chunking method (default: None, uses method defaults)
+            user: User object to use for processing (optional)
         """
         self.max_workers = max_workers
         self.rate_limit_delay = rate_limit_delay
@@ -58,7 +59,8 @@ class MasterPipeline:
             # Upload pipeline (document_pipeline.py)
             self.upload_pipeline = DocumentPipeline(
                 max_workers=max_workers,
-                rate_limit_delay=rate_limit_delay
+                rate_limit_delay=rate_limit_delay,
+                user=user
             )
             logger.info("✓ Document upload pipeline initialized")
 
@@ -81,9 +83,9 @@ class MasterPipeline:
             logger.error(f"Failed to initialize master pipeline: {e}")
             raise
 
-    def process_directory_complete(self, directory_path: str, namespace: str,
-                                   use_parallel_upload: bool = True,
-                                   use_parallel_processing: bool = True) -> Dict:
+    async def process_directory_complete(self, directory_path: str, namespace: str,
+                                       use_parallel_upload: bool = True,
+                                       use_parallel_processing: bool = True) -> Dict:
         """Complete processing workflow: upload → process → chunk → summarize
 
         Args:
@@ -175,7 +177,7 @@ class MasterPipeline:
                     use_parallel=use_parallel_processing
                 )
 
-            processing_results = asyncio.run(run_processing())
+            processing_results = await run_processing()
 
             # Log processing summary
             logger.info(f"\n✅ Processing Phase Complete:")
@@ -257,11 +259,11 @@ class MasterPipeline:
                 'message': f'Workflow failed: {str(e)}'
             }
 
-    def process_directory_complete_with_embeddings(self, directory_path: str, namespace: str,
-                                                   user_id: str = None,
-                                                   embedding_model: str = "text-embedding-3-small",
-                                                   use_parallel_upload: bool = True,
-                                                   use_parallel_processing: bool = True) -> Dict:
+    async def process_directory_complete_with_embeddings(self, directory_path: str, namespace: str,
+                                                         user_id: str = None,
+                                                         embedding_model: str = "text-embedding-3-small",
+                                                         use_parallel_upload: bool = True,
+                                                         use_parallel_processing: bool = True) -> Dict:
         """Complete workflow: upload → process → chunk → summarize → embed → store in Pinecone
 
         Args:
@@ -296,7 +298,7 @@ class MasterPipeline:
         logger.info(f"👥 Max Workers: {self.max_workers}")
 
         # First run the standard document processing workflow
-        processing_results = self.process_directory_complete(
+        processing_results = await self.process_directory_complete(
             directory_path=directory_path,
             namespace=namespace,
             use_parallel_upload=use_parallel_upload,
@@ -613,14 +615,14 @@ def main():
         )
 
         # Run complete workflow with embeddings (user_id will be auto-determined from upload pipeline)
-        results = master_pipeline.process_directory_complete_with_embeddings(
+        results = asyncio.run(master_pipeline.process_directory_complete_with_embeddings(
             directory_path=folder_path,
             namespace=namespace,
             user_id=None,  # Will auto-use the same user from upload pipeline
             embedding_model=embedding_model,
             use_parallel_upload=use_parallel_upload,
             use_parallel_processing=use_parallel_processing
-        )
+        ))
 
         # Show detailed results
         if results.get('complete_workflow_success'):

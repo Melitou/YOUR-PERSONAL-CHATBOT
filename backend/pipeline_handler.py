@@ -1,0 +1,322 @@
+"""
+Pipeline Handler for FastAPI Integration
+Handles communication between FastAPI endpoints and the existing pipeline components
+"""
+import os
+import tempfile
+import hashlib
+import asyncio
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Optional, Tuple
+from fastapi import UploadFile, HTTPException, status
+
+from master_pipeline import MasterPipeline
+
+from db_service import initialize_db, User_Auth_Table, ChatBots
+from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class PipelineHandler:
+    """Handles the integration between FastAPI and the existing pipeline"""
+    
+    def __init__(self):
+        """Initialize the pipeline handler"""
+        # Initialize database connection
+        self.client, self.db, self.fs = initialize_db()
+        if self.client is None or self.db is None or self.fs is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to initialize database connection"
+            )
+        
+        logger.info("Pipeline handler initialized successfully")
+    
+    def validate_files(self, files: List[UploadFile]) -> List[FileMetadata]:
+        """Validate uploaded files and return metadata"""
+        if not files:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No files provided"
+            )
+        
+        # Supported file types
+        supported_extensions = {'.pdf', '.docx', '.txt', '.csv'}
+        supported_mime_types = {
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain',
+            'text/csv',
+            'application/csv'
+        }
+        
+        file_metadata = []
+        
+        for file in files:
+            if not file.filename:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="File must have a filename"
+                )
+            
+            # Check file extension
+            file_ext = Path(file.filename).suffix.lower()
+            if file_ext not in supported_extensions:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported file type: {file_ext}. Supported types: {', '.join(supported_extensions)}"
+                )
+            
+            # Check content type if available
+            if file.content_type and file.content_type not in supported_mime_types:
+                logger.warning(f"File {file.filename} has unsupported MIME type: {file.content_type}")
+            
+            # Create metadata (file hash will be calculated when reading content)
+            metadata = FileMetadata(
+                filename=file.filename,
+                content_type=file.content_type or "application/octet-stream",
+                size=0,  # Will be updated when reading content
+                file_hash=""  # Will be calculated when reading content
+            )
+            file_metadata.append(metadata)
+        
+        return file_metadata
+    
+    async def save_files_to_temp_directory(self, files: List[UploadFile]) -> Tuple[str, List[FileMetadata]]:
+        """Save uploaded files to a temporary directory and return the path with metadata"""
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp(prefix="fastapi_upload_")
+        file_metadata = []
+        
+        try:
+            for file in files:
+                # Read file content
+                content = await file.read()
+                
+                # Calculate file hash
+                file_hash = hashlib.sha256(content).hexdigest()
+                
+                # Create file metadata
+                metadata = FileMetadata(
+                    filename=file.filename,
+                    content_type=file.content_type or "application/octet-stream",
+                    size=len(content),
+                    file_hash=file_hash
+                )
+                file_metadata.append(metadata)
+                
+                # Save file to temp directory
+                file_path = Path(temp_dir) / file.filename
+                with open(file_path, 'wb') as f:
+                    f.write(content)
+                
+                # Reset file pointer for potential future use
+                await file.seek(0)
+            
+            logger.info(f"Saved {len(files)} files to temporary directory: {temp_dir}")
+            return temp_dir, file_metadata
+            
+        except Exception as e:
+            # Clean up temp directory if error occurs
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error saving files: {str(e)}"
+            )
+    
+    def create_unique_namespace(self, user_namespace: str, user: User_Auth_Table) -> str:
+        """Create unique namespace by concatenating user input with user ID
+
+        Args:
+            user_namespace: User-provided namespace prefix
+            user: User object for getting user ID
+
+        Returns:
+            Unique namespace in format: {user_namespace}_{user_id}
+
+        Raises:
+            ValueError: If user_namespace contains underscores or is too long
+        """
+        # Validate user input
+        if '_' in user_namespace:
+            raise ValueError(
+                "Namespace cannot contain underscores (used for user ID separation)")
+
+        if len(user_namespace) > 50:  # Leave room for user ID
+            raise ValueError("Namespace prefix too long (max 50 characters)")
+
+        if not user_namespace.strip():
+            raise ValueError("Namespace cannot be empty")
+
+        # Create unique namespace
+        unique_namespace = f"{user_namespace.strip()}_{user.id}"
+        return unique_namespace
+    
+    def generate_chatbot_name(self, agent_description: str) -> str:
+        """Generate a chatbot name from the agent description"""
+        # Clean the description and limit length
+        clean_name = "".join(c for c in agent_description if c.isalnum() or c in " -").strip()
+        clean_name = " ".join(clean_name.split())  # Normalize spaces
+        
+        # Limit to 100 characters for the name
+        if len(clean_name) > 100:
+            clean_name = clean_name[:97] + "..."
+        
+        return clean_name if clean_name else "Untitled Chatbot"
+    
+    def determine_default_settings(self, agent_provider: Optional[AgentProvider]) -> Tuple[ChunkingMethod, EmbeddingModel]:
+        """Determine default chunking method and embedding model based on agent provider"""
+        if agent_provider == AgentProvider.GEMINI:
+            return ChunkingMethod.TOKEN, EmbeddingModel.GEMINI
+        elif agent_provider == AgentProvider.OPENAI:
+            return ChunkingMethod.TOKEN, EmbeddingModel.OPENAI_SMALL
+        else:
+            # Super user - use OpenAI as default
+            return ChunkingMethod.TOKEN, EmbeddingModel.OPENAI_SMALL
+    
+    async def process_agent_creation(
+        self,
+        user: User_Auth_Table,
+        files: List[UploadFile],
+        agent_description: str,
+        user_namespace: str,
+        chunking_method: Optional[ChunkingMethod] = None,
+        embedding_model: Optional[EmbeddingModel] = None,
+        agent_provider: Optional[AgentProvider] = None
+    ) -> Dict:
+        """Process the complete agent creation workflow"""
+        
+        # Validate files
+        self.validate_files(files)
+        
+        # Save files to temporary directory
+        temp_dir, file_metadata = await self.save_files_to_temp_directory(files)
+        
+        try:
+            # Generate unique namespace using user input and user ID
+            namespace = self.create_unique_namespace(user_namespace, user)
+            
+            # Determine settings for normal users
+            if agent_provider is not None:  # Normal user
+                chunking_method, embedding_model = self.determine_default_settings(agent_provider)
+                logger.info(f"Normal user - using default settings: chunking={chunking_method}, embedding={embedding_model}")
+            else:  # Super user
+                if not chunking_method:
+                    chunking_method = ChunkingMethod.TOKEN
+                if not embedding_model:
+                    embedding_model = EmbeddingModel.OPENAI_SMALL
+                logger.info(f"Super user - using specified settings: chunking={chunking_method}, embedding={embedding_model}")
+            
+            # Initialize master pipeline with the specified settings
+            if MasterPipeline is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Pipeline functionality not available due to missing dependencies"
+                )
+            
+            master_pipeline = MasterPipeline(
+                max_workers=4,
+                rate_limit_delay=0.2,
+                chunking_method=chunking_method.value,
+                chunking_params={},
+                user=user
+            )
+            # The document processor doesn't have a user field, but it operates on documents
+            # We need to ensure it processes documents for this specific user
+            
+            logger.info(f"Processing {len(files)} files for user {user.user_name} with namespace '{namespace}'")
+            
+            # Run the complete workflow with embeddings
+            results = await master_pipeline.process_directory_complete_with_embeddings(
+                directory_path=temp_dir,
+                namespace=namespace,
+                user_id=str(user.id),
+                embedding_model=embedding_model.value,
+                use_parallel_upload=True,
+                use_parallel_processing=True
+            )
+            
+            # Close pipeline connections
+            master_pipeline.close()
+            
+            # Process results
+            success = results.get('complete_workflow_success', False)
+            
+            # If processing was successful, create ChatBot record
+            if success:
+                try:
+                    chatbot_name = self.generate_chatbot_name(agent_description)
+                    chatbot = ChatBots(
+                        name=chatbot_name,
+                        description=agent_description,
+                        embedding_model=embedding_model.value,
+                        chunking_method=chunking_method.value,
+                        date_created=datetime.now(),
+                        user_id=user,
+                        namespace=namespace
+                    )
+                    chatbot.save()
+                    logger.info(f"✅ ChatBot record created: {chatbot_name} (namespace: {namespace})")
+                except Exception as e:
+                    logger.error(f"❌ Error creating ChatBot record: {e}")
+                    # Don't fail the entire process if ChatBot creation fails
+                    success = False
+            
+            response_data = {
+                'success': success,
+                'message': results.get('message', 'Processing completed'),
+                'namespace': namespace,
+                'file_metadata': file_metadata,
+                'processing_results': None,
+                'embedding_results': results.get('embedding_results'),
+                'total_time': results.get('total_complete_workflow_time', 0)
+            }
+            
+            # Add processing results if available
+            if results.get('processing_results'):
+                pr = results['processing_results']
+                response_data['processing_results'] = {
+                    'total_files': len(files),
+                    'processed': pr.get('processed', 0),
+                    'failed': pr.get('failed', 0),
+                    'chunks_created': pr.get('chunks_created', 0),
+                    'processing_time': pr.get('processing_time', 0)
+                }
+            
+            if success:
+                logger.info(f"Successfully processed agent for user {user.user_name}")
+            else:
+                logger.warning(f"Agent processing completed with issues for user {user.user_name}")
+            
+            return response_data
+            
+        except Exception as e:
+            logger.error(f"Error processing agent creation: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error processing files: {str(e)}"
+            )
+        
+        finally:
+            # Clean up temporary directory
+            import shutil
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                logger.info(f"Cleaned up temporary directory: {temp_dir}")
+            except Exception as e:
+                logger.warning(f"Error cleaning up temp directory {temp_dir}: {e}")
+    
+    def close(self):
+        """Close database connections"""
+        try:
+            if self.client:
+                self.client.close()
+                logger.info("Database connections closed")
+        except Exception as e:
+            logger.error(f"Error closing database connections: {e}")

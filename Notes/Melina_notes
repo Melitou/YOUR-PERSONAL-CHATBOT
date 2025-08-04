@@ -18,7 +18,7 @@ Your embedding step is batched, so it doesn’t contribute to request spikes.
 
 
 
-- Why does the chatbot sat that it see the summary context column ✅
+- Why does the chatbot say that it see the summary context column ✅
 - 200K token count we start deleting the earliest messages. Remove ai and user message✅
 - User decides the final client✅
 - Check timings
@@ -47,18 +47,6 @@ After: user_namespace|userid
 
 
 
-ID: 688b494eb4b8f2c7bb33c50b
+***PROBLEMS*** 
 
-chunk_index: 0
-
-chunking_method: "token"
-
-content_preview: "```\nTITLE: Alice's Adventures in Wonderland\r\nAUTHOR: Lewis Carroll\r\n\r\n\r\n= CHAPTER I = \r\n=( Down the Rabbit-Hole )=\r\n\r\n Alice was beginning to get very tired of sitting by her sister\r\non the bank, and..."
-
-created_at: "2025-07-31T12:45:34.682000"
-
-document_id: "688b4949b4b8f2c7bb33c50a"
-
-file_name: "alice_in_wonderland.txt"
-
-summary_preview: "This chunk contains the beginning of \"Alice's Ad
+1. When the user uploads the same documents but changes the namespace name, the bot cannot retrieve the documents.

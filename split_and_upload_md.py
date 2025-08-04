@@ -21,22 +21,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-PINECONE_API_KEY     = os.getenv("PINECONE_API_KEY")
-OPENAI_API_KEY       = os.getenv("OPENAI_API_KEY")
-MD_DIR               = "/Users/aparajitbhattacharya/Library/CloudStorage/OneDrive-Personal/MyDocuments/AI/IASPIS_AND_SCALING_UP/md"
-CHECKPOINT_DIR       = os.path.join(MD_DIR, ".checkpoints")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+MD_DIR = "/Users/aparajitbhattacharya/Library/CloudStorage/OneDrive-Personal/MyDocuments/AI/IASPIS_AND_SCALING_UP/md"
+CHECKPOINT_DIR = os.path.join(MD_DIR, ".checkpoints")
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
-INDEX_NAME           = "scaling-up"
-NAMESPACE            = "scaling-up-demo-2"
-EMBEDDING_MODEL      = "text-embedding-3-small"
-EMBEDDING_DIMENSION  = 1536
-SUMMARY_MODEL        = "gpt-4.1-mini"
-ENCODING_NAME        = "cl100k_base"  # For tiktoken
+INDEX_NAME = "scaling-up"
+NAMESPACE = "scaling-up-demo-2"
+EMBEDDING_MODEL = "text-embedding-3-small"
+EMBEDDING_DIMENSION = 1536
+SUMMARY_MODEL = "gpt-4.1-mini"
+ENCODING_NAME = "cl100k_base"  # For tiktoken
 
 # Rate limits
 SUMMARY_RPM = 2000    # requests per minute for gpt-4.1-mini
-EMBED_RPM   = 600     # safe default for embeddings
+EMBED_RPM = 600     # safe default for embeddings
 
 # Tiktoken Encoding
 ENCODING = tiktoken.get_encoding(ENCODING_NAME)
@@ -53,7 +53,7 @@ MAX_CONCURRENT_EMBEDS = max(1, EMBED_RPM // 60)
 summary_concurrency_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SUMMARIES)
 embed_concurrency_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EMBEDS)
 client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-pc     = Pinecone(api_key=PINECONE_API_KEY)
+pc = Pinecone(api_key=PINECONE_API_KEY)
 
 # Pinecone index setup (sync, at startup)
 # list_indexes returns list of index names (strings)
@@ -71,7 +71,7 @@ index = pc.Index(INDEX_NAME)
 
 # Rate limiters
 summary_rate_limiter = AsyncLimiter(SUMMARY_RPM, 60)
-embed_rate_limiter   = AsyncLimiter(EMBED_RPM, 60)
+embed_rate_limiter = AsyncLimiter(EMBED_RPM, 60)
 
 # Prompts
 DOCUMENT_CONTEXT_PROMPT = """
@@ -91,9 +91,11 @@ Focus on what this specific chunk is about in relation to the entire document.
 Answer only with the succinct context and nothing else.
 """
 
+
 def num_tokens_from_string(string: str) -> int:
     """Returns the number of tokens in a text string using the global ENCODING."""
     return len(ENCODING.encode(string))
+
 
 def chunk_markdown(text: str, max_tokens: int = 7000, overlap: int = 300):
     """Chunks markdown text into smaller pieces based on token count using the global ENCODING."""
@@ -108,8 +110,9 @@ def chunk_markdown(text: str, max_tokens: int = 7000, overlap: int = 300):
         chunks.append(chunk_text)
         if end == total_tokens:
             break
-        start = end - overlap # Recalculate start for the next chunk, considering overlap
+        start = end - overlap  # Recalculate start for the next chunk, considering overlap
     return chunks
+
 
 @backoff.on_exception(backoff.expo,
                       OpenAIError,
@@ -117,19 +120,22 @@ def chunk_markdown(text: str, max_tokens: int = 7000, overlap: int = 300):
                       max_time=300,
                       jitter=backoff.full_jitter)
 async def generate_contextual_summary_async(doc_content: str, chunk_content: str) -> str:
-    async with summary_concurrency_semaphore: # Added semaphore for concurrency control
-        async with summary_rate_limiter: # Keep RPM limiter as well
+    async with summary_concurrency_semaphore:  # Added semaphore for concurrency control
+        async with summary_rate_limiter:  # Keep RPM limiter as well
             response = await client.chat.completions.create(
                 model=SUMMARY_MODEL,
                 messages=[
                     {"role": "system", "content": "You are an expert at summarizing text chunks in the context of a larger document."},
-                    {"role": "user", "content": DOCUMENT_CONTEXT_PROMPT.format(doc_content=doc_content)},
-                    {"role": "user", "content": CHUNK_CONTEXT_PROMPT.format(chunk_content=chunk_content)}
+                    {"role": "user", "content": DOCUMENT_CONTEXT_PROMPT.format(
+                        doc_content=doc_content)},
+                    {"role": "user", "content": CHUNK_CONTEXT_PROMPT.format(
+                        chunk_content=chunk_content)}
                 ],
                 max_tokens=150,
                 temperature=0.2
             )
             return response.choices[0].message.content.strip()
+
 
 @backoff.on_exception(backoff.expo,
                       OpenAIError,
@@ -147,11 +153,13 @@ async def get_batched_embeddings_with_retry_async(texts_for_embedding: list[str]
         )
         return [data.embedding for data in response.data]
 
+
 def upsert_vectors_to_pinecone(index, vectors_to_upsert):
     """Upserts a list of vectors to Pinecone in batches."""
     for i in range(0, len(vectors_to_upsert), 100):
         batch = vectors_to_upsert[i:i+100]
         index.upsert(vectors=batch, namespace=NAMESPACE)
+
 
 async def upsert_vectors_to_pinecone_async(index, vectors_to_upsert, batch_size=100):
     """Async upserts a list of vectors to Pinecone in batches using threads."""
@@ -159,14 +167,16 @@ async def upsert_vectors_to_pinecone_async(index, vectors_to_upsert, batch_size=
     for i in range(0, len(vectors_to_upsert), batch_size):
         batch = vectors_to_upsert[i:i+batch_size]
         # Revert to asyncio.to_thread for synchronous Pinecone client calls
-        tasks.append(asyncio.to_thread(index.upsert, vectors=batch, namespace=NAMESPACE))
+        tasks.append(asyncio.to_thread(
+            index.upsert, vectors=batch, namespace=NAMESPACE))
     await asyncio.gather(*tasks)
+
 
 async def prepare_chunk_data_async(md_file: str, full_text: str, idx: int, chunk_text: str):
     """Generates summary for a chunk and prepares text for embedding and metadata parts."""
     summary = await generate_contextual_summary_async(full_text, chunk_text)
     text_for_embedding = f"{chunk_text}\n\nContextual summary: {summary}"
-    
+
     # Prepare base metadata, embedding will be added later
     base_metadata = {
         "source_file": md_file,
@@ -176,6 +186,7 @@ async def prepare_chunk_data_async(md_file: str, full_text: str, idx: int, chunk
         "Source": "Scaling_Up"
     }
     return summary, text_for_embedding, base_metadata, f"{md_file}_chunk_{idx}"
+
 
 async def process_file(md_file: str):
     """Read, chunk, summarize, embed and upsert in micro-batches; write checkpoint on success."""
@@ -202,7 +213,7 @@ async def process_file(md_file: str):
 
     # Process in micro-batches to limit memory and isolate failures
     for batch_start in range(0, len(chunks), CHUNK_BATCH_SIZE):
-        batch = chunks[batch_start : batch_start + CHUNK_BATCH_SIZE]
+        batch = chunks[batch_start: batch_start + CHUNK_BATCH_SIZE]
 
         # 1) Summarize each chunk in the batch (isolate failures)
         tasks = [
@@ -276,6 +287,7 @@ async def process_file(md_file: str):
     open(checkpoint_path, "w").close()
     logger.info("Completed processing %s", md_file)
 
+
 async def main():
     md_files = [f for f in os.listdir(MD_DIR) if f.lower().endswith(".md")]
     file_semaphore = asyncio.Semaphore(FILE_CONCURRENCY)
@@ -286,7 +298,8 @@ async def main():
 
     tasks = [_limited_process(f) for f in md_files]
     await asyncio.gather(*tasks)
-    logger.info("All markdown files processed and contextual embeddings uploaded to Pinecone.")
+    logger.info(
+        "All markdown files processed and contextual embeddings uploaded to Pinecone.")
 
 if __name__ == "__main__":
     asyncio.run(main())

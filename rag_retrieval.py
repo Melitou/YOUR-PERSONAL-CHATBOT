@@ -47,17 +47,21 @@ class RAGService:
         """
         try:
             # Use EmbeddingService for consistent initialization
-            initialized_model = self.embedding_service.initialize_embedding_model(embedding_model)
-            
+            initialized_model = self.embedding_service.initialize_embedding_model(
+                embedding_model)
+
             if initialized_model:
-                logger.info(f"✅ Embedding client initialized for model: {initialized_model}")
+                logger.info(
+                    f"✅ Embedding client initialized for model: {initialized_model}")
                 return True
             else:
-                logger.error(f"Failed to initialize embedding model: {embedding_model}")
+                logger.error(
+                    f"Failed to initialize embedding model: {embedding_model}")
                 return False
 
         except Exception as e:
-            logger.error(f"Failed to initialize embedding client for {embedding_model}: {e}")
+            logger.error(
+                f"Failed to initialize embedding client for {embedding_model}: {e}")
             return False
 
     def initialize_pinecone_client(self) -> bool:
@@ -121,7 +125,7 @@ class RAGService:
                 model_name=embedding_model,
                 max_retries=3
             )
-            
+
             if embeddings and len(embeddings) > 0:
                 return embeddings[0]  # Return first (and only) embedding
             else:
@@ -303,16 +307,17 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
     logger.info(f"📊 Top K: {top_k}")
 
     try:
-        # Step 1: Create user's full namespace (namespace_userid)
-        full_namespace = f"{namespace}_{user_id}"
+        # Step 1: Create user's full namespace (namespace|userid)
+        full_namespace = f"{namespace}|{user_id}"
         logger.info(f"🔗 Full namespace: {full_namespace}")
 
         # Step 2: Auto-determine Pinecone index and route to correct search function
         if "gemini" in embedding_model.lower():
             # Use Google/Gemini search pipeline
             pinecone_index = "chatbot-vectors-google"
-            logger.info(f"📊 Using Google/Gemini search pipeline with index: {pinecone_index}")
-            
+            logger.info(
+                f"📊 Using Google/Gemini search pipeline with index: {pinecone_index}")
+
             result = search_rag_google(
                 query=query,
                 namespace=full_namespace,
@@ -321,12 +326,13 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
                 top_k=top_k * 2,  # Get more initial results for better reranking
                 top_reranked=top_k  # Return the requested number after reranking
             )
-            
+
         else:
-            # Use OpenAI search pipeline  
+            # Use OpenAI search pipeline
             pinecone_index = "chatbot-vectors-openai"
-            logger.info(f"📊 Using OpenAI search pipeline with index: {pinecone_index}")
-            
+            logger.info(
+                f"📊 Using OpenAI search pipeline with index: {pinecone_index}")
+
             result = search_rag_openai(
                 query=query,
                 namespace=full_namespace,
@@ -336,7 +342,8 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
                 top_reranked=top_k  # Return the requested number after reranking
             )
 
-        logger.info("✅ RAG search completed successfully using optimized pipeline")
+        logger.info(
+            "✅ RAG search completed successfully using optimized pipeline")
         logger.info("=" * 60)
 
         return result

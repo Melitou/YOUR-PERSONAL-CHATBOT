@@ -175,7 +175,8 @@ class EmbeddingService:
                     )
 
                     # Extract the values from each embedding object
-                    embeddings = [embedding.values for embedding in result.embeddings]
+                    embeddings = [
+                        embedding.values for embedding in result.embeddings]
                     return embeddings
 
                 else:
@@ -286,7 +287,8 @@ class EmbeddingService:
                 raise ValueError(
                     "PINECONE_API_KEY environment variable not set")
 
-            self.pinecone_client = Pinecone(api_key=api_key)
+            self.pinecone_client = Pinecone(
+                api_key=api_key, environment="eu-west4-gcp")
             logger.info("Successfully initialized Pinecone client")
             return True
 

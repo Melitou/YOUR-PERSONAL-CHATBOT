@@ -140,7 +140,7 @@ class MasterPipeline:
                     "⚠️  No new documents were uploaded. Checking for existing pending documents...")
 
                 # Check for existing pending documents
-                pending_docs = self.processing_pipeline.get_pending_documents()
+                pending_docs = self.processing_pipeline.get_pending_documents(user=self.user)
                 if not pending_docs:
                     logger.info(
                         "ℹ️  No pending documents found. Workflow complete.")
@@ -174,6 +174,7 @@ class MasterPipeline:
 
             # Run document processing asynchronously
             processing_results = await self.processing_pipeline.process_pending_documents(
+                user=self.user,
                 limit=None,  # Process all pending documents
                 use_parallel=use_parallel_processing
             )

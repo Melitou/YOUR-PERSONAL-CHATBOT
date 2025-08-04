@@ -15,8 +15,8 @@ from bson import ObjectId
 
 from master_pipeline import MasterPipeline
 
-from db_service import initialize_db, User_Auth_Table, ChatBots, Documents, Chunks
-from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata, ChatbotDetailResponse, LoadedFileInfo
+from db_service import initialize_db, User_Auth_Table, ChatBots, Documents, Chunks, Conversation, Messages
+from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata, ChatbotDetailResponse, LoadedFileInfo, ConversationsResponse, MessageResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -376,6 +376,75 @@ class PipelineHandler:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error retrieving chatbots: {str(e)}"
+            )
+    
+    def get_chatbot_conversations(self, chatbot_id: str, user_id: str = None) -> List[ConversationsResponse]:
+        """Get all conversations for a specific chatbot with their messages"""
+        try:
+            # Find the chatbot by ObjectId
+            try:
+                chatbot = ChatBots.objects(id=ObjectId(chatbot_id)).first()
+            except Exception as e:
+                logger.error(f"Invalid chatbot ID format: {chatbot_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid chatbot ID format"
+                )
+            
+            if not chatbot:
+                logger.error(f"Chatbot not found: {chatbot_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chatbot not found"
+                )
+            
+            # Optional: Validate that the user owns this chatbot (if user_id is provided)
+            if user_id:
+                if str(chatbot.user_id.id) != user_id:
+                    logger.error(f"User {user_id} does not own chatbot {chatbot_id}")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="You do not have permission to access this chatbot's conversations"
+                    )
+            
+            # Get all conversations for this chatbot
+            conversations = Conversation.objects(chatbot=chatbot).order_by('-created_at')
+            
+            conversation_responses = []
+            for conversation in conversations:
+                # Get all messages for this conversation
+                messages = Messages.objects(conversation_id=conversation).order_by('created_at')
+                
+                # Convert messages to MessageResponse objects
+                message_responses = []
+                for message in messages:
+                    message_response = MessageResponse(
+                        message=message.message,
+                        created_at=message.created_at,
+                        role=message.role
+                    )
+                    message_responses.append(message_response)
+                
+                # Create conversation response
+                conversation_response = ConversationsResponse(
+                    conversation_id=str(conversation.id),
+                    messages=message_responses,
+                    created_at=conversation.created_at,
+                    belonging_user_uid=str(chatbot.user_id.id),
+                    belonging_chatbot_id=str(chatbot.id)
+                )
+                conversation_responses.append(conversation_response)
+            
+            logger.info(f"Retrieved {len(conversation_responses)} conversations for chatbot {chatbot.name}")
+            return conversation_responses
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error retrieving conversations for chatbot {chatbot_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error retrieving conversations: {str(e)}"
             )
     
     def close(self):

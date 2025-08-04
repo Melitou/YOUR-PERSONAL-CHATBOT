@@ -96,6 +96,7 @@ class Messages(Document):
     """A message made between a user and a chatbot, it belongs to the conversation"""
     conversation_id = ReferenceField(Conversation, required=True)
     message = StringField(required=True)
+    role = StringField(required=True, choices=['user', 'agent'])
     created_at = DateTimeField(required=True)
 
     meta = {
@@ -103,11 +104,12 @@ class Messages(Document):
         'indexes': [
             {'fields': ['conversation_id']},
             {'fields': ['created_at']},
+            {'fields': ['role']},
         ]
     }
 
     def __str__(self) -> str:
-        return f"Messages(conversation_id={self.conversation_id}, message={self.message}, created_at={self.created_at})"
+        return f"Messages(conversation_id={self.conversation_id}, message={self.message}, role={self.role}, created_at={self.created_at})"
 
 class Documents(Document):
     user = ReferenceField(User_Auth_Table, required=True)

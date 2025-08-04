@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api_models import (
     CreateAgentRequest, CreateAgentResponse, LoginRequest, LoginResponse,
     SigninRequest, SigninResponse, UserResponse, ErrorResponse,
-    ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse
+    ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse, ConversationsResponse
 )
 from auth_utils import (
     authenticate_user, create_user, create_access_token, verify_token,
@@ -348,6 +348,19 @@ async def get_user_chatbots(current_user: User_Auth_Table = Depends(get_current_
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving chatbots"
+        )
+
+@app.get("/chatbot/conversations", response_model=List[ConversationsResponse], tags=["Chatbot"])
+async def get_chatbot_conversations(chatbot_id: str, current_user: User_Auth_Table = Depends(get_current_user)):
+    """Get all conversations for a specific chatbot"""
+    try:
+        conversations = pipeline_handler.get_chatbot_conversations(chatbot_id, str(current_user.id))
+        return conversations
+    except Exception as e:
+        logger.error(f"Error retrieving conversations for chatbot {chatbot_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving conversations"
         )
 
 

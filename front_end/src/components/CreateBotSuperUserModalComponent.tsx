@@ -48,9 +48,9 @@ const CreateBotSuperUserModalComponent = ({
         "text-embedding-3-small",
         "text-embedding-3-large",
         "text-embedding-ada-002",
-        "text-embedding-005",
-        "text-multilingual-embedding-002",
-        "multilingual-e5-large",
+        // "text-embedding-005",
+        // "text-multilingual-embedding-002",
+        // "multilingual-e5-large",
         "gemini-embedding-001"
     ];
 

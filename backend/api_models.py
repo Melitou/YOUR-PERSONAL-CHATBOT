@@ -142,6 +142,19 @@ class ChatbotDetailResponse(BaseModel):
     total_files: int = Field(..., description="Total number of files loaded")
     total_chunks: int = Field(..., description="Total number of chunks across all files")
 
+class MessageResponse(BaseModel):
+    """Response model for messages of a conversation"""
+    message: str = Field(..., description="Message content")
+    created_at: datetime = Field(..., description="When the message was created")
+    role: str = Field(..., description="Role of the message (user, agent)")
+
+class ConversationsResponse(BaseModel):
+    """Response model for conversations"""
+    conversation_id: str = Field(..., description="Conversation ID")
+    messages: List[MessageResponse] = Field(..., description="List of messages in the conversation")
+    created_at: datetime = Field(..., description="When the conversation was created")
+    belonging_user_uid: str = Field(..., description="User ID of the user who owns the conversation")
+    belonging_chatbot_id: str = Field(..., description="Chatbot ID of the chatbot that the conversation belongs to")    
 
 class ErrorResponse(BaseModel):
     """Standard error response model"""

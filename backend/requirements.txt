@@ -24,3 +24,8 @@ email-validator>=2.0.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 aiofiles>=23.2.0
+
+# Dependencies for multilingual-e5-large model
+transformers>=4.30.0
+torch>=2.0.0
+sentence-transformers>=2.2.2

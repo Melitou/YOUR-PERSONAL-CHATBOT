@@ -1,6 +1,6 @@
 import csv
 import tempfile
-from file_type import doc_type_check
+from loguru import logger
 
 
 def csv_to_md(file_bytes: bytes, delimiter: str = ",") -> str:
@@ -30,25 +30,5 @@ def csv_to_md(file_bytes: bytes, delimiter: str = ",") -> str:
                 markdown_content += "| " + " | ".join(row) + " |\n"
         return markdown_content
     except Exception as e:
-        print(f"Error with csv extraction: {e}")
+        logger.error(f"Error with csv extraction: {e}")
         return None
-
-
-# Test code - only runs when script is executed directly
-if __name__ == "__main__":
-    # Example usage (commented out to prevent file not found errors)
-    # file_bytes = open("example.csv", "rb").read()
-    # type_doc = doc_type_check(file_bytes)
-    # print(type_doc[0])
-    # print(f"File size: {type_doc[1]} bytes")
-    #
-    # if type_doc[0] == "The document provided is a CSV file":
-    #     md = csv_to_md(file_bytes)
-    #     print(md[:100])
-    # else:
-    #     print("Unsupported document type for this script.")
-    print("CSV parser module loaded successfully")
-
-# text to sql llama index
-# smolAgents
-# if 60% is numbers to sql lite database

@@ -16,6 +16,22 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Transformers imports (with error handling for optional dependency)
+try:
+    import torch
+    import torch.nn.functional as F
+    from transformers import AutoTokenizer, AutoModel
+    from torch import Tensor
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    torch = None
+    F = None
+    AutoTokenizer = None
+    AutoModel = None
+    Tensor = None
+    TRANSFORMERS_AVAILABLE = False
+    logger.warning("Transformers not available. Install 'transformers' and 'torch' to use multilingual-e5-large model.")
+
 
 class EmbeddingService:
     """
@@ -28,16 +44,40 @@ class EmbeddingService:
         self.google_initialized = False
         self.google_client = None
         self.pinecone_client = None
+        
+        # Transformers models
+        self.transformers_models = {}
+        self.transformers_tokenizers = {}
+
+        self.model_providers = {
+            # OpenAI models
+            "text-embedding-3-large": "openai",
+            "text-embedding-3-small": "openai",
+            "text-embedding-ada-002": "openai",
+
+            # Google models
+            "text-embedding-005": "google",
+            "text-multilingual-embedding-002": "google",
+            "gemini-embedding-001": "google",
+
+            # Open-Source models
+            "multilingual-e5-large": "other",
+        }
 
         # Fallback model hierarchy
         self.fallback_models = {
+            # OpenAI models
             "text-embedding-3-large": "text-embedding-3-small",
             "text-embedding-3-small": "text-embedding-ada-002",
-            "text-embedding-ada-002": "text-embedding-005",
+            "text-embedding-ada-002": "gemini-embedding-001",
+
+            # Gemini models
+            "gemini-embedding-001": "text-embedding-005",
             "text-embedding-005": "text-multilingual-embedding-002",
-            "text-multilingual-embedding-002": "multilingual-e5-large",
-            "multilingual-e5-large": "gemini-embedding-001",
-            "gemini-embedding-001": "text-embedding-3-small"
+            "text-multilingual-embedding-002": "gemini-embedding-001",
+
+            # Open-Source models
+            "multilingual-e5-large": "text-embedding-3-small",
         }
 
     def initialize_embedding_model(self,
@@ -61,7 +101,14 @@ class EmbeddingService:
                 logger.info(
                     f"Attempting to initialize model: {current_model} (attempt {attempts + 1})")
 
-                if current_model.startswith("text-embedding"):
+                # Determine provider from model_providers dictionary
+                if current_model not in self.model_providers:
+                    raise ValueError(
+                        f"Unknown embedding model: {current_model}")
+                
+                provider = self.model_providers[current_model]
+
+                if provider == "openai":
                     # Initialize OpenAI client
                     if not self.openai_client:
                         api_key = os.getenv("OPENAI_API_KEY")
@@ -86,7 +133,7 @@ class EmbeddingService:
                         f"Successfully initialized OpenAI model: {current_model}")
                     return current_model
 
-                elif current_model.startswith("gemini"):
+                elif provider == "google":
                     # Initialize Google client
                     if not self.google_initialized:
                         api_key = os.getenv("GOOGLE_API_KEY")
@@ -108,9 +155,47 @@ class EmbeddingService:
                         f"Successfully initialized Google model: {current_model}")
                     return current_model
 
+                elif provider == "other":
+                    # Handle open-source models (currently supports multilingual-e5-large)
+                    if current_model == "multilingual-e5-large":
+                        if not TRANSFORMERS_AVAILABLE:
+                            raise ValueError(
+                                "Transformers not available. Install 'transformers' and 'torch' to use multilingual-e5-large model.")
+                        
+                        # Initialize multilingual-e5-large model
+                        if current_model not in self.transformers_models:
+                            logger.info(f"Loading {current_model} model...")
+                            
+                            try:
+                                tokenizer = AutoTokenizer.from_pretrained('intfloat/multilingual-e5-large')
+                                model = AutoModel.from_pretrained('intfloat/multilingual-e5-large')
+                                
+                                self.transformers_tokenizers[current_model] = tokenizer
+                                self.transformers_models[current_model] = model
+                                
+                                logger.info(f"Successfully loaded {current_model} model")
+                            except Exception as e:
+                                raise ValueError(f"Failed to load {current_model}: {e}")
+                        
+                        # Test the model with a simple embedding
+                        test_input = ["query: test"]
+                        tokenizer = self.transformers_tokenizers[current_model]
+                        model = self.transformers_models[current_model]
+                        
+                        batch_dict = tokenizer(test_input, max_length=512, padding=True, truncation=True, return_tensors='pt')
+                        with torch.no_grad():
+                            outputs = model(**batch_dict)
+                            embeddings = self._average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+                            embeddings = F.normalize(embeddings, p=2, dim=1)
+                        
+                        logger.info(f"Successfully initialized {current_model} model")
+                        return current_model
+                    else:
+                        raise ValueError(f"Open-source model {current_model} not yet implemented")
+                
                 else:
                     raise ValueError(
-                        f"Invalid embedding model: {current_model}")
+                        f"Unknown provider '{provider}' for model: {current_model}")
 
             except Exception as e:
                 logger.warning(
@@ -153,7 +238,13 @@ class EmbeddingService:
 
         for attempt in range(1, max_retries + 1):
             try:
-                if model_name.startswith("text-embedding"):
+                # Determine provider from model_providers dictionary
+                if model_name not in self.model_providers:
+                    raise ValueError(f"Unknown embedding model: {model_name}")
+                
+                provider = self.model_providers[model_name]
+
+                if provider == "openai":
                     if not self.openai_client:
                         raise RuntimeError("OpenAI client not initialized")
 
@@ -165,7 +256,7 @@ class EmbeddingService:
                     embeddings = [item.embedding for item in response.data]
                     return embeddings
 
-                elif model_name.startswith("gemini"):
+                elif provider == "google":
                     if not self.google_client:
                         raise RuntimeError("Google client not initialized")
 
@@ -178,8 +269,35 @@ class EmbeddingService:
                     embeddings = [embedding.values for embedding in result.embeddings]
                     return embeddings
 
+                elif provider == "other":
+                    if model_name == "multilingual-e5-large":
+                        if model_name not in self.transformers_models:
+                            raise RuntimeError(f"{model_name} model not initialized")
+                        
+                        tokenizer = self.transformers_tokenizers[model_name]
+                        model = self.transformers_models[model_name]
+                        
+                        # Preprocess chunks for multilingual-e5-large
+                        # Add "query: " prefix as recommended by the model documentation
+                        processed_chunks = [f"query: {chunk}" for chunk in chunks]
+                        
+                        # Tokenize the input texts
+                        batch_dict = tokenizer(processed_chunks, max_length=512, padding=True, truncation=True, return_tensors='pt')
+                        
+                        with torch.no_grad():
+                            outputs = model(**batch_dict)
+                            embeddings = self._average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+                            # Normalize embeddings
+                            embeddings = F.normalize(embeddings, p=2, dim=1)
+                        
+                        # Convert to list of lists for consistency with other providers
+                        embeddings_list = embeddings.tolist()
+                        return embeddings_list
+                    else:
+                        raise ValueError(f"Open-source model {model_name} not yet implemented")
+                
                 else:
-                    raise ValueError(f"Unknown embedding model: {model_name}")
+                    raise ValueError(f"Unknown provider '{provider}' for model: {model_name}")
 
             except Exception as e:
                 logger.warning(
@@ -203,10 +321,20 @@ class EmbeddingService:
         Returns:
             True if the model is initialized, False otherwise
         """
-        if model_name.startswith("text-embedding"):
+        if model_name not in self.model_providers:
+            return False
+        
+        provider = self.model_providers[model_name]
+        
+        if provider == "openai":
             return self.openai_client is not None
-        elif model_name.startswith("gemini"):
+        elif provider == "google":
             return self.google_initialized
+        elif provider == "other":
+            if model_name == "multilingual-e5-large":
+                return model_name in self.transformers_models
+            else:
+                return False
         else:
             return False
 

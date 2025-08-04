@@ -559,22 +559,21 @@ Answer only with the succinct context and nothing else.
 
         return result
 
-    def get_pending_documents(self, limit: Optional[int] = None) -> List[Documents]:
-        """Get all documents with status='pending'"""
+    def get_pending_documents(self, user: User_Auth_Table, limit: Optional[int] = None) -> List[Documents]:
+        """Get all documents with status='pending' for a specific user"""
         try:
-            query = Documents.objects(status="pending")
+            query = Documents.objects(status="pending", user=user)  # ✅ Add user filter
             if limit:
                 query = query.limit(limit)
-
+            
             documents = list(query)
-            logger.info(f"Found {len(documents)} pending documents")
+            logger.info(f"Found {len(documents)} pending documents for user {user.user_name}")
             return documents
-
         except Exception as e:
             logger.error(f"Error querying pending documents: {e}")
             raise
 
-    async def process_pending_documents(self, limit: Optional[int] = None, use_parallel: bool = True) -> Dict:
+    async def process_pending_documents(self, user: User_Auth_Table, limit: Optional[int] = None, use_parallel: bool = True) -> Dict:
         """Process all pending documents with optional parallel processing"""
         logger.info("\n=== Starting Document Processing Pipeline ===")
 
@@ -589,7 +588,7 @@ Answer only with the succinct context and nothing else.
 
         try:
             # Get pending documents
-            documents = self.get_pending_documents(limit)
+            documents = self.get_pending_documents(user=user, limit=limit)
 
             if not documents:
                 logger.info("No pending documents found")
@@ -739,7 +738,7 @@ def main():
 
         # Process documents
         async def run_processing():
-            return await processor.process_pending_documents(limit, use_parallel)
+            return await processor.process_pending_documents(user=processor.user, limit=limit, use_parallel=use_parallel)
 
         results = asyncio.run(run_processing())
 

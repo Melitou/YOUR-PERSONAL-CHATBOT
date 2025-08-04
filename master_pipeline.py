@@ -481,28 +481,33 @@ def main():
     try:
         # STEP 1: Get folder path
         while True:
-            folder_path = input("📁 Enter folder path containing documents: ").strip()
+            folder_path = input(
+                "📁 Enter folder path containing documents: ").strip()
             if folder_path:
                 folder_path = folder_path.strip('"\'')
                 if os.path.exists(folder_path):
                     file_count = len([f for f in Path(folder_path).iterdir()
                                       if f.is_file() and f.suffix.lower() in {'.pdf', '.docx', '.txt', '.csv'}])
-                    print(f"✅ Found {file_count} supported files in {folder_path}")
+                    print(
+                        f"✅ Found {file_count} supported files in {folder_path}")
                     break
                 else:
-                    print(f"❌ Folder '{folder_path}' does not exist. Please try again.")
+                    print(
+                        f"❌ Folder '{folder_path}' does not exist. Please try again.")
             else:
                 print("⚠️  Please enter a valid folder path.")
 
-        # STEP 2: Get namespace 
+        # STEP 2: Get namespace
         while True:
-            namespace = input("🏷️  Enter namespace (e.g., 'my_docs', 'company'): ").strip()
+            namespace = input(
+                "🏷️  Enter namespace (e.g., 'my_docs', 'company'): ").strip()
             if namespace:
                 if '_' in namespace:
                     print("⚠️  Namespace cannot contain underscores. Please try again.")
                     continue
                 if len(namespace) > 50:
-                    print("⚠️  Namespace too long (max 50 characters). Please try again.")
+                    print(
+                        "⚠️  Namespace too long (max 50 characters). Please try again.")
                     continue
                 break
             else:
@@ -512,7 +517,7 @@ def main():
         print("\n🤖 Select embedding provider:")
         print("1. OpenAI (text-embedding-3-small)")
         print("2. Gemini (gemini-embedding-001)")
-        
+
         while True:
             choice = input("Choose provider (1 or 2): ").strip()
             if choice == "1":
@@ -526,16 +531,71 @@ def main():
             else:
                 print("⚠️  Please enter 1 or 2.")
 
-        # STEP 4: Get chunking strategy
+        # STEP 4: Get chatbot model
+        print("\n🤖 Select chatbot model:")
+        print("Choose which AI model will power your personal document assistant:")
+        print()
+        print("📘 OpenAI Models:")
+        openai_models = [
+            ("gpt-4.1", "GPT-4.1 - Latest flagship model (recommended)"),
+            ("gpt-4o", "GPT-4o - Optimized for general use"),
+            ("gpt-4o-mini", "GPT-4o Mini - Fast and efficient"),
+            ("gpt-o3", "GPT-o3 - Advanced reasoning model"),
+            ("gpt-o3-pro", "GPT-o3 Pro - Enhanced reasoning"),
+            ("gpt-o3-mini", "GPT-o3 Mini - Compact reasoning model")
+        ]
+
+        print("🟢 Gemini Models:")
+        gemini_models = [
+            ("gemini-2.5-pro", "Gemini 2.5 Pro - Latest flagship model"),
+            ("gemini-2.5-flash", "Gemini 2.5 Flash - Fast and efficient"),
+            ("gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite - Lightweight"),
+            ("gemini-2.0-flash", "Gemini 2.0 Flash - Reliable performance"),
+            ("gemini-2.0-flash-lite", "Gemini 2.0 Flash Lite - Quick responses"),
+            ("gemini-1.5-pro", "Gemini 1.5 Pro - Proven performance"),
+            ("gemini-1.5-flash", "Gemini 1.5 Flash - Balanced option")
+        ]
+
+        # Display options with numbers
+        all_models = openai_models + gemini_models
+        for i, (model_id, description) in enumerate(all_models, 1):
+            provider = "🔵 OpenAI" if model_id.startswith("gpt") else "🟢 Gemini"
+            print(f"{i:2d}. {provider} - {description}")
+
+        chatbot_model = None
+        while True:
+            try:
+                choice = input(
+                    f"\nChoose chatbot model (1-{len(all_models)}): ").strip()
+                if choice.isdigit():
+                    choice_num = int(choice)
+                    if 1 <= choice_num <= len(all_models):
+                        chatbot_model = all_models[choice_num - 1][0]
+                        provider = "OpenAI" if chatbot_model.startswith(
+                            "gpt") else "Gemini"
+                        print(f"✅ Selected: {chatbot_model} ({provider})")
+                        break
+                    else:
+                        print(
+                            f"⚠️  Please enter a number between 1 and {len(all_models)}.")
+                else:
+                    print(
+                        f"⚠️  Please enter a valid number between 1 and {len(all_models)}.")
+            except ValueError:
+                print(
+                    f"⚠️  Please enter a valid number between 1 and {len(all_models)}.")
+
+        # STEP 5: Get chunking strategy
         print("\n✂️  Select chunking strategy:")
         print("1. Token-based (default) - Split by token count, good for general use")
         print("2. Semantic - Split by meaning, requires OpenAI embeddings")
         print("3. Line-based - Split by line count, good for structured text")
         print("4. Recursive - Character-based recursive splitting")
-        
+
         chunking_method = "token"  # default
         while True:
-            choice = input("Choose chunking strategy (1-4, default 1): ").strip()
+            choice = input(
+                "Choose chunking strategy (1-4, default 1): ").strip()
             if choice == "1" or choice == "":
                 chunking_method = "token"
                 print("✅ Selected: Token-based chunking")
@@ -558,7 +618,8 @@ def main():
         print(f"\n🔧 Configuration:")
         print(f"   📁 Folder: {folder_path}")
         print(f"   🏷️  Namespace: {namespace}")
-        print(f"   🤖 Embedding: {embedding_model}")
+        print(f"   🔍 Embedding: {embedding_model}")
+        print(f"   🤖 Chatbot: {chatbot_model}")
         print(f"   ✂️  Chunking: {chunking_method}")
 
         # Confirmation
@@ -579,7 +640,8 @@ def main():
 
         # Create unique namespace
         try:
-            unique_namespace = master_pipeline.upload_pipeline.create_unique_namespace(namespace)
+            unique_namespace = master_pipeline.upload_pipeline.create_unique_namespace(
+                namespace)
             print(f"✅ Created namespace: {unique_namespace}")
         except Exception as e:
             print(f"❌ Error creating namespace: {e}")
@@ -597,7 +659,8 @@ def main():
 
         # Check if processing was successful
         if not results.get('complete_workflow_success'):
-            print(f"\n❌ Processing failed: {results.get('message', 'Unknown error')}")
+            print(
+                f"\n❌ Processing failed: {results.get('message', 'Unknown error')}")
             master_pipeline.close()
             return
 
@@ -612,7 +675,7 @@ def main():
 
         # Get user ID for chatbot
         user_id = str(master_pipeline.upload_pipeline.user.id)
-        
+
         # Close the pipeline
         master_pipeline.close()
 
@@ -623,12 +686,13 @@ def main():
 
         # Import and start the RAG chatbot
         from LLM.rag_llm_call import start_rag_chat_session
-        
+
         # Start the interactive chat session
         start_rag_chat_session(
             user_id=user_id,
             namespace=namespace,  # Use original namespace (without user_id)
-            embedding_model=embedding_model
+            embedding_model=embedding_model,
+            chatbot_model=chatbot_model
         )
 
     except KeyboardInterrupt:

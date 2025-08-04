@@ -13,6 +13,19 @@ Your retry logic may compound this (e.g. 4 retrying + 4 new ones).
 
 Your embedding step is batched, so it doesn’t contribute to request spikes.
 
+4. What about sql dbs?
+
+
+
+
+- Why does the chatbot sat that it see the summary context column ✅
+- 200K token count we start deleting the earliest messages. Remove ai and user message✅
+- User decides the final client✅
+- Check timings
+- Make user and developer
+- Add columns role and embeddings model in mongodb
+- Namespace cannot contain spaces e.g. "My chatbot" 
+
 
 
 ID: 688b494eb4b8f2c7bb33c50b

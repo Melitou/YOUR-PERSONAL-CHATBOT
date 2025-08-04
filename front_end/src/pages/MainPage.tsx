@@ -3,11 +3,11 @@ import HeaderComponent from "../components/HeaderComponent";
 import ChatComponent from "../components/ChatComponent";
 import WelcomeScreenComponent from "../components/WelcomeScreenComponent";
 import ViewStore from "../stores/ViewStore";
-import ChatbotStore from "../stores/LoadedChatbotStore";
+import LoadedChatbotStore from "../stores/LoadedChatbotStore";
 
 const MainPage = () => {
     const sidebarOpen = ViewStore((state: any) => state.sidebarOpen);
-    const chatbot = ChatbotStore((state: any) => state.chatbot);
+    const chatbot = LoadedChatbotStore((state: any) => state.loadedChatbot);
 
     return (
         <div className="h-screen flex flex-row overflow-hidden w-screen">

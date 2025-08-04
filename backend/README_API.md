@@ -162,6 +162,49 @@ Get current user information (requires authentication).
 Authorization: Bearer your_jwt_token_here
 ```
 
+### Chatbot Management
+
+#### GET `/chatbots`
+Get all chatbots created by the current user with detailed information.
+
+**Headers:**
+```
+Authorization: Bearer your_jwt_token_here
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "chatbot_id_123",
+    "name": "support_bot",
+    "description": "Customer support chatbot for product documentation",
+    "embedding_model": "text-embedding-3-small",
+    "chunking_method": "token",
+    "namespace": "support_bot_user123_20241201",
+    "date_created": "2024-01-01T12:00:00",
+    "loaded_files": [
+      {
+        "file_name": "user_manual.pdf",
+        "file_type": "pdf",
+        "status": "processed",
+        "upload_date": "2024-01-01T12:00:00",
+        "total_chunks": 15
+      },
+      {
+        "file_name": "faq.txt",
+        "file_type": "txt",
+        "status": "processed",
+        "upload_date": "2024-01-01T12:05:00",
+        "total_chunks": 8
+      }
+    ],
+    "total_files": 2,
+    "total_chunks": 23
+  }
+]
+```
+
 ## 👥 User Types
 
 ### Normal Users

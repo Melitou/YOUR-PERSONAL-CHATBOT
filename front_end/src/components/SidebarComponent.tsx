@@ -5,7 +5,6 @@ import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
 import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent";
 import UserAuthStore from "../stores/UserAuthStore";
 import ManageChatbotsModalComponent from "./ManageChatbotsModalComponent";
-import ChatbotStore from "../stores/LoadedChatbotStore";
 
 const SidebarComponent = () => {
     const user = UserAuthStore((state: any) => state.user);
@@ -187,13 +186,11 @@ const SidebarComponent = () => {
                 <CreateBotSuperUserModalComponent 
                     open={createBotModalOpen} 
                     onClose={() => setCreateBotModalOpen(false)} 
-                    onSubmit={() => {}}
                 />
             ) : (
                 <CreateBotUserModalComponent 
                     open={createBotModalOpen} 
                     onClose={() => setCreateBotModalOpen(false)} 
-                    onSubmit={() => {}}
                 />
             )}
 

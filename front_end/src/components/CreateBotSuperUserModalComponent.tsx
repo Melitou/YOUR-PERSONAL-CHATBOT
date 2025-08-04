@@ -1,21 +1,14 @@
 import { Modal } from "@mui/material";
 import { useState, useRef, useEffect } from "react";
-import { chatbotApi } from "../utils/api";
+import ChatbotManagerStore from "../stores/ChatbotManagerStore";
 
 const CreateBotSuperUserModalComponent = ({ 
     open, 
     onClose, 
-    onSubmit 
+    
 }: { 
     open: boolean, 
     onClose: () => void, 
-    onSubmit: (
-        name: string, 
-        description: string, 
-        selectedFiles: File[], 
-        chunkingMethod: string, 
-        embeddingModel: string
-    ) => void 
 }) => {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -24,6 +17,8 @@ const CreateBotSuperUserModalComponent = ({
     const [chunkingMethod, setChunkingMethod] = useState("Fixed Token");
     const [embeddingModel, setEmbeddingModel] = useState("text-embedding-3-small");
     const [errorMessage, setErrorMessage] = useState("");
+
+    const {isLoading} = ChatbotManagerStore.getState();
 
     useEffect(() => {
         if (open) {
@@ -93,18 +88,38 @@ const CreateBotSuperUserModalComponent = ({
         }
     };
 
-    const handleSubmit = async (name: string, description: string, files: File[], chunkingMethod: string, embeddingModel: string) => {
+    const handleSubmit = async (
+        name: string, 
+        description: string, 
+        files: File[], 
+        chunkingMethod: string, 
+        embeddingModel: string
+    ) => {
         try {
             console.log('Creating chatbot with name:', name, 'description:', description, 'files:', files, 'chunkingMethod:', chunkingMethod, 'embeddingModel:', embeddingModel);
-            const result = await chatbotApi.createSuperUserChatbot(
-                name, 
-                description, 
-                files, 
-                chunkingMethod, 
-                embeddingModel
-            );
+            
+            if (!name || !description || !files.length || !chunkingMethod || !embeddingModel) {
+                setErrorMessage("Please fill in all fields and select at least one file");
+                return;
+            }
+
+            const data = {
+                name: name,
+                description: description,
+                files: files,
+                chunkingMethod: chunkingMethod,
+                embeddingModel: embeddingModel
+            }
+
+            const result = await ChatbotManagerStore.getState().createChatbotSuperUser(data);
             console.log('Chatbot created successfully:', result);
-            onSubmit(name, description, files, chunkingMethod, embeddingModel);
+
+            setName("");
+            setDescription("");
+            setSelectedFiles([]);
+            setChunkingMethod("Fixed Token");
+            setEmbeddingModel("text-embedding-3-small");
+            setErrorMessage("");
             onClose();
         } catch (error) {
             console.error('Failed to create chatbot:', error);
@@ -209,10 +224,14 @@ const CreateBotSuperUserModalComponent = ({
 
                     <div className="flex justify-center">
                         <button 
-                            className="px-8 py-3 bg-[#23272e] text-white rounded-md hover:bg-[#23272e]/80 transition-colors font-medium" 
+                            className="px-8 py-3 bg-[#23272e] text-white rounded-md hover:bg-[#23272e]/80 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" 
                             onClick={() => handleSubmit(name, description, selectedFiles, chunkingMethod, embeddingModel)}
+                            disabled={isLoading}
                         >
-                            Create Agent
+                            {isLoading && (
+                                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                            )}
+                            {isLoading ? "Creating..." : "Create Agent"}
                         </button>
                     </div>
                 </div>

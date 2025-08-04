@@ -1,7 +1,8 @@
 import { Modal } from "@mui/material";
 import { useState, useRef } from "react";
+import ChatbotManagerStore from "../stores/ChatbotManagerStore";
 
-const CreateBotUserModalComponent = ({ open, onClose, onSubmit }: { open: boolean, onClose: () => void, onSubmit: (name: string, description: string, aiProvider: string, selectedFiles: File[]) => void }) => {
+const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose: () => void }) => {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [name, setName] = useState("");
@@ -45,26 +46,33 @@ const CreateBotUserModalComponent = ({ open, onClose, onSubmit }: { open: boolea
         }
     };
 
-    const handleSubmit = () => {
-        console.log("Name: ", name);
-        console.log("Description: ", description);
-        console.log("AI Provider: ", aiProvider);
-        console.log("Selected Files: ", selectedFiles);
-
+    const handleSubmit = async (
+        name: string, 
+        description: string, 
+        files: File[], 
+        aiProvider: string
+    ) => {
         // Check if any of the fields are empty
         if (!name || !description || !aiProvider || selectedFiles.length === 0) {
             setErrorMessage("Please fill in all fields and select at least one file");
             return;
         }
 
-        setErrorMessage("");
+        const data = {
+            name: name,
+            description: description,
+            files: files,
+            aiProvider: aiProvider
+        }
 
-        onSubmit(name, description, aiProvider, selectedFiles);
+        const result = await ChatbotManagerStore.getState().createChatbotNormalUser(data);
+        console.log('Chatbot created successfully:', result);
+
         setName("");
         setDescription("");
         setAiProvider("gemini");
         setSelectedFiles([]);
-        
+        setErrorMessage("");
         onClose();
     }
     
@@ -167,7 +175,7 @@ const CreateBotUserModalComponent = ({ open, onClose, onSubmit }: { open: boolea
                     <div className="flex justify-center">
                         <button 
                             className="px-8 py-3 bg-[#23272e] text-white rounded-md hover:bg-[#23272e]/80 transition-colors font-medium" 
-                            onClick={handleSubmit}
+                            onClick={() => handleSubmit(name, description, selectedFiles, aiProvider)}
                         >
                             Create Agent
                         </button>

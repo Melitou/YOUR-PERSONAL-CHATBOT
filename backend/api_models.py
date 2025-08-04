@@ -18,6 +18,11 @@ class ChunkingMethod(str, Enum):
 class EmbeddingModel(str, Enum):
     """Enumeration for embedding models"""
     OPENAI_SMALL = "text-embedding-3-small"
+    OPENAI_LARGE = "text-embedding-3-large"
+    OPENAI_ADA = "text-embedding-ada-002"
+    OPENAI_BEDROCK = "text-embedding-005"
+    OPENAI_MULTILINGUAL = "text-multilingual-embedding-002"
+    OPENAI_MULTILINGUAL_LARGE = "multilingual-e5-large"
     GEMINI = "gemini-embedding-001"
 
 
@@ -106,6 +111,36 @@ class CreateAgentResponse(BaseModel):
     processing_results: Optional[ProcessingResult] = Field(None, description="File processing results")
     embedding_results: Optional[dict] = Field(None, description="Embedding processing results")
     total_time: float = Field(..., description="Total processing time")
+
+
+class ChatbotResponse(BaseModel):
+    """Response model for chatbot"""
+    id: str = Field(..., description="Chatbot ID")
+    name: str = Field(..., description="Chatbot name")
+    description: str = Field(..., description="Chatbot description")
+
+
+class LoadedFileInfo(BaseModel):
+    """Information about a loaded file in a chatbot"""
+    file_name: str = Field(..., description="Name of the file")
+    file_type: str = Field(..., description="Type of the file (pdf, docx, txt, csv)")
+    status: str = Field(..., description="Processing status (pending, processed, failed)")
+    upload_date: datetime = Field(..., description="When the file was uploaded")
+    total_chunks: int = Field(..., description="Number of chunks created from this file")
+
+
+class ChatbotDetailResponse(BaseModel):
+    """Detailed response model for chatbot with all information"""
+    id: str = Field(..., description="Chatbot ID")
+    name: str = Field(..., description="Chatbot name")
+    description: str = Field(..., description="Chatbot description")
+    embedding_model: str = Field(..., description="Embedding model used")
+    chunking_method: str = Field(..., description="Chunking method used")
+    namespace: str = Field(..., description="Unique namespace for the chatbot")
+    date_created: datetime = Field(..., description="When the chatbot was created")
+    loaded_files: List[LoadedFileInfo] = Field(..., description="List of files loaded into this chatbot")
+    total_files: int = Field(..., description="Total number of files loaded")
+    total_chunks: int = Field(..., description="Total number of chunks across all files")
 
 
 class ErrorResponse(BaseModel):

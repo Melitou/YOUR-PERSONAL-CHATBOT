@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiClient } from "../utils/api";
+import { chatbotApi } from "../utils/api";
 
 export interface ChatbotFile {
     id: string;
@@ -36,14 +36,10 @@ interface ChatbotManagerState {
     setLoading: (loading: boolean) => void;
     setError: (error: string | null) => void;
     
-    // Utility actions
-    getChatbotById: (id: string) => CreatedChatbot | undefined;
-    getActiveChatbots: () => CreatedChatbot[];
-    toggleChatbotStatus: (id: string) => void;
-    
     // API integration actions
     fetchChatbots: () => Promise<void>;
-    createChatbot: (data: Omit<CreatedChatbot, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+    createChatbotSuperUser: (data: any) => Promise<void>;
+    createChatbotNormalUser: (data: any) => Promise<void>;
     removeChatbot: (id: string) => Promise<void>;
 }
 
@@ -97,30 +93,37 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
         set({ error, isLoading: false });
     },
 
-    // Utility functions
-    getChatbotById: (id) => {
-        return get().chatbots.find(chatbot => chatbot.id === id);
-    },
 
-    getActiveChatbots: () => {
-        return get().chatbots.filter(chatbot => chatbot.isActive);
-    },
-
-    toggleChatbotStatus: (id) => {
-        const { updateChatbot, getChatbotById } = get();
-        const chatbot = getChatbotById(id);
-        if (chatbot) {
-            updateChatbot(id, { isActive: !chatbot.isActive });
-        }
-    },
 
     // API integration methods
     fetchChatbots: async () => {
         try {
             set({ isLoading: true, error: null });
             
-            const response = await apiClient.getUserAgents();
-            set({ chatbots: response.data || [], isLoading: false });
+            const response = await chatbotApi.getUserChatbots();
+            
+            // Transform backend data to frontend format
+            const transformedChatbots: CreatedChatbot[] = (response || []).map((chatbot: any) => ({
+                id: chatbot.id,
+                name: chatbot.name,
+                description: chatbot.description,
+                namespace: chatbot.namespace,
+                index: chatbot.namespace, // Use namespace as index for now
+                embeddingType: chatbot.embedding_model as 'text-embedding-3-small' | 'text-embedding-3-large' | 'gemini-embedding-001',
+                chunkingProcess: chatbot.chunking_method as 'recursive' | 'semantic' | 'fixed-size',
+                files: (chatbot.loaded_files || []).map((file: any) => ({
+                    id: file.file_name, // Use filename as ID for now
+                    name: file.file_name,
+                    size: 0, // Backend doesn't provide file size
+                    type: file.file_type === 'txt' ? 'text/plain' : 'application/octet-stream',
+                    uploadedAt: new Date(file.upload_date)
+                })),
+                isActive: true, // Default to true since backend doesn't provide this
+                createdAt: new Date(chatbot.date_created),
+                updatedAt: new Date(chatbot.date_created), // Backend doesn't have updated date
+            }));
+            
+            set({ chatbots: transformedChatbots, isLoading: false });
         } catch (error) {
             console.error('Failed to fetch chatbots:', error);
             set({ 
@@ -130,19 +133,27 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
         }
     },
 
-    createChatbot: async (data) => {
+    createChatbotSuperUser: async (data) => {
         try {
             set({ isLoading: true, error: null });
             
             // Map the data to match the API expected format
             const apiData = {
-                name: data.name,
-                description: data.description || '',
-                aiProvider: data.embeddingType,
-                files: data.files.map(f => f as any) // Convert ChatbotFile to File type
+                user_namespace: data.name,
+                agent_description: data.description,
+                agent_provider: '',
+                chunking_method: data.chunkingMethod,
+                embedding_model: data.embeddingModel,
+                files: data.files.map((f: any) => f as any) // Convert ChatbotFile to File type
             };
             
-            const response = await agentApi.createUserAgent(apiData);
+            const response = await chatbotApi.createSuperUserChatbot(
+                apiData.user_namespace, 
+                apiData.agent_description, 
+                apiData.files, 
+                apiData.chunking_method, 
+                apiData.embedding_model
+            );
             
             // Add the created chatbot to local state
             if (response.data) {
@@ -159,11 +170,44 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
         }
     },
 
+    createChatbotNormalUser: async (data) => {
+        try {
+            set({ isLoading: true, error: null });
+
+            const apiData = {
+                user_namespace: data.name,
+                agent_description: data.description,
+                agent_provider: data.agent_provider,
+                chunking_method: '',
+                embedding_model: '',
+                files: data.files.map((f: any) => f as any) // Convert ChatbotFile to File type
+            };
+
+            const response = await chatbotApi.createNormalUserChatbot(
+                apiData.user_namespace,
+                apiData.agent_description,
+                apiData.files,
+                apiData.agent_provider
+            );
+    
+            // Add the created chatbot to local state
+            if (response.data) {
+                get().addChatbot(data);
+            }
+
+            set({ isLoading: false });
+        } catch (error) {
+            console.error('Failed to create chatbot:', error);
+            set({ 
+                error: error instanceof Error ? error.message : 'Failed to create chatbot',
+                isLoading: false 
+            });
+        }
+    },
+
     removeChatbot: async (id) => {
         try {
             set({ isLoading: true, error: null });
-            
-            await agentApi.deleteAgent(id);
             
             // Remove from local state on successful deletion
             get().deleteChatbot(id);

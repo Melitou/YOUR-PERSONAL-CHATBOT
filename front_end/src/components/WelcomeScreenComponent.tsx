@@ -2,10 +2,17 @@ import { useState } from "react";
 import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
 import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent";
 import UserAuthStore from "../stores/UserAuthStore";
+import ManageChatbotsModalComponent from "./ManageChatbotsModalComponent";
 
 const WelcomeScreenComponent = () => {
     const user = UserAuthStore((state: any) => state.user);
     const [createBotModalOpen, setCreateBotModalOpen] = useState(false);
+    const [existingChatbotsModalOpen, setExistingChatbotsModalOpen] = useState(false);
+
+    const handleExistingChatbotsClick = () => {
+        // Open the existing chatbots modal
+        setExistingChatbotsModalOpen(true);
+    }
     
     return (
         <div className="flex flex-col w-full h-full text-white items-center justify-center">
@@ -26,7 +33,7 @@ const WelcomeScreenComponent = () => {
                         </button>
                     </div>
                     <div className="flex flex-row w-50 h-30 gap-2 bg-[#efefef] rounded-lg shadow-md border border-gray-200 hover:shadow-lg hover:scale-105 transition-all duration-200">
-                        <button className="p-3 w-full  rounded-md hover:bg-[#d5d5d5] transition-colors flex flex-col items-start justify-start text-left gap-2 text-black text-xs sm:text-sm">
+                        <button onClick={handleExistingChatbotsClick} className="p-3 w-full  rounded-md hover:bg-[#d5d5d5] transition-colors flex flex-col items-start justify-start text-left gap-2 text-black text-xs sm:text-sm">
                             <span className="material-symbols-outlined">
                                 chat
                             </span>
@@ -42,15 +49,19 @@ const WelcomeScreenComponent = () => {
                 <CreateBotSuperUserModalComponent 
                     open={createBotModalOpen} 
                     onClose={() => setCreateBotModalOpen(false)} 
-                    onSubmit={() => {}}
                 />
             ) : (
                 <CreateBotUserModalComponent 
                     open={createBotModalOpen} 
                     onClose={() => setCreateBotModalOpen(false)} 
-                    onSubmit={() => {}}
                 />
             )}
+
+            <ManageChatbotsModalComponent
+                open={existingChatbotsModalOpen}
+                onClose={() => setExistingChatbotsModalOpen(false)}
+                onSelectChatbot={() => {}}
+            />
         </div>
     )
 }

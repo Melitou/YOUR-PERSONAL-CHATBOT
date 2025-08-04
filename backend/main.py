@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api_models import (
     CreateAgentRequest, CreateAgentResponse, LoginRequest, LoginResponse,
     SigninRequest, SigninResponse, UserResponse, ErrorResponse,
-    ChunkingMethod, EmbeddingModel, AgentProvider
+    ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse
 )
 from auth_utils import (
     authenticate_user, create_user, create_access_token, verify_token,
@@ -166,8 +166,8 @@ async def login(request: LoginRequest):
         )
 
 
-@app.post("/signin", response_model=SigninResponse, tags=["Authentication"])
-async def signin(request: SigninRequest):
+@app.post("/signup", response_model=SigninResponse, tags=["Authentication"])
+async def signup(request: SigninRequest):
     """Register a new user"""
     try:
         # Check if user already exists
@@ -282,6 +282,15 @@ async def create_agent(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Namespace cannot be empty"
             )
+
+        # Log the request
+        logger.info(f"\n\n\nCreating agent for user: {current_user.user_name} (Super User: {is_super_user})")
+        logger.info(f"Agent description: {agent_description}")
+        logger.info(f"User namespace: {user_namespace}")
+        logger.info(f"Chunking method: {chunking_method_enum}")
+        logger.info(f"Embedding model: {embedding_model_enum}")
+        logger.info(f"Agent provider: {agent_provider_enum}")
+        logger.info(f"Files: {files}\n\n")
         
         # Use the authenticated user (no need to create a new user)
         user = current_user
@@ -316,7 +325,6 @@ async def create_agent(
             logger.warning(f"⚠️ Agent creation completed with issues for user {user.user_name}")
         
         return response
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -324,6 +332,21 @@ async def create_agent(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
+        )
+
+
+@app.get("/chatbots", response_model=List[ChatbotDetailResponse], tags=["Chatbot"])
+async def get_user_chatbots(current_user: User_Auth_Table = Depends(get_current_user)):
+    """Get all chatbots for a user with detailed information including loaded files"""
+    try:
+        chatbots = pipeline_handler.get_user_chatbots(str(current_user.id))
+        logger.info(f"Retrieved {len(chatbots)} chatbots for user {current_user.user_name}")
+        return chatbots
+    except Exception as e:
+        logger.error(f"Error retrieving chatbots for user {current_user.user_name}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving chatbots"
         )
 
 

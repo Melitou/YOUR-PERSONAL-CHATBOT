@@ -1,7 +1,8 @@
 import { Modal } from "@mui/material";
 import { useState, useEffect } from "react";
 
-import ChatbotManagerStore, { type CreatedChatbot, type ChatbotFile } from "../stores/ChatbotManagerStore";
+import ChatbotManagerStore, { type CreatedChatbot } from "../stores/ChatbotManagerStore";
+import LoadedChatbotStore from "../stores/LoadedChatbotStore";
 
 const ManageChatbotsModalComponent = ({ 
     open, 
@@ -14,146 +15,20 @@ const ManageChatbotsModalComponent = ({
 }) => {
     const { 
         chatbots, 
-        addChatbot, 
         isLoading, 
-        error, 
-        toggleChatbotStatus 
+        error,
+        fetchChatbots,
+        deleteChatbot
     } = ChatbotManagerStore();
     const [expandedChatbot, setExpandedChatbot] = useState<string | null>(null);
+    const { setLoadedChatbot } = LoadedChatbotStore((state: any) => state);
 
-
-    // Add fake chatbots for testing/development when component mounts
+    // Fetch real chatbots when component mounts
     useEffect(() => {
-        if (chatbots.length === 0) {
-            // Create fake files
-            const fakeFiles1: ChatbotFile[] = [
-                {
-                    id: "file1",
-                    name: "product_manual.pdf",
-                    size: 2048576, // 2MB
-                    type: "application/pdf",
-                    uploadedAt: new Date("2024-01-15")
-                },
-                {
-                    id: "file2",
-                    name: "company_policies.docx",
-                    size: 1024000, // 1MB
-                    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    uploadedAt: new Date("2024-01-16")
-                }
-            ];
-
-            const fakeFiles2: ChatbotFile[] = [
-                {
-                    id: "file3",
-                    name: "customer_data.csv",
-                    size: 512000, // 512KB
-                    type: "text/csv",
-                    uploadedAt: new Date("2024-01-20")
-                },
-                {
-                    id: "file4",
-                    name: "support_guide.txt",
-                    size: 256000, // 256KB
-                    type: "text/plain",
-                    uploadedAt: new Date("2024-01-21")
-                }
-            ];
-
-            const fakeFiles3: ChatbotFile[] = [
-                {
-                    id: "file5",
-                    name: "technical_specs.pdf",
-                    size: 3072000, // 3MB
-                    type: "application/pdf",
-                    uploadedAt: new Date("2024-01-25")
-                }
-            ];
-
-            const fakeFiles4: ChatbotFile[] = [
-                {
-                    id: "file6",
-                    name: "api_documentation.md",
-                    size: 512000, // 512KB
-                    type: "text/markdown",
-                    uploadedAt: new Date("2024-02-01")
-                },
-                {
-                    id: "file7",
-                    name: "user_guide.pdf",
-                    size: 1536000, // 1.5MB
-                    type: "application/pdf",
-                    uploadedAt: new Date("2024-02-02")
-                }
-            ];
-
-            const fakeFiles5: ChatbotFile[] = [
-                {
-                    id: "file8",
-                    name: "faq_database.txt",
-                    size: 256000, // 256KB
-                    type: "text/plain",
-                    uploadedAt: new Date("2024-02-10")
-                }
-            ];
-
-            // Add fake chatbots for demo/development purposes
-            const fakeChatbots = [
-                {
-                    name: "Customer Support Bot",
-                    description: "Handles customer inquiries and support requests",
-                    namespace: "customer_support",
-                    index: "support_index_v1",
-                    embeddingType: "text-embedding-3-small" as const,
-                    chunkingProcess: "recursive" as const,
-                    files: fakeFiles1,
-                    isActive: true
-                },
-                {
-                    name: "Product Assistant",
-                    description: "Provides product information and recommendations",
-                    namespace: "product_help",
-                    index: "product_index_v2",
-                    embeddingType: "text-embedding-3-large" as const,
-                    chunkingProcess: "semantic" as const,
-                    files: fakeFiles2,
-                    isActive: true
-                },
-                {
-                    name: "Technical Documentation Bot",
-                    description: "Answers technical questions from documentation",
-                    namespace: "tech_docs",
-                    index: "tech_index_v1",
-                    embeddingType: "gemini-embedding-001" as const,
-                    chunkingProcess: "fixed-size" as const,
-                    files: fakeFiles3,
-                    isActive: false
-                },
-                {
-                    name: "API Helper",
-                    description: "Assists developers with API usage and integration",
-                    namespace: "api_support",
-                    index: "api_index_v1",
-                    embeddingType: "text-embedding-3-small" as const,
-                    chunkingProcess: "recursive" as const,
-                    files: fakeFiles4,
-                    isActive: true
-                },
-                {
-                    name: "FAQ Bot",
-                    description: "Answers frequently asked questions",
-                    namespace: "faq_assistant",
-                    index: "faq_index_v1",
-                    embeddingType: "text-embedding-3-large" as const,
-                    chunkingProcess: "semantic" as const,
-                    files: fakeFiles5,
-                    isActive: false
-                }
-            ];
-
-            fakeChatbots.forEach(bot => addChatbot(bot));
+        if (open && chatbots.length === 0) {
+            fetchChatbots();
         }
-    }, [chatbots.length, addChatbot]);
+    }, [open, chatbots.length, fetchChatbots]);
 
     const formatFileSize = (bytes: number): string => {
         if (bytes === 0) return '0 Bytes';
@@ -174,33 +49,19 @@ const ManageChatbotsModalComponent = ({
         return { icon: 'insert_drive_file', color: 'text-gray-400' };
     };
 
-    const getRandomConversationCount = () => {
-        // Generate random conversation count for demo purposes
-        return Math.floor(Math.random() * 150) + 1;
-    };
-
     const toggleExpanded = (chatbotId: string) => {
         setExpandedChatbot(expandedChatbot === chatbotId ? null : chatbotId);
     };
 
     const handleSelectChatbot = (chatbot: CreatedChatbot) => {
-        if (onSelectChatbot) {
-            onSelectChatbot(chatbot);
-        }
+    setLoadedChatbot(chatbot)
         onClose();
-    };
-
-    const handleToggleStatus = (e: React.MouseEvent, chatbotId: string) => {
-        e.stopPropagation();
-        toggleChatbotStatus(chatbotId);
     };
 
     const handleDeleteChatbot = (e: React.MouseEvent, chatbotId: string, chatbotName: string) => {
         e.stopPropagation();
         
         if (window.confirm(`Are you sure you want to delete "${chatbotName}"? This action cannot be undone.`)) {
-            // In demo mode, just remove from local state
-            const { deleteChatbot } = ChatbotManagerStore.getState();
             deleteChatbot(chatbotId);
         }
     };
@@ -224,7 +85,7 @@ const ManageChatbotsModalComponent = ({
                                     My Chatbots ({chatbots.length})
                                 </h2>
                                 <span className="text-sm text-gray-500">
-                                    Demo Mode
+                                    Real-time Data
                                 </span>
                             </div>
                             <button
@@ -252,7 +113,7 @@ const ManageChatbotsModalComponent = ({
                                     error
                                 </span>
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                    Error in demo mode
+                                    Error loading chatbots
                                 </h3>
                                 <p className="text-gray-500 text-center mb-4">
                                     {error}
@@ -315,24 +176,10 @@ const ManageChatbotsModalComponent = ({
                                                             <span className="text-xs text-gray-500">
                                                                 {chatbot.files.length} files
                                                             </span>
-                                                            <span className="text-xs text-gray-500">
-                                                                {getRandomConversationCount()} conversations
-                                                            </span>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center space-x-2">
-                                                    <button
-                                                        onClick={(e) => handleToggleStatus(e, chatbot.id)}
-                                                        className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                                                            chatbot.isActive 
-                                                                ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
-                                                                : 'bg-green-100 text-green-800 hover:bg-green-200'
-                                                        }`}
-                                                        title={chatbot.isActive ? 'Deactivate' : 'Activate'}
-                                                    >
-                                                        {chatbot.isActive ? 'Deactivate' : 'Activate'}
-                                                    </button>
                                                     <button
                                                         onClick={(e) => handleDeleteChatbot(e, chatbot.id, chatbot.name)}
                                                         className="px-3 py-1 bg-red-100 text-red-800 text-xs rounded-md hover:bg-red-200 transition-colors"
@@ -410,14 +257,6 @@ const ManageChatbotsModalComponent = ({
                                                                     {chatbot.index}
                                                                 </p>
                                                             </div>
-                                                            <div>
-                                                                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                                                    Conversations
-                                                                </span>
-                                                                <p className="text-sm text-gray-900 mt-1">
-                                                                    {getRandomConversationCount()} total conversations
-                                                                </p>
-                                                            </div>
                                                         </div>
                                                     </div>
 
@@ -463,9 +302,6 @@ const ManageChatbotsModalComponent = ({
                                                     <div className="flex justify-between text-xs text-gray-500">
                                                         <span>
                                                             Created: {chatbot.createdAt.toLocaleString()}
-                                                        </span>
-                                                        <span>
-                                                            Last updated: {chatbot.updatedAt.toLocaleString()}
                                                         </span>
                                                     </div>
                                                 </div>

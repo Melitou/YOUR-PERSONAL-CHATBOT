@@ -118,6 +118,59 @@ export const chatbotApi = {
         return response.json();
     },
 
+    createNormalUserChatbot: async (
+        name: string,
+        description: string,
+        files: File[],  
+        agent_provider: string,
+    ) => {
+        const formData = new FormData();
+        formData.append('agent_provider', agent_provider);
+        formData.append('agent_description', description);
+        formData.append('chunking_method', '');
+        formData.append('embedding_model', '');
+        formData.append('user_namespace', name);
+
+        files.forEach((file) => {
+            formData.append('files', file);
+        });
+
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`${apiClient['baseURL']}/create_agent`, {
+            method: 'POST',
+            headers: {
+                ...(token && { 'Authorization': `Bearer ${token}` }),
+            },
+            body: formData,
+        });
+
+        if (response.status === 401) {
+            localStorage.removeItem('authToken');
+            throw new Error('Authentication required');
+        }
+
+        if (!response.ok) {
+            let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            try {
+                const errorData = await response.text();
+                console.error('Server response:', errorData);
+                
+                try {
+                    const errorJson = JSON.parse(errorData);
+                    errorMessage = errorJson.message || errorJson.detail || errorMessage;
+                } catch {
+                    errorMessage = errorData || errorMessage;
+                }
+            } catch (parseError) {
+                console.error('Failed to parse error response:', parseError);
+            }
+            
+            throw new Error(`Failed to create chatbot: ${errorMessage}`);
+        }
+
+        return response.json();
+    },
+
     // Get all chatbots for the current user
     getUserChatbots: () =>
         apiClient.get('/chatbots'),

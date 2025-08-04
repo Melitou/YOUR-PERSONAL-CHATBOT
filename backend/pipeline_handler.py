@@ -11,11 +11,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from fastapi import UploadFile, HTTPException, status
+from bson import ObjectId
 
 from master_pipeline import MasterPipeline
 
-from db_service import initialize_db, User_Auth_Table, ChatBots
-from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata
+from db_service import initialize_db, User_Auth_Table, ChatBots, Documents, Chunks
+from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata, ChatbotDetailResponse, LoadedFileInfo
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -311,6 +312,69 @@ class PipelineHandler:
                 logger.info(f"Cleaned up temporary directory: {temp_dir}")
             except Exception as e:
                 logger.warning(f"Error cleaning up temp directory {temp_dir}: {e}")
+    
+    def get_user_chatbots(self, user_id: str) -> List[ChatbotDetailResponse]:
+        """Get all chatbots for a user with detailed information including loaded files"""
+        try:
+            # Find user by ObjectId
+            user = User_Auth_Table.objects(id=ObjectId(user_id)).first()
+            if not user:
+                logger.error(f"User not found: {user_id}")
+                return []
+            
+            # Get all chatbots for this user
+            chatbots = ChatBots.objects(user_id=user).order_by('-date_created')
+            
+            chatbot_details = []
+            for chatbot in chatbots:
+                # Get documents for this chatbot (by namespace)
+                documents = Documents.objects(
+                    user=user,
+                    namespace=chatbot.namespace
+                ).order_by('created_at')
+                
+                # Create loaded file info
+                loaded_files = []
+                total_chunks_across_files = 0
+                
+                for doc in documents:
+                    # Count chunks for this document
+                    chunk_count = Chunks.objects(document=doc).count()
+                    total_chunks_across_files += chunk_count
+                    
+                    loaded_file = LoadedFileInfo(
+                        file_name=doc.file_name,
+                        file_type=doc.file_type,
+                        status=doc.status,
+                        upload_date=doc.created_at,
+                        total_chunks=chunk_count
+                    )
+                    loaded_files.append(loaded_file)
+                
+                # Create detailed chatbot response
+                chatbot_detail = ChatbotDetailResponse(
+                    id=str(chatbot.id),
+                    name=chatbot.name,
+                    description=chatbot.description,
+                    embedding_model=chatbot.embedding_model,
+                    chunking_method=chatbot.chunking_method,
+                    namespace=chatbot.namespace,
+                    date_created=chatbot.date_created,
+                    loaded_files=loaded_files,
+                    total_files=len(loaded_files),
+                    total_chunks=total_chunks_across_files
+                )
+                chatbot_details.append(chatbot_detail)
+            
+            logger.info(f"Retrieved {len(chatbot_details)} chatbots for user {user.user_name}")
+            return chatbot_details
+            
+        except Exception as e:
+            logger.error(f"Error retrieving user chatbots: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error retrieving chatbots: {str(e)}"
+            )
     
     def close(self):
         """Close database connections"""

@@ -24,7 +24,26 @@ Your embedding step is batched, so it doesn’t contribute to request spikes.
 - Check timings
 - Make user and developer
 - Add columns role and embeddings model in mongodb
-- Namespace cannot contain spaces e.g. "My chatbot" 
+
+
+
+- Namespace cannot contain spaces e.g. "My chatbot" ✅
+### 1. ✅ Updated create_unique_namespace method:
+Removed underscore prohibition
+Added space prohibition
+Added pipe character (|) prohibition
+Changed separator from _ to |
+Updated docstring with new format and validation rules
+### 2. ✅ Updated validation logic:
+CLI now checks for spaces instead of underscores
+### 3. ✅ Allows: Underscores (my_documents, chat_bot_data)
+❌ Prohibits: Spaces (my documents)
+❌ Prohibits: Pipe characters (test|data)
+❌ Prohibits: Empty/too long namespaces (unchanged)
+Format Change:
+Before: user_namespace_userid
+After: user_namespace|userid
+
 
 
 

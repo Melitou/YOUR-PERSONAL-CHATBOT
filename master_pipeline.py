@@ -500,15 +500,26 @@ def main():
         # STEP 2: Get namespace
         while True:
             namespace = input(
-                "🏷️  Enter namespace (e.g., 'my_docs', 'company'): ").strip()
+                "🏷️  Enter namespace (e.g., 'my_documents', 'company_data'): ").strip()
             if namespace:
-                if '_' in namespace:
-                    print("⚠️  Namespace cannot contain underscores. Please try again.")
+                # Comprehensive validation with immediate feedback
+                if not namespace.strip():
+                    print("⚠️  Namespace cannot be empty. Please try again.")
+                    continue
+                if ' ' in namespace:
+                    print("⚠️  Namespace cannot contain spaces. Please try again.")
+                    continue
+                if '|' in namespace:
+                    print(
+                        "⚠️  Namespace cannot contain pipe character (reserved for user ID separation). Please try again.")
                     continue
                 if len(namespace) > 50:
                     print(
                         "⚠️  Namespace too long (max 50 characters). Please try again.")
                     continue
+
+                # All validation passed
+                print(f"✅ Namespace '{namespace}' is valid.")
                 break
             else:
                 print("⚠️  Please enter a valid namespace.")
@@ -638,14 +649,47 @@ def main():
             chunking_method=chunking_method
         )
 
-        # Create unique namespace
-        try:
-            unique_namespace = master_pipeline.upload_pipeline.create_unique_namespace(
-                namespace)
-            print(f"✅ Created namespace: {unique_namespace}")
-        except Exception as e:
-            print(f"❌ Error creating namespace: {e}")
-            return
+        # Create unique namespace with retry loop
+        unique_namespace = None
+        while unique_namespace is None:
+            try:
+                unique_namespace = master_pipeline.upload_pipeline.create_unique_namespace(
+                    namespace)
+                print(f"✅ Created namespace: {unique_namespace}")
+            except ValueError as e:
+                print(f"❌ Namespace error: {e}")
+                print("Please enter a new namespace.")
+
+                # Ask for new namespace
+                while True:
+                    namespace = input(
+                        "🏷️  Enter namespace (e.g., 'my_documents', 'company_data'): ").strip()
+                    if namespace:
+                        # Comprehensive validation with immediate feedback
+                        if not namespace.strip():
+                            print("⚠️  Namespace cannot be empty. Please try again.")
+                            continue
+                        if ' ' in namespace:
+                            print(
+                                "⚠️  Namespace cannot contain spaces. Please try again.")
+                            continue
+                        if '|' in namespace:
+                            print(
+                                "⚠️  Namespace cannot contain pipe character (reserved for user ID separation). Please try again.")
+                            continue
+                        if len(namespace) > 50:
+                            print(
+                                "⚠️  Namespace too long (max 50 characters). Please try again.")
+                            continue
+
+                        # All validation passed
+                        print(f"✅ Namespace '{namespace}' is valid.")
+                        break
+                    else:
+                        print("⚠️  Please enter a valid namespace.")
+            except Exception as e:
+                print(f"❌ Unexpected error creating namespace: {e}")
+                return
 
         # Run complete workflow with embeddings
         results = master_pipeline.process_directory_complete_with_embeddings(

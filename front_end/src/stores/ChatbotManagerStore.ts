@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { chatbotApi } from "../utils/api";
+import ViewStore from "./ViewStore";
 
 export interface ChatbotFile {
     id: string;
@@ -38,9 +39,12 @@ interface ChatbotManagerState {
     
     // API integration actions
     fetchChatbots: () => Promise<void>;
-    createChatbotSuperUser: (data: any) => Promise<void>;
-    createChatbotNormalUser: (data: any) => Promise<void>;
+    createChatbotSuperUser: (data: any) => Promise<boolean>;
+    createChatbotNormalUser: (data: any) => Promise<boolean>;
     removeChatbot: (id: string) => Promise<void>;
+    
+    // Reset action
+    resetStore: () => void;
 }
 
 const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
@@ -125,15 +129,17 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
             
             set({ chatbots: transformedChatbots, isLoading: false });
         } catch (error) {
-            console.error('Failed to fetch chatbots:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Failed to fetch chatbots';
+            console.error('Failed to fetch chatbots:', errorMessage);
+            ViewStore.getState().addError(errorMessage);
             set({ 
-                error: error instanceof Error ? error.message : 'Failed to fetch chatbots',
+                error: errorMessage,
                 isLoading: false 
             });
         }
     },
 
-    createChatbotSuperUser: async (data) => {
+    createChatbotSuperUser: async (data): Promise<boolean> => {
         try {
             set({ isLoading: true, error: null });
             
@@ -154,30 +160,31 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
                 apiData.chunking_method, 
                 apiData.embedding_model
             );
-            
-            // Add the created chatbot to local state
-            if (response.data) {
-                get().addChatbot(data);
-            }
-            
+            console.log('Response:', response);
             set({ isLoading: false });
+            return true;
         } catch (error) {
-            console.error('Failed to create chatbot:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Failed to create super user chatbot';
+            console.error('Failed to create super user chatbot:', errorMessage);
+            ViewStore.getState().addError(errorMessage);
             set({ 
-                error: error instanceof Error ? error.message : 'Failed to create chatbot',
+                error: errorMessage,
                 isLoading: false 
             });
+            return false;
         }
     },
 
-    createChatbotNormalUser: async (data) => {
+    createChatbotNormalUser: async (data): Promise<boolean> => {
         try {
             set({ isLoading: true, error: null });
+
+            console.log('Creating chatbot with data:', data);
 
             const apiData = {
                 user_namespace: data.name,
                 agent_description: data.description,
-                agent_provider: data.agent_provider,
+                agent_provider: data.aiProvider,
                 chunking_method: '',
                 embedding_model: '',
                 files: data.files.map((f: any) => f as any) // Convert ChatbotFile to File type
@@ -189,19 +196,18 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
                 apiData.files,
                 apiData.agent_provider
             );
-    
-            // Add the created chatbot to local state
-            if (response.data) {
-                get().addChatbot(data);
-            }
-
+            console.log('Response:', response);
             set({ isLoading: false });
+            return true;
         } catch (error) {
-            console.error('Failed to create chatbot:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Failed to create normal user chatbot';
+            console.error('Failed to create normal user chatbot:', errorMessage);
+            ViewStore.getState().addError(errorMessage);
             set({ 
-                error: error instanceof Error ? error.message : 'Failed to create chatbot',
+                error: errorMessage,
                 isLoading: false 
             });
+            return false;
         }
     },
 
@@ -213,12 +219,22 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
             get().deleteChatbot(id);
             set({ isLoading: false });
         } catch (error) {
-            console.error('Failed to delete chatbot:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Failed to delete chatbot';
+            console.error('Failed to delete chatbot:', errorMessage);
+            ViewStore.getState().addError(errorMessage);
             set({ 
-                error: error instanceof Error ? error.message : 'Failed to delete chatbot',
+                error: errorMessage,
                 isLoading: false 
             });
         }
+    },
+
+    resetStore: () => {
+        set({
+            chatbots: [],
+            isLoading: false,
+            error: null
+        });
     },
 }));
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Button, TextField, Paper, Typography } from '@mui/material';
 import { authApi } from '../utils/api';
 import UserAuthStore from '../stores/UserAuthStore';
+import ViewStore from '../stores/ViewStore';
 
 const AuthPage: React.FC = () => {
     const [username, setUsername] = useState('');
@@ -10,6 +11,7 @@ const AuthPage: React.FC = () => {
     const [error, setError] = useState('');
     
     const { login } = UserAuthStore();
+    const { addError } = ViewStore();
 
     const handleSubmit = async (e: React.FormEvent) => {
         console.log('handleSubmit');
@@ -33,7 +35,10 @@ const AuthPage: React.FC = () => {
             }, response.access_token);
             
         } catch (err: any) {
-            setError(err.message || 'Login failed. Please check your credentials.');
+            const errorMessage = err.message || 'Login failed. Please check your credentials.';
+            console.error('Authentication failed:', errorMessage);
+            setError(errorMessage);
+            addError(errorMessage);
         } finally {
             setLoading(false);
         }

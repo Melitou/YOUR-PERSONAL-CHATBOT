@@ -169,7 +169,7 @@ const SidebarComponent = () => {
                 </div>
 
                 {/* User settings section */}
-                <UserComponent />
+                {/* <UserComponent /> */}
             </aside>
 
             {/* Overlay for mobile when sidebar is open */}

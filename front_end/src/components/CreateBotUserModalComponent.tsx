@@ -1,24 +1,45 @@
 import { Modal } from "@mui/material";
 import { useState, useRef } from "react";
 import ChatbotManagerStore from "../stores/ChatbotManagerStore";
+import ViewStore from "../stores/ViewStore";
 
 const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose: () => void }) => {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
-    const [aiProvider, setAiProvider] = useState("gemini");
+    const [aiProvider, setAiProvider] = useState("Gemini");
     const [errorMessage, setErrorMessage] = useState("");
+    const { addError } = ViewStore();
+    const { isLoading } = ChatbotManagerStore();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(event.target.files || []);
-        // Filter for allowed file types
-        const allowedTypes = ['.pdf', '.doc', '.docx', '.csv', '.txt'];
-        const validFiles = files.filter(file => {
-            const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-            return allowedTypes.includes(fileExtension);
-        });
-        setSelectedFiles(prev => [...prev, ...validFiles]);
+        try {
+            const files = Array.from(event.target.files || []);
+            // Filter for allowed file types
+            const allowedTypes = ['.pdf', '.doc', '.docx', '.csv', '.txt'];
+            const validFiles = files.filter(file => {
+                const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+                return allowedTypes.includes(fileExtension);
+            });
+            
+            const invalidFiles = files.filter(file => {
+                const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+                return !allowedTypes.includes(fileExtension);
+            });
+            
+            if (invalidFiles.length > 0) {
+                const errorMsg = `Invalid file types: ${invalidFiles.map(f => f.name).join(', ')}. Only PDF, DOC, DOCX, CSV, and TXT files are allowed.`;
+                addError(errorMsg);
+                console.error('Invalid file types uploaded:', invalidFiles.map(f => f.name));
+            }
+            
+            setSelectedFiles(prev => [...prev, ...validFiles]);
+        } catch (error) {
+            const errorMsg = 'Error processing uploaded files';
+            console.error('File upload error:', error);
+            addError(errorMsg);
+        }
     };
 
     const removeFile = (index: number) => {
@@ -54,7 +75,9 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
     ) => {
         // Check if any of the fields are empty
         if (!name || !description || !aiProvider || selectedFiles.length === 0) {
-            setErrorMessage("Please fill in all fields and select at least one file");
+            const errorMsg = "Please fill in all fields and select at least one file";
+            setErrorMessage(errorMsg);
+            addError(errorMsg);
             return;
         }
 
@@ -66,14 +89,19 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
         }
 
         const result = await ChatbotManagerStore.getState().createChatbotNormalUser(data);
-        console.log('Chatbot created successfully:', result);
 
-        setName("");
-        setDescription("");
-        setAiProvider("gemini");
-        setSelectedFiles([]);
-        setErrorMessage("");
-        onClose();
+        if (result) {
+            onClose();
+            setName("");
+            setDescription("");
+            setAiProvider("gemini");
+            setSelectedFiles([]);
+            setErrorMessage("");
+        } else {
+            const errorMsg = "Failed to create normal user chatbot";
+            setErrorMessage(errorMsg);
+            addError(errorMsg);
+        }
     }
     
     return (
@@ -122,25 +150,25 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                 <div className="flex items-center">
                                     <input 
                                         type="radio"
-                                        id="gemini"
+                                        id="Gemini"
                                         name="aiProvider"
-                                        value="gemini"
+                                        value="Gemini"
                                         className="mr-2"
                                         defaultChecked
                                         onChange={(e) => setAiProvider(e.target.value)}
                                     />
-                                    <label htmlFor="gemini" className="text-sm text-gray-700 cursor-pointer">Gemini</label>
+                                    <label htmlFor="Gemini" className="text-sm text-gray-700 cursor-pointer">Gemini</label>
                                 </div>
                                 <div className="flex items-center">
                                     <input 
                                         type="radio"
-                                        id="openai"
+                                        id="OpenAI"
                                         name="aiProvider"
-                                        value="openai"
+                                        value="OpenAI"
                                         className="mr-2"
                                         onChange={(e) => setAiProvider(e.target.value)}
                                     />
-                                    <label htmlFor="openai" className="text-sm text-gray-700 cursor-pointer">OpenAI</label>
+                                    <label htmlFor="OpenAI" className="text-sm text-gray-700 cursor-pointer">OpenAI</label>
                                 </div>
                             </div>
                         </div>
@@ -174,10 +202,14 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
 
                     <div className="flex justify-center">
                         <button 
-                            className="px-8 py-3 bg-[#23272e] text-white rounded-md hover:bg-[#23272e]/80 transition-colors font-medium" 
+                            className="px-8 py-3 bg-[#23272e] text-white rounded-md hover:bg-[#23272e]/80 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" 
                             onClick={() => handleSubmit(name, description, selectedFiles, aiProvider)}
+                            disabled={isLoading}
                         >
-                            Create Agent
+                            {isLoading && (
+                                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                            )}
+                            {isLoading ? "Creating..." : "Create Agent"}
                         </button>
                     </div>
                 </div>

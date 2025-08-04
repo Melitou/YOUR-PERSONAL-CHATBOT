@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import LoadedChatbotStore from '../stores/LoadedChatbotStore';
 
 interface Message {
@@ -10,9 +10,9 @@ interface Message {
 
 const ChatComponent = () => {
     
-    const { isThinking, setIsThinking } = LoadedChatbotStore();
+    const { isThinking, setIsThinking, loadedChatbot } = LoadedChatbotStore((state: any) => state);
 
-    const [messages, setMessages] = useState<Message[]>([
+    const [messages] = useState<Message[]>([
         {
             id: 1,
             text: "Hello! I'm your AI assistant. How can I help you today?",
@@ -35,45 +35,6 @@ const ChatComponent = () => {
     
     const [inputMessage, setInputMessage] = useState('');
 
-    // Dummy agent responses for demonstration
-    const dummyResponses = [
-        "That's an interesting question! Let me think about that...",
-        "I understand what you're asking. Here's what I think...",
-        "Great point! From my perspective...",
-        "That's a common question. The answer is...",
-        "I'm glad you asked! Here's my response...",
-        "Absolutely! I can help you with that...",
-        "That's a fascinating topic. Let me explain...",
-        "I see what you mean. My suggestion would be..."
-    ];
-
-    // const handleSendMessage = () => {
-    //     if (inputMessage.trim() === '') return;
-
-    //     // Add user message
-    //     const userMessage: Message = {
-    //         id: messages.length + 1,
-    //         text: inputMessage,
-    //         sender: 'user',
-    //         timestamp: new Date()
-    //     };
-
-    //     setMessages(prev => [...prev, userMessage]);
-    //     setInputMessage('');
-
-    //     // Simulate agent response after a short delay
-    //     setTimeout(() => {
-    //         const randomResponse = dummyResponses[Math.floor(Math.random() * dummyResponses.length)];
-    //         const agentMessage: Message = {
-    //             id: messages.length + 2,
-    //             text: randomResponse,
-    //             sender: 'agent',
-    //             timestamp: new Date()
-    //         };
-    //         setMessages(prev => [...prev, agentMessage]);
-    //     }, 1000);
-    // };
-
     const handleSendMessage = () => {
         setIsThinking(true);
         setTimeout(() => {
@@ -82,9 +43,36 @@ const ChatComponent = () => {
     };  
 
     return (
-        <div className="flex flex-col flex-1 min-h-0 w-full sm:w-2/3">
+        <div className="flex flex-col flex-1 h-full w-full max-w-5xl mx-auto">
+            {/* Chatbot Header */}
+            <div className="bg-white border-b border-gray-200 px-4 py-4">
+                <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="material-symbols-outlined text-white text-xl">
+                            smart_toy
+                        </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h2 className="text-lg font-semibold text-gray-900 truncate">
+                            {loadedChatbot?.name || 'AI Assistant'}
+                        </h2>
+                        {loadedChatbot?.description && (
+                            <p className="text-sm text-gray-500 truncate">
+                                {loadedChatbot.description}
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                        <div className={`w-3 h-3 rounded-full ${loadedChatbot?.isActive ? 'bg-green-400' : 'bg-gray-300'}`}></div>
+                        <span className="text-sm text-gray-500 whitespace-nowrap">
+                            {loadedChatbot?.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
             {/* Chat Messages Container */}
-            <div className="flex-1 overflow-y-auto p-10 space-y-4 w-full">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.map((message) => (
                     <div
                         key={message.id}
@@ -112,7 +100,7 @@ const ChatComponent = () => {
             </div>
 
             {/* Message Input Bar */}
-            <div className="border rounded-xl border-gray-200 bg-white p-3 w-full">
+            <div className="border rounded-xl border-gray-200 bg-white p-3">
                 <div className="flex items-center space-x-3">
                     <div className="flex-1 relative">
                         <textarea

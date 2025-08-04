@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 
 import ChatbotManagerStore, { type CreatedChatbot } from "../stores/ChatbotManagerStore";
 import LoadedChatbotStore from "../stores/LoadedChatbotStore";
+import ViewStore from "../stores/ViewStore";
 
 const ManageChatbotsModalComponent = ({ 
     open, 
@@ -22,13 +23,18 @@ const ManageChatbotsModalComponent = ({
     } = ChatbotManagerStore();
     const [expandedChatbot, setExpandedChatbot] = useState<string | null>(null);
     const { setLoadedChatbot } = LoadedChatbotStore((state: any) => state);
+    const { addError } = ViewStore();
 
     // Fetch real chatbots when component mounts
     useEffect(() => {
         if (open && chatbots.length === 0) {
-            fetchChatbots();
+            fetchChatbots().catch((error) => {
+                const errorMsg = 'Failed to load chatbots';
+                console.error('Error fetching chatbots on mount:', error);
+                addError(errorMsg);
+            });
         }
-    }, [open, chatbots.length, fetchChatbots]);
+    }, [open, chatbots.length, fetchChatbots, addError]);
 
     const formatFileSize = (bytes: number): string => {
         if (bytes === 0) return '0 Bytes';
@@ -54,15 +60,25 @@ const ManageChatbotsModalComponent = ({
     };
 
     const handleSelectChatbot = (chatbot: CreatedChatbot) => {
-    setLoadedChatbot(chatbot)
+        setLoadedChatbot(chatbot);
+        if (onSelectChatbot) {
+            onSelectChatbot(chatbot);
+        }
         onClose();
     };
 
-    const handleDeleteChatbot = (e: React.MouseEvent, chatbotId: string, chatbotName: string) => {
+    const handleDeleteChatbot = async (e: React.MouseEvent, chatbotId: string, chatbotName: string) => {
         e.stopPropagation();
         
         if (window.confirm(`Are you sure you want to delete "${chatbotName}"? This action cannot be undone.`)) {
-            deleteChatbot(chatbotId);
+            try {
+                await deleteChatbot(chatbotId);
+                console.log(`Successfully deleted chatbot: ${chatbotName}`);
+            } catch (error) {
+                const errorMsg = `Failed to delete chatbot "${chatbotName}"`;
+                console.error('Delete chatbot error:', error);
+                addError(errorMsg);
+            }
         }
     };
 
@@ -134,7 +150,7 @@ const ManageChatbotsModalComponent = ({
                                 </p>
                             </div>
                         ) : (
-                            <div className="divide-y divide-gray-200">
+                            <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
                                 {chatbots.map((chatbot) => (
                                     <div key={chatbot.id} className="p-6">
                                         {/* Chatbot List Item */}
@@ -159,7 +175,9 @@ const ManageChatbotsModalComponent = ({
                                                         </h3>
                                                         {chatbot.description && (
                                                             <p className="text-sm text-gray-600 mb-1">
-                                                                {chatbot.description}
+                                                                {chatbot.description.length > 100 
+                                                                    ? chatbot.description.slice(0, 100) + '...' 
+                                                                    : chatbot.description}
                                                             </p>
                                                         )}
                                                         <p className="text-sm text-gray-500">

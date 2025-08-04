@@ -20,7 +20,7 @@ const MainPage = () => {
             {/* Main Content */}
             <div className="flex-grow flex flex-col p-2">
                 <HeaderComponent />
-                <div className="flex flex-col flex-1 min-h-0 justify-center items-center">
+                <div className="flex flex-row flex-1 min-h-0 justify-center items-center">
                     {chatbot ? (
                         <ChatComponent />
                     ) : (

@@ -1,16 +1,20 @@
-llama-parse
-python-dotenv
-docx
-pypdf
-mongoengine
-pymongo
+llama-parse>=0.4.0
+python-dotenv>=1.0.0
+docx>=0.2.4
+pypdf>=3.17.0
+mongoengine>=0.27.0
+pymongo>=4.6.0
 
-openai
-aiolimiter
-backoff
-tiktoken
-langchain-experimental
-pinecone
+openai>=1.12.0
+aiolimiter>=1.1.0
+backoff>=2.2.1
+tiktoken>=0.5.2
+langchain-experimental>=0.0.50
+langchain-text-splitters>=0.0.1
+langchain_google_genai>=2.1.8
+langchain_openai>=0.3.28
+langchain-core>=0.1.20
+pinecone>=3.0.0
 
 fastapi>=0.104.1
 uvicorn>=0.24.0

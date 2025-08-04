@@ -4,9 +4,12 @@ import MainPage from './pages/MainPage'
 import AuthPage from './pages/AuthPage'
 import UserAuthStore from './stores/UserAuthStore'
 import { authApi } from './utils/api'
+import ErrorComponent from './components/ErrorComponent'
+import ViewStore from './stores/ViewStore'
 
 function App() {
   const { isLoggedIn, login, logout } = UserAuthStore();
+  const { addError } = ViewStore();
 
   useEffect(() => {
     // Check if user is already authenticated on app load
@@ -18,6 +21,8 @@ function App() {
           login(userData, token);
         } catch (error) {
           // Token is invalid, remove it
+          console.error('Authentication check failed:', error);
+          addError('Session expired - please log in again');
           logout();
         }
       }
@@ -29,6 +34,7 @@ function App() {
   return (
     <div>
       {isLoggedIn ? <MainPage /> : <AuthPage />}
+      <ErrorComponent />
     </div>
   )
 }

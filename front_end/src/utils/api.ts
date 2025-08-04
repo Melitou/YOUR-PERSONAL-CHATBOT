@@ -1,3 +1,5 @@
+import ViewStore from '../stores/ViewStore';
+
 // Simple API client for authentication
 class ApiClient {
     private baseURL: string;
@@ -18,32 +20,50 @@ class ApiClient {
         if (response.status === 401) {
             // Token expired or invalid
             localStorage.removeItem('authToken');
-            throw new Error('Authentication required');
+            const errorMessage = 'Authentication required - please log in again';
+            ViewStore.getState().addError(errorMessage);
+            throw new Error(errorMessage);
         }
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-            throw new Error(error.message || 'Request failed');
+            const errorMessage = error.message || `Request failed with status ${response.status}`;
+            ViewStore.getState().addError(errorMessage);
+            throw new Error(errorMessage);
         }
 
         return response.json();
     }
 
     async post(endpoint: string, data: any) {
-        const response = await fetch(`${this.baseURL}${endpoint}`, {
-            method: 'POST',
-            headers: this.getAuthHeaders(),
-            body: JSON.stringify(data),
-        });
-        return this.handleResponse(response);
+        try {
+            const response = await fetch(`${this.baseURL}${endpoint}`, {
+                method: 'POST',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify(data),
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Network error occurred';
+            console.error('POST request failed:', errorMessage);
+            ViewStore.getState().addError(errorMessage);
+            throw error;
+        }
     }
 
     async get(endpoint: string) {
-        const response = await fetch(`${this.baseURL}${endpoint}`, {
-            method: 'GET',
-            headers: this.getAuthHeaders(),
-    });
-        return this.handleResponse(response);
+        try {
+            const response = await fetch(`${this.baseURL}${endpoint}`, {
+                method: 'GET',
+                headers: this.getAuthHeaders(),
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Network error occurred';
+            console.error('GET request failed:', errorMessage);
+            ViewStore.getState().addError(errorMessage);
+            throw error;
+        }
     }
 }
 
@@ -124,51 +144,63 @@ export const chatbotApi = {
         files: File[],  
         agent_provider: string,
     ) => {
-        const formData = new FormData();
-        formData.append('agent_provider', agent_provider);
-        formData.append('agent_description', description);
-        formData.append('chunking_method', '');
-        formData.append('embedding_model', '');
-        formData.append('user_namespace', name);
+        try {
+            const formData = new FormData();
+            formData.append('agent_provider', agent_provider);
+            formData.append('agent_description', description);
+            formData.append('chunking_method', '');
+            formData.append('embedding_model', '');
+            formData.append('user_namespace', name);
 
-        files.forEach((file) => {
-            formData.append('files', file);
-        });
+            files.forEach((file) => {
+                formData.append('files', file);
+            });
 
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(`${apiClient['baseURL']}/create_agent`, {
-            method: 'POST',
-            headers: {
-                ...(token && { 'Authorization': `Bearer ${token}` }),
-            },
-            body: formData,
-        });
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`${apiClient['baseURL']}/create_agent`, {
+                method: 'POST',
+                headers: {
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                },
+                body: formData,
+            });
 
-        if (response.status === 401) {
-            localStorage.removeItem('authToken');
-            throw new Error('Authentication required');
-        }
-
-        if (!response.ok) {
-            let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-            try {
-                const errorData = await response.text();
-                console.error('Server response:', errorData);
-                
-                try {
-                    const errorJson = JSON.parse(errorData);
-                    errorMessage = errorJson.message || errorJson.detail || errorMessage;
-                } catch {
-                    errorMessage = errorData || errorMessage;
-                }
-            } catch (parseError) {
-                console.error('Failed to parse error response:', parseError);
+            if (response.status === 401) {
+                localStorage.removeItem('authToken');
+                const errorMessage = 'Authentication required - please log in again';
+                ViewStore.getState().addError(errorMessage);
+                throw new Error(errorMessage);
             }
-            
-            throw new Error(`Failed to create chatbot: ${errorMessage}`);
-        }
 
-        return response.json();
+            if (!response.ok) {
+                let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = await response.text();
+                    console.error('Server response:', errorData);
+                    
+                    try {
+                        const errorJson = JSON.parse(errorData);
+                        errorMessage = errorJson.message || errorJson.detail || errorMessage;
+                    } catch {
+                        errorMessage = errorData || errorMessage;
+                    }
+                } catch (parseError) {
+                    console.error('Failed to parse error response:', parseError);
+                    ViewStore.getState().addError('Failed to parse server error response');
+                }
+                
+                const fullErrorMessage = `Failed to create normal user chatbot: ${errorMessage}`;
+                ViewStore.getState().addError(fullErrorMessage);
+                throw new Error(fullErrorMessage);
+            }
+
+            return response.json();
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Network error occurred while creating chatbot';
+            console.error('Create normal user chatbot failed:', errorMessage);
+            ViewStore.getState().addError(errorMessage);
+            throw error;
+        }
     },
 
     // Get all chatbots for the current user

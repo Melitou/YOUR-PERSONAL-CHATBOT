@@ -327,10 +327,10 @@ class PipelineHandler:
             
             chatbot_details = []
             for chatbot in chatbots:
-                # Get documents for this chatbot (by namespace)
+                # Get documents for this chatbot (by namespace) - case insensitive
                 documents = Documents.objects(
                     user=user,
-                    namespace=chatbot.namespace
+                    namespace__iexact=chatbot.namespace
                 ).order_by('created_at')
                 
                 # Create loaded file info
@@ -350,6 +350,8 @@ class PipelineHandler:
                         total_chunks=chunk_count
                     )
                     loaded_files.append(loaded_file)
+
+                logger.info(f"Chatbot {chatbot.name} has {len(loaded_files)} loaded files and {total_chunks_across_files} total chunks")
                 
                 # Create detailed chatbot response
                 chatbot_detail = ChatbotDetailResponse(

@@ -222,6 +222,16 @@ async def create_agent(
 ):
     """Create a new agent with document processing and embedding generation"""
     try:
+
+        # Log the request
+        logger.info(f"\n\n\nCreating agent for user: {current_user.user_name}")
+        logger.info(f"Agent description: {agent_description}")
+        logger.info(f"User namespace: {user_namespace}")
+        logger.info(f"Chunking method: {chunking_method}")
+        logger.info(f"Embedding model: {embedding_model}")
+        logger.info(f"Agent provider: {agent_provider}")
+        logger.info(f"Files: {files}\n\n")
+
         # Validate and convert form inputs
         agent_provider_enum = None
         if agent_provider and agent_provider.strip():
@@ -282,15 +292,6 @@ async def create_agent(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Namespace cannot be empty"
             )
-
-        # Log the request
-        logger.info(f"\n\n\nCreating agent for user: {current_user.user_name} (Super User: {is_super_user})")
-        logger.info(f"Agent description: {agent_description}")
-        logger.info(f"User namespace: {user_namespace}")
-        logger.info(f"Chunking method: {chunking_method_enum}")
-        logger.info(f"Embedding model: {embedding_model_enum}")
-        logger.info(f"Agent provider: {agent_provider_enum}")
-        logger.info(f"Files: {files}\n\n")
         
         # Use the authenticated user (no need to create a new user)
         user = current_user

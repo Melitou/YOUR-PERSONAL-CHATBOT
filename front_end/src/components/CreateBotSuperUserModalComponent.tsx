@@ -1,6 +1,7 @@
 import { Modal } from "@mui/material";
 import { useState, useRef, useEffect } from "react";
 import ChatbotManagerStore from "../stores/ChatbotManagerStore";
+import ViewStore from "../stores/ViewStore";
 
 const CreateBotSuperUserModalComponent = ({ 
     open, 
@@ -17,8 +18,9 @@ const CreateBotSuperUserModalComponent = ({
     const [chunkingMethod, setChunkingMethod] = useState("Fixed Token");
     const [embeddingModel, setEmbeddingModel] = useState("text-embedding-3-small");
     const [errorMessage, setErrorMessage] = useState("");
+    const { addError } = ViewStore();
 
-    const {isLoading} = ChatbotManagerStore.getState();
+    const { isLoading } = ChatbotManagerStore((state: any) => state);   
 
     useEffect(() => {
         if (open) {
@@ -52,15 +54,33 @@ const CreateBotSuperUserModalComponent = ({
         "gemini-embedding-001"
     ];
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(event.target.files || []);
-        // Filter for allowed file types
-        const allowedTypes = ['.pdf', '.doc', '.docx', '.csv', '.txt'];
-        const validFiles = files.filter(file => {
-            const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-            return allowedTypes.includes(fileExtension);
-        });
-        setSelectedFiles(prev => [...prev, ...validFiles]);
+        const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        try {
+            const files = Array.from(event.target.files || []);
+            // Filter for allowed file types  
+            const allowedTypes = ['.pdf', '.doc', '.docx', '.csv', '.txt'];
+            const validFiles = files.filter(file => {
+                const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+                return allowedTypes.includes(fileExtension);
+            });
+            
+            const invalidFiles = files.filter(file => {
+                const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+                return !allowedTypes.includes(fileExtension);
+            });
+            
+            if (invalidFiles.length > 0) {
+                const errorMsg = `Invalid file types: ${invalidFiles.map(f => f.name).join(', ')}. Only PDF, DOC, DOCX, CSV, and TXT files are allowed.`;
+                addError(errorMsg);
+                console.error('Invalid file types uploaded:', invalidFiles.map(f => f.name));
+            }
+            
+            setSelectedFiles(prev => [...prev, ...validFiles]);
+        } catch (error) {
+            const errorMsg = 'Error processing uploaded files';
+            console.error('File upload error:', error);
+            addError(errorMsg);
+        }
     };
 
     const removeFile = (index: number) => {
@@ -99,7 +119,9 @@ const CreateBotSuperUserModalComponent = ({
             console.log('Creating chatbot with name:', name, 'description:', description, 'files:', files, 'chunkingMethod:', chunkingMethod, 'embeddingModel:', embeddingModel);
             
             if (!name || !description || !files.length || !chunkingMethod || !embeddingModel) {
-                setErrorMessage("Please fill in all fields and select at least one file");
+                const errorMsg = "Please fill in all fields and select at least one file";
+                setErrorMessage(errorMsg);
+                addError(errorMsg);
                 return;
             }
 
@@ -112,18 +134,25 @@ const CreateBotSuperUserModalComponent = ({
             }
 
             const result = await ChatbotManagerStore.getState().createChatbotSuperUser(data);
-            console.log('Chatbot created successfully:', result);
 
-            setName("");
-            setDescription("");
-            setSelectedFiles([]);
-            setChunkingMethod("Fixed Token");
-            setEmbeddingModel("text-embedding-3-small");
-            setErrorMessage("");
-            onClose();
+            if (result) {
+                onClose();
+                setName("");
+                setDescription("");
+                setSelectedFiles([]);
+                setChunkingMethod("Fixed Token");
+                setEmbeddingModel("text-embedding-3-small");
+                setErrorMessage("");
+            } else {
+                const errorMsg = "Failed to create super user chatbot";
+                setErrorMessage(errorMsg);
+                addError(errorMsg);
+            }
         } catch (error) {
-            console.error('Failed to create chatbot:', error);
-            setErrorMessage('Failed to create chatbot. Please try again.');
+            const errorMsg = error instanceof Error ? error.message : 'Failed to create super user chatbot. Please try again.';
+            console.error('Failed to create super user chatbot:', errorMsg);
+            setErrorMessage(errorMsg);
+            addError(errorMsg);
         }
     }
     

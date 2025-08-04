@@ -27,7 +27,7 @@ const HeaderComponent = () => {
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
                             <Avatar 
-                                sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}
+                                sx={{ width: 32, height: 32, bgcolor: 'primary.main', backgroundColor: 'black', color: 'white' }}
                             >
                                 <FaUser className="text-sm" />
                             </Avatar>
@@ -41,13 +41,21 @@ const HeaderComponent = () => {
                             <Button
                                 onClick={handleLogout}
                                 variant="outlined"
+                                className='text-black'
                                 size="small"
                                 startIcon={<FaSignOutAlt />}
                                 sx={{
                                     textTransform: 'none',
                                     borderRadius: 2,
                                     minWidth: 'auto',
-                                    px: 2
+                                    px: 2,
+                                    backgroundColor: 'white',
+                                    color: 'black',
+                                    borderColor: 'black',
+                                    '&:hover': {
+                                        backgroundColor: 'white',
+                                        color: 'black',
+                                    }
                                 }}
                             >
                                 Logout

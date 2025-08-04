@@ -26,6 +26,12 @@ const LoadedChatbotStore = create((set) => ({
 
     isThinking: false,
     setIsThinking: (isThinking: boolean) => set({ isThinking }),
+
+    resetStore: () => set({
+        loadedChatbot: null,
+        loadedChatbotHistory: [],
+        isThinking: false,
+    }),
 }));
 
 export default LoadedChatbotStore;

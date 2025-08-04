@@ -1,7 +1,64 @@
 1. Add the option for the user to select which documents to chunk and how to chunk.
 
-2. Change to gemini-2.5-flash-lite summarizing 
+2. Add documents' version to pinecone
 
 3. document processor and master problem with api calling, very slow (agent)
+Answer:
+--------------------------
+During summarization, each chunk gets its own POST /chat/completions call.
 
-4. Let the namespace be a concatenation of user id and the desired namespace
+With 15 chunks and 4 workers, you’ll likely hit 4 requests at once repeatedly until all are done.
+
+Your retry logic may compound this (e.g. 4 retrying + 4 new ones).
+
+Your embedding step is batched, so it doesn’t contribute to request spikes.
+
+4. What about sql dbs?
+
+
+
+
+- Why does the chatbot sat that it see the summary context column ✅
+- 200K token count we start deleting the earliest messages. Remove ai and user message✅
+- User decides the final client✅
+- Check timings
+- Make user and developer
+- Add columns role and embeddings model in mongodb
+
+
+
+- Namespace cannot contain spaces e.g. "My chatbot" ✅
+### 1. ✅ Updated create_unique_namespace method:
+Removed underscore prohibition
+Added space prohibition
+Added pipe character (|) prohibition
+Changed separator from _ to |
+Updated docstring with new format and validation rules
+### 2. ✅ Updated validation logic:
+CLI now checks for spaces instead of underscores
+### 3. ✅ Allows: Underscores (my_documents, chat_bot_data)
+❌ Prohibits: Spaces (my documents)
+❌ Prohibits: Pipe characters (test|data)
+❌ Prohibits: Empty/too long namespaces (unchanged)
+Format Change:
+Before: user_namespace_userid
+After: user_namespace|userid
+
+
+
+
+ID: 688b494eb4b8f2c7bb33c50b
+
+chunk_index: 0
+
+chunking_method: "token"
+
+content_preview: "```\nTITLE: Alice's Adventures in Wonderland\r\nAUTHOR: Lewis Carroll\r\n\r\n\r\n= CHAPTER I = \r\n=( Down the Rabbit-Hole )=\r\n\r\n Alice was beginning to get very tired of sitting by her sister\r\non the bank, and..."
+
+created_at: "2025-07-31T12:45:34.682000"
+
+document_id: "688b4949b4b8f2c7bb33c50a"
+
+file_name: "alice_in_wonderland.txt"
+
+summary_preview: "This chunk contains the beginning of \"Alice's Ad

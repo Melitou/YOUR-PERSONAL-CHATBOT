@@ -43,10 +43,25 @@ def semantic_chunk(text: str, embedding_model: str = "text-embedding-3-small", b
         list[str] The chunks of text.
     """
     from langchain_experimental.text_splitter import SemanticChunker
+
+    # Initialize the appropriate embedding model object
+    if embedding_model.startswith("text-embedding"):
+        # OpenAI embedding models
+        from langchain_openai import OpenAIEmbeddings
+        embeddings = OpenAIEmbeddings(model=embedding_model)
+    elif embedding_model.startswith("gemini"):
+        # Google Gemini embedding models
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+        embeddings = GoogleGenerativeAIEmbeddings(model=embedding_model)
+    else:
+        # Fallback to OpenAI for unknown models
+        from langchain_openai import OpenAIEmbeddings
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
     splitter = SemanticChunker(
-        embedding_model=embedding_model,
-        breakpoint_threshold_type=breakpoint_threshold_type
-    )
+        embeddings,
+        breakpoint_threshold_type=breakpoint_threshold_type)
+
     docs = splitter.create_documents([text])
     chunks = []
     for doc in docs:

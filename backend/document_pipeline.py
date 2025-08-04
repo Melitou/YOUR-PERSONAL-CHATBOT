@@ -79,6 +79,36 @@ class DocumentPipeline:
         """Generate SHA256 hash for the file content"""
         return hashlib.sha256(file_bytes).hexdigest()
 
+    def create_unique_namespace(self, user_namespace: str) -> str:
+        """Create unique namespace by concatenating user input with user ID
+
+        Args:
+            user_namespace: User-provided namespace prefix (should be pre-validated)
+
+        Returns:
+            Unique namespace in format: {user_namespace}|{user_id}
+
+        Raises:
+            ValueError: If user_namespace contains spaces, pipe character, or is too long (failsafe validation)
+        """
+        # Failsafe validation (should already be validated in CLI)
+        if ' ' in user_namespace:
+            raise ValueError("Namespace cannot contain spaces")
+
+        if '|' in user_namespace:
+            raise ValueError(
+                "Namespace cannot contain pipe character (used for user ID separation)")
+
+        if len(user_namespace) > 50:  # Leave room for user ID
+            raise ValueError("Namespace prefix too long (max 50 characters)")
+
+        if not user_namespace.strip():
+            raise ValueError("Namespace cannot be empty")
+
+        # Create unique namespace
+        unique_namespace = f"{user_namespace.strip()}|{self.user.id}"
+        return unique_namespace
+
     def check_file_exists(self, file_hash: str) -> bool:
         """Check if a file with this hash already exists for this user (thread-safe)"""
         try:
@@ -399,13 +429,38 @@ def main():
             else:
                 print("Please enter a valid folder path.")
 
+        print("\n🏷️  Namespace Configuration:")
+        print("   Your namespace will be made unique by adding your user ID")
+        print("   Format: your_input|userid")
+        print("   Note: Cannot contain spaces or pipe character (reserved for user ID separation)")
+
+        namespace = None
         while True:
-            namespace = input(
-                "Enter the namespace (e.g., 'examples'): ").strip()
-            if namespace:
+            user_namespace = input(
+                "Enter namespace prefix (e.g., 'my_documents'): ").strip()
+            if user_namespace:
+                # Comprehensive validation with immediate feedback
+                if not user_namespace.strip():
+                    print("⚠️  Namespace cannot be empty. Please try again.")
+                    continue
+                if ' ' in user_namespace:
+                    print("⚠️  Namespace cannot contain spaces. Please try again.")
+                    continue
+                if '|' in user_namespace:
+                    print(
+                        "⚠️  Namespace cannot contain pipe character (reserved for user ID separation). Please try again.")
+                    continue
+                if len(user_namespace) > 50:
+                    print(
+                        "⚠️  Namespace too long (max 50 characters). Please try again.")
+                    continue
+
+                # All validation passed
+                namespace = user_namespace  # Store user input, will be made unique later
+                print(f"✅ Namespace '{user_namespace}' is valid.")
                 break
             else:
-                print("Please enter a valid namespace.")
+                print("⚠️  Please enter a valid namespace.")
 
         # Optional: Ask about parallel processing
         use_parallel = True
@@ -430,9 +485,51 @@ def main():
         print("\nInitializing pipeline...")
         pipeline = DocumentPipeline(max_workers=max_workers)
 
+        # Create unique namespace with retry loop
+        unique_namespace = None
+        while unique_namespace is None:
+            try:
+                unique_namespace = pipeline.create_unique_namespace(namespace)
+                print(f"✅ Created unique namespace: {unique_namespace}")
+            except ValueError as e:
+                print(f"❌ Namespace error: {e}")
+                print("Please enter a new namespace.")
+
+                # Ask for new namespace
+                while True:
+                    user_namespace = input(
+                        "Enter namespace prefix (e.g., 'my_documents'): ").strip()
+                    if user_namespace:
+                        # Comprehensive validation with immediate feedback
+                        if not user_namespace.strip():
+                            print("⚠️  Namespace cannot be empty. Please try again.")
+                            continue
+                        if ' ' in user_namespace:
+                            print(
+                                "⚠️  Namespace cannot contain spaces. Please try again.")
+                            continue
+                        if '|' in user_namespace:
+                            print(
+                                "⚠️  Namespace cannot contain pipe character (reserved for user ID separation). Please try again.")
+                            continue
+                        if len(user_namespace) > 50:
+                            print(
+                                "⚠️  Namespace too long (max 50 characters). Please try again.")
+                            continue
+
+                        # All validation passed
+                        namespace = user_namespace
+                        print(f"✅ Namespace '{user_namespace}' is valid.")
+                        break
+                    else:
+                        print("⚠️  Please enter a valid namespace.")
+            except Exception as e:
+                print(f"❌ Unexpected error creating unique namespace: {e}")
+                return
+
         # Process directory
         results = pipeline.process_directory(
-            folder_path, namespace, use_parallel)
+            folder_path, unique_namespace, use_parallel)
 
         # Show detailed results if any files were processed
         if results['results']:

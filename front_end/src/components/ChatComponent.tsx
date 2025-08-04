@@ -47,7 +47,7 @@ const ChatComponent = () => {
             {/* Chatbot Header */}
             <div className="bg-white border-b border-gray-200 px-4 py-4">
                 <div className="flex items-center space-x-3 min-w-0">
-                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                    <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center">
                         <span className="material-symbols-outlined text-white text-xl">
                             smart_toy
                         </span>

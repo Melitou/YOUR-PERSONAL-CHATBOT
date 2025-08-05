@@ -6,6 +6,7 @@ Integrates the optimized RAG search pipeline for document-based question answeri
 from rag_retrieval import rag_search
 from openai import OpenAI, AsyncOpenAI
 from google import genai
+from google.genai import types
 from typing import AsyncGenerator, Dict, Any, List, Optional
 import sys
 import asyncio
@@ -277,7 +278,7 @@ def trim_conversation_history(messages: List[Dict[str, Any]], target_tokens: int
 
     Strategy:
     1. Keep system prompt (index 0) - never remove
-    2. Keep current user query (last message) - never remove  
+    2. Keep current user query (last message) - never remove
     3. Remove oldest user-assistant pairs from the middle
     4. Remove pairs together to maintain conversation coherence
 
@@ -661,13 +662,13 @@ def ask_gemini_assistant(history: list, query: str, model: str) -> str:
             response = gemini_client.models.generate_content(
                 model=model,
                 contents=contents,
-                tools=gemini_tools
+                config=types.GenerateContentConfig(tools=gemini_tools)
             )
 
             # Check if there are function calls
             if response.candidates and response.candidates[0].content.parts:
                 function_calls = [part for part in response.candidates[0].content.parts
-                                  if hasattr(part, 'function_call')]
+                                  if hasattr(part, 'function_call') and part.function_call is not None]
 
                 if not function_calls:
                     # No function calls, get the text response
@@ -790,13 +791,13 @@ async def ask_gemini_assistant_stream(history: list, query: str, model: str) -> 
             response = gemini_client.models.generate_content(
                 model=model,
                 contents=contents,
-                tools=gemini_tools
+                config=types.GenerateContentConfig(tools=gemini_tools)
             )
 
             # Check if there are function calls
             if response.candidates and response.candidates[0].content.parts:
                 function_calls = [part for part in response.candidates[0].content.parts
-                                  if hasattr(part, 'function_call')]
+                                  if hasattr(part, 'function_call') and part.function_call is not None]
 
                 if not function_calls:
                     # No function calls, break to streaming
@@ -929,6 +930,78 @@ async def ask_rag_assistant_stream(history: list, query: str) -> AsyncGenerator[
         yield f"Error: Unsupported model provider for model: {model}"
 
 
+def ask_rag_assistant_sync_stream(history: list, query: str) -> str:
+    """
+    Synchronous wrapper for streaming assistant that provides real-time output to CLI.
+    Handles the async streaming and displays chunks as they arrive.
+
+    Args:
+        history: List of previous conversation turns
+        query: User's current query
+
+    Returns:
+        Complete response string (for conversation history)
+    """
+    import sys
+    import time
+
+    # Create async event loop for this sync context
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        accumulated_response = ""
+
+        async def stream_and_display():
+            nonlocal accumulated_response
+
+            # Show streaming indicator
+            print("\n✨ Generating response", end="", flush=True)
+            for i in range(3):
+                time.sleep(0.05)
+                print(".", end="", flush=True)
+            print()
+
+            print("🤖 Assistant: ", end="", flush=True)
+
+            chunk_count = 0
+            start_time = time.time()
+
+            async for chunk in ask_rag_assistant_stream(history, query):
+                # Print each chunk immediately
+                print(chunk, end="", flush=True)
+                accumulated_response += chunk
+                chunk_count += 1
+
+                # Add small delay to make streaming visible for very fast responses
+                if chunk_count % 5 == 0:
+                    await asyncio.sleep(0.01)
+
+            # Add final newline and completion indicator
+            print()
+
+            elapsed_time = time.time() - start_time
+            debug_print(
+                f"Streaming completed: {chunk_count} chunks in {elapsed_time:.2f}s")
+
+            return accumulated_response
+
+        # Run the async streaming
+        result = loop.run_until_complete(stream_and_display())
+        return result
+
+    except Exception as e:
+        print(f"\n❌ Streaming error: {e}")
+        debug_print(f"Streaming error details: {type(e).__name__}: {e}")
+        print("🔄 Falling back to non-streaming mode...")
+        # Fallback to non-streaming
+        fallback_response = ask_rag_assistant(history, query)
+        print(f"🤖 Assistant: {fallback_response}")
+        return fallback_response
+    finally:
+        loop.close()
+
+
 def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, chatbot_model: str = "gpt-4.1"):
     """
     Start an interactive RAG chat session with the user
@@ -947,6 +1020,7 @@ def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, c
     print("=" * 80)
     print("Your documents have been processed and I'm ready to help!")
     print("Ask me anything about your uploaded documents.")
+    print("✨ Responses will appear in real-time as they're generated")
     print("Type 'exit' or 'quit' to end the session.")
     print("=" * 80)
 
@@ -968,11 +1042,9 @@ def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, c
 
             print("\n🔍 Searching your documents...")
 
-            # Get response from RAG assistant
-            assistant_response = ask_rag_assistant(
+            # Get streaming response from RAG assistant
+            assistant_response = ask_rag_assistant_sync_stream(
                 conversation_history, user_input)
-
-            print(f"\n🤖 Assistant: {assistant_response}")
 
             # Add to conversation history
             conversation_history.append({

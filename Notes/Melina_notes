@@ -2,18 +2,7 @@
 
 2. Add documents' version to pinecone
 
-3. document processor and master problem with api calling, very slow (agent)
-Answer:
---------------------------
-During summarization, each chunk gets its own POST /chat/completions call.
-
-With 15 chunks and 4 workers, you’ll likely hit 4 requests at once repeatedly until all are done.
-
-Your retry logic may compound this (e.g. 4 retrying + 4 new ones).
-
-Your embedding step is batched, so it doesn’t contribute to request spikes.
-
-4. What about sql dbs?
+3. What about sql dbs?
 
 
 
@@ -21,9 +10,7 @@ Your embedding step is batched, so it doesn’t contribute to request spikes.
 - Why does the chatbot say that it see the summary context column ✅
 - 200K token count we start deleting the earliest messages. Remove ai and user message✅
 - User decides the final client✅
-- Check timings
-- Make user and developer
-- Add columns role and embeddings model in mongodb
+- Show the already hashed files and skip 
 
 
 

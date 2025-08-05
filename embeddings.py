@@ -296,17 +296,24 @@ class EmbeddingService:
             logger.error(f"Failed to initialize Pinecone client: {e}")
             return False
 
-    def ensure_pinecone_index_exists(self, index_name: str, dimension: int = 1536) -> bool:
+    def ensure_pinecone_index_exists(self, index_name: str, dimension: int = None) -> bool:
         """
         Ensure Pinecone index exists, create if it doesn't.
+        Auto-determines dimension based on index name if not provided.
 
         Args:
             index_name: Name of the Pinecone index
-            dimension: Vector dimension (default: 1536 for text-embedding-3-small)
+            dimension: Vector dimension (auto-determined if None)
 
         Returns:
             True if index exists or was created successfully
         """
+        # Auto-determine dimension based on index name if not provided
+        if dimension is None:
+            if "google" in index_name.lower():
+                dimension = 3072  # Gemini embeddings dimension
+            else:
+                dimension = 1536  # OpenAI embeddings dimension
         try:
             if not self.pinecone_client:
                 if not self.initialize_pinecone_client():
@@ -317,7 +324,20 @@ class EmbeddingService:
             index_names = [idx.name for idx in existing_indexes]
 
             if index_name in index_names:
-                logger.info(f"Pinecone index '{index_name}' already exists")
+                # Validate existing index has correct dimensions
+                index_info = next(
+                    (idx for idx in existing_indexes if idx.name == index_name), None)
+                if index_info and hasattr(index_info, 'dimension'):
+                    existing_dimension = index_info.dimension
+                    if existing_dimension != dimension:
+                        logger.warning(
+                            f"Pinecone index '{index_name}' exists but has wrong dimension: {existing_dimension} (expected: {dimension})")
+                        logger.warning(
+                            f"❌ Dimension mismatch! Please delete index '{index_name}' and re-run to create with correct dimensions")
+                        return False
+
+                logger.info(
+                    f"Pinecone index '{index_name}' already exists with correct dimensions ({dimension})")
                 return True
 
             # Create index if it doesn't exist

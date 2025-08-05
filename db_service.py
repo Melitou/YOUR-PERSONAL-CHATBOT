@@ -73,9 +73,14 @@ class Documents(Document):
             {'fields': ['full_hash']},
             {'fields': ['status']},
             {'fields': ['chunking_method']},
+            {'fields': ['namespace']},
             # Composite unique index
             # Same user can't upload same file twice
-            {'fields': [('user', 1), ('full_hash', 1)], 'unique': True}
+            {'fields': [('user', 1), ('full_hash', 1)], 'unique': True},
+            # Optimized indexes for chatbot detection
+            {'fields': [('user', 1), ('namespace', 1), ('status', 1)]},
+            {'fields': [('namespace', 1), ('status', 1)]},
+            {'fields': [('user', 1), ('full_hash', 1), ('namespace', 1)]}
         ]
     }
 
@@ -116,8 +121,13 @@ class Chunks(Document):
             {'fields': ['user']},
             {'fields': ['vector_id']},
             {'fields': ['chunking_method']},
+            {'fields': ['namespace']},
             # query by both document and chunk_index
-            {'fields': [('document', 1), ('chunk_index', 1)]}
+            {'fields': [('document', 1), ('chunk_index', 1)]},
+            # Optimized indexes for chatbot detection and embedding queries
+            {'fields': [('namespace', 1), ('vector_id', 1)]},
+            {'fields': [('user', 1), ('namespace', 1)]},
+            {'fields': [('document', 1), ('namespace', 1), ('vector_id', 1)]}
         ]
     }
 
@@ -224,6 +234,7 @@ def create_sample_data(client, db, fs):
     finally:
         client.close()
 
+
 def get_user_id_by_email(email: str):
     """Get user_id by email address"""
     try:
@@ -300,19 +311,19 @@ if __name__ == "__main__":
 
         # Test the new user_id retrieval functions
         print("\n=== Testing User ID Retrieval Functions ===")
-        
+
         # Test get_user_id_by_email
         user_id = get_user_id_by_email("john.doe@example.com")
         print(f"User ID by email: {user_id}")
-        
+
         # Test get_user_id_by_username
         user_id_username = get_user_id_by_username("test_user")
         print(f"User ID by username: {user_id_username}")
-        
+
         # Test get_user_info
         user_info = get_user_info("john.doe@example.com")
         print(f"Complete user info: {user_info}")
-        
+
         # Test get_all_users
         all_users = get_all_users()
         print(f"All users: {all_users}")

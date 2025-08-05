@@ -22,11 +22,9 @@ pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
 def get_embedding(text: str, model: str = "text-embedding-3-small") -> List[float]:
     """
     Generate an embedding for the given text using OpenAI embedding model.
-
     Args:
         text: The input text to embed
         model: The embedding model to use
-
     Returns:
         List of float values representing the embedding vector
     """

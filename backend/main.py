@@ -1,17 +1,20 @@
 import os
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, status, Depends, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, status, Depends, UploadFile, File, Form, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.websockets import WebSocket, WebSocketDisconnect
 
 from api_models import (
     CreateAgentRequest, CreateAgentResponse, LoginRequest, LoginResponse,
     SigninRequest, SigninResponse, UserResponse, ErrorResponse,
-    ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse, ConversationsResponse
+    ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse, ConversationsResponse,
+    CreateSessionRequest, CreateSessionResponse, ChatMessageRequest, ChatMessageResponse
 )
 from auth_utils import (
     authenticate_user, create_user, create_access_token, verify_token,
@@ -363,6 +366,266 @@ async def get_chatbot_conversations(chatbot_id: str, current_user: User_Auth_Tab
             detail="Error retrieving conversations"
         )
 
+@app.post("/chatbot/{chatbot_id}/session", response_model=CreateSessionResponse, tags=["Chat Session"])
+async def create_chat_session(
+    chatbot_id: str,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Create a new chat session for a chatbot"""
+    try:
+        session_response = pipeline_handler.create_chat_session(str(current_user.id), chatbot_id)
+        logger.info(f"Created chat session {session_response.session_id} for user {current_user.user_name}")
+        return session_response
+    except Exception as e:
+        logger.error(f"Error creating chat session for chatbot {chatbot_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error creating chat session"
+        )
+
+async def authenticate_websocket(websocket: WebSocket, token: str) -> User_Auth_Table:
+    """Authenticate WebSocket connection using JWT token"""
+    try:
+        payload = verify_token(token)
+        username = payload.get("sub")
+        
+        user = get_user_by_username(username)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+        
+        return user
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token"
+        )
+
+@app.websocket("/ws/chat/{session_id}")
+async def websocket_chat(websocket: WebSocket, session_id: str, token: str = Query(...)):
+    """Handle WebSocket chat session with streaming responses"""
+    user = None
+    session = None
+    
+    # Authenticate user via query parameter
+    try:
+        user = await authenticate_websocket(websocket, token)
+    except HTTPException:
+        await safe_websocket_close(websocket, code=1008, reason="Unauthorized")
+        return
+    
+    # Accept connection
+    try:
+        await websocket.accept()
+    except Exception as e:
+        logger.error(f"Failed to accept WebSocket connection: {e}")
+        return
+    
+    try:
+        # Validate session belongs to user
+        session = pipeline_handler.get_chat_session(session_id, str(user.id))
+        chatbot = session.chatbot_id
+        
+        logger.info(f"WebSocket connected for session {session_id}, user {user.user_name}, chatbot {chatbot.name}")
+        
+        # Send initial session info
+        await safe_websocket_send(websocket, {
+            "type": "session_info",
+            "session_id": session_id,
+            "chatbot_name": chatbot.name,
+            "message": f"Connected to {chatbot.name}. You can start chatting!"
+        })
+        
+        while True:
+            # Receive message from client
+            try:
+                data = await websocket.receive_text()
+                message_data = json.loads(data)
+                
+                user_message = message_data.get("message", "").strip()
+                if not user_message:
+                    await safe_websocket_send(websocket, {
+                        "type": "error",
+                        "message": "Empty message received"
+                    })
+                    continue
+                
+                # Save user message to database
+                user_msg_record = pipeline_handler.save_message_to_session(
+                    session_id, user_message, "user"
+                )
+                
+                # Send acknowledgment
+                await safe_websocket_send(websocket, {
+                    "type": "message_received",
+                    "message_id": str(user_msg_record.id),
+                    "timestamp": user_msg_record.created_at.isoformat()
+                })
+                
+                # Initialize RAG for this chatbot
+                from LLM.rag_llm_call import initialize_rag_config, ask_rag_assistant_stream
+                
+                initialize_rag_config(
+                    user_id=str(user.id),
+                    namespace=chatbot.namespace,
+                    embedding_model=chatbot.embedding_model
+                )
+                
+                # Get conversation history for context
+                from db_service import Messages, Conversation
+                messages = Messages.objects(conversation_id=session.conversation_id).order_by('created_at')
+                
+                # Build history for RAG
+                # RAG system expects format: [{"user": "...", "assistant": "..."}, ...]
+                history = []
+                recent_messages = list(messages)[-20:]  # Get more messages to form pairs
+                
+                # Group messages into user-assistant pairs
+                i = 0
+                while i < len(recent_messages) - 1:  # Exclude current message
+                    current_msg = recent_messages[i]
+                    next_msg = recent_messages[i + 1] if i + 1 < len(recent_messages) else None
+                    
+                    # Look for user-assistant pairs
+                    if current_msg.role == "user" and next_msg and next_msg.role == "agent":
+                        history.append({
+                            "user": current_msg.message,
+                            "assistant": next_msg.message
+                        })
+                        i += 2  # Skip both messages as we've processed them as a pair
+                    else:
+                        i += 1  # Move to next message
+                
+                # Keep only last 5 pairs to avoid token limit issues
+                history = history[-5:]
+                
+                logger.info(f"Built conversation history with {len(history)} pairs for RAG")
+                
+                # Stream response from RAG assistant
+                assistant_response = ""
+                await safe_websocket_send(websocket, {
+                    "type": "response_start",
+                    "message": "Assistant is thinking..."
+                })
+                
+                try:
+                    async for chunk in ask_rag_assistant_stream(history, user_message):
+                        if chunk.strip():
+                            assistant_response += chunk
+                            await safe_websocket_send(websocket, {
+                                "type": "response_chunk",
+                                "chunk": chunk
+                            })
+                except Exception as e:
+                    logger.error(f"Error in RAG streaming: {e}")
+                    await safe_websocket_send(websocket, {
+                        "type": "error",
+                        "message": "Error generating response. Please try again."
+                    })
+                    continue
+                
+                # Save assistant response to database
+                if assistant_response.strip():
+                    assistant_msg_record = pipeline_handler.save_message_to_session(
+                        session_id, assistant_response, "agent"
+                    )
+                    
+                    # Send completion message
+                    await safe_websocket_send(websocket, {
+                        "type": "response_complete",
+                        "message_id": str(assistant_msg_record.id),
+                        "timestamp": assistant_msg_record.created_at.isoformat(),
+                        "full_response": assistant_response
+                    })
+                
+            except json.JSONDecodeError:
+                await safe_websocket_send(websocket, {
+                    "type": "error",
+                    "message": "Invalid JSON format"
+                })
+            except WebSocketDisconnect:
+                # Client disconnected normally
+                logger.info(f"Client disconnected from session {session_id}")
+                break
+            except Exception as e:
+                logger.error(f"Error processing message in session {session_id}: {e}")
+                await safe_websocket_send(websocket, {
+                    "type": "error",
+                    "message": "Error processing message. Please try again."
+                })
+                
+    except HTTPException as e:
+        logger.error(f"Session validation failed: {e.detail}")
+        await safe_websocket_close(websocket, code=1008, reason=e.detail)
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected for session {session_id}")
+    except Exception as e:
+        logger.error(f"Unexpected error in WebSocket for session {session_id}: {e}")
+        await safe_websocket_close(websocket, code=1011, reason="Internal server error")
+    finally:
+        # Cleanup session if we have user info
+        if user and session_id:
+            try:
+                pipeline_handler.close_chat_session(session_id, str(user.id))
+            except Exception as e:
+                logger.error(f"Error closing session in cleanup: {e}")
+
+
+async def safe_websocket_send(websocket: WebSocket, data: dict) -> bool:
+    """Safely send data via WebSocket, return True if successful"""
+    try:
+        if websocket.client_state.value == 1:  # CONNECTED state
+            await websocket.send_text(json.dumps(data))
+            return True
+    except Exception as e:
+        logger.debug(f"Failed to send WebSocket message: {e}")
+    return False
+
+
+async def safe_websocket_close(websocket: WebSocket, code: int = 1000, reason: str = "") -> bool:
+    """Safely close WebSocket connection, return True if successful"""
+    try:
+        if websocket.client_state.value == 1:  # CONNECTED state
+            await websocket.close(code=code, reason=reason)
+            return True
+    except Exception as e:
+        logger.debug(f"Failed to close WebSocket: {e}")
+    return False
+
+@app.delete("/chatbot/session/{session_id}", tags=["Chat Session"])
+async def close_chat_session(
+    session_id: str,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Close/deactivate a chat session"""
+    try:
+        pipeline_handler.close_chat_session(session_id, str(current_user.id))
+        return {"message": "Session closed successfully"}
+    except Exception as e:
+        logger.error(f"Error closing chat session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error closing chat session"
+        )
+
+@app.post("/admin/cleanup-sessions", tags=["Admin"])
+async def cleanup_inactive_sessions(
+    hours: int = Query(24, description="Hours of inactivity before cleanup"),
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Cleanup inactive sessions (admin only)"""
+    # You might want to add admin role check here
+    try:
+        pipeline_handler.cleanup_inactive_sessions(hours)
+        return {"message": f"Cleaned up sessions inactive for more than {hours} hours"}
+    except Exception as e:
+        logger.error(f"Error cleaning up sessions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error cleaning up sessions"
+        )
 
 @app.get("/me", response_model=UserResponse, tags=["User"])
 async def get_current_user_info(current_user: User_Auth_Table = Depends(get_current_user)):

@@ -72,12 +72,12 @@ class EmbeddingService:
             "text-embedding-ada-002": "gemini-embedding-001",
 
             # Gemini models
-            "gemini-embedding-001": "text-embedding-005",
-            "text-embedding-005": "text-multilingual-embedding-002",
-            "text-multilingual-embedding-002": "gemini-embedding-001",
+            "gemini-embedding-001": "text-embedding-3-small",
+            "text-embedding-005": "text-multilingual-embedding-002", # not available
+            "text-multilingual-embedding-002": "gemini-embedding-001", # not available
 
             # Open-Source models
-            "multilingual-e5-large": "text-embedding-3-small",
+            "multilingual-e5-large": "text-embedding-3-small", # very slow
         }
 
     def initialize_embedding_model(self,

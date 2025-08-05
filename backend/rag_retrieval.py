@@ -303,8 +303,8 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
     logger.info(f"📊 Top K: {top_k}")
 
     try:
-        # Step 1: Create user's full namespace (namespace_userid)
-        full_namespace = f"{namespace}_{user_id}"
+        # Step 1: Create user's full namespace (namespace|userid) - must match document storage format
+        full_namespace = f"{namespace}|{user_id}"
         logger.info(f"🔗 Full namespace: {full_namespace}")
 
         # Step 2: Auto-determine Pinecone index and route to correct search function

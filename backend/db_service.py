@@ -1,5 +1,5 @@
 from datetime import datetime
-from mongoengine import connect, Document, StringField, DateTimeField, IntField, ReferenceField, ObjectIdField, ListField, DictField
+from mongoengine import connect, Document, StringField, DateTimeField, IntField, ReferenceField, ObjectIdField, ListField, DictField, BooleanField
 from bson import ObjectId
 from pymongo import MongoClient
 from gridfs import GridFS
@@ -110,6 +110,32 @@ class Messages(Document):
 
     def __str__(self) -> str:
         return f"Messages(conversation_id={self.conversation_id}, message={self.message}, role={self.role}, created_at={self.created_at})"
+
+class ChatSession(Document):
+    """Active chat sessions for real-time conversations"""
+    user_id = ReferenceField(User_Auth_Table, required=True)
+    chatbot_id = ReferenceField(ChatBots, required=True)
+    conversation_id = ReferenceField(Conversation, required=True)
+    session_id = StringField(required=True, unique=True)  # UUID for WebSocket connection
+    created_at = DateTimeField(required=True)
+    last_activity = DateTimeField(required=True)
+    is_active = BooleanField(required=True, default=True)
+
+    meta = {
+        'collection': 'chat_sessions',
+        'indexes': [
+            {'fields': ['user_id']},
+            {'fields': ['chatbot_id']},
+            {'fields': ['session_id'], 'unique': True},
+            {'fields': ['created_at']},
+            {'fields': ['last_activity']},
+            {'fields': ['is_active']},
+            {'fields': [('user_id', 1), ('is_active', 1)]},  # For finding active user sessions
+        ]
+    }
+
+    def __str__(self) -> str:
+        return f"ChatSession(user_id={self.user_id}, chatbot_id={self.chatbot_id}, session_id={self.session_id}, is_active={self.is_active})"
 
 class Documents(Document):
     user = ReferenceField(User_Auth_Table, required=True)

@@ -142,8 +142,8 @@ class ChatbotDetailResponse(BaseModel):
     total_files: int = Field(..., description="Total number of files loaded")
     total_chunks: int = Field(..., description="Total number of chunks across all files")
 
-class MessageResponse(BaseModel):
-    """Response model for messages of a conversation"""
+class Message(BaseModel):
+    """Model for messages of a conversation"""
     message: str = Field(..., description="Message content")
     created_at: datetime = Field(..., description="When the message was created")
     role: str = Field(..., description="Role of the message (user, agent)")
@@ -151,10 +151,35 @@ class MessageResponse(BaseModel):
 class ConversationsResponse(BaseModel):
     """Response model for conversations"""
     conversation_id: str = Field(..., description="Conversation ID")
-    messages: List[MessageResponse] = Field(..., description="List of messages in the conversation")
+    messages: List[Message] = Field(..., description="List of messages in the conversation")
     created_at: datetime = Field(..., description="When the conversation was created")
     belonging_user_uid: str = Field(..., description="User ID of the user who owns the conversation")
-    belonging_chatbot_id: str = Field(..., description="Chatbot ID of the chatbot that the conversation belongs to")    
+    belonging_chatbot_id: str = Field(..., description="Chatbot ID of the chatbot that the conversation belongs to")
+
+class CreateSessionRequest(BaseModel):
+    """Request model for creating a chat session"""
+    pass  # No additional data needed, chatbot_id comes from URL and user from JWT
+
+class CreateSessionResponse(BaseModel):
+    """Response model for chat session creation"""
+    session_id: str = Field(..., description="Unique session ID for WebSocket connection")
+    conversation_id: str = Field(..., description="Conversation ID for this session")
+    chatbot_id: str = Field(..., description="Chatbot ID")
+    chatbot_name: str = Field(..., description="Chatbot name")
+    previous_messages: List[Message] = Field(default=[], description="Previous messages if continuing a conversation")
+
+class ChatMessageRequest(BaseModel):
+    """Request model for chat messages via WebSocket"""
+    message: str = Field(..., min_length=1, max_length=2000, description="User message content")
+    message_type: str = Field(default="text", description="Type of message (text, system, etc.)")
+
+class ChatMessageResponse(BaseModel):
+    """Response model for chat messages"""
+    message: str = Field(..., description="Assistant response")
+    message_id: str = Field(..., description="Unique message ID")
+    timestamp: datetime = Field(..., description="Message timestamp")
+    is_complete: bool = Field(default=True, description="Whether this is the complete message or a chunk")
+    session_id: str = Field(..., description="Session ID")   
 
 class ErrorResponse(BaseModel):
     """Standard error response model"""

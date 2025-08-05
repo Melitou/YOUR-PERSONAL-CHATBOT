@@ -7,7 +7,7 @@ import tempfile
 import hashlib
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from fastapi import UploadFile, HTTPException, status
@@ -15,8 +15,8 @@ from bson import ObjectId
 
 from master_pipeline import MasterPipeline
 
-from db_service import initialize_db, User_Auth_Table, ChatBots, Documents, Chunks, Conversation, Messages
-from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata, ChatbotDetailResponse, LoadedFileInfo, ConversationsResponse, MessageResponse
+from db_service import initialize_db, User_Auth_Table, ChatBots, Documents, Chunks, Conversation, Messages, ChatSession
+from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata, ChatbotDetailResponse, LoadedFileInfo, ConversationsResponse, Message, CreateSessionResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -418,7 +418,7 @@ class PipelineHandler:
                 # Convert messages to MessageResponse objects
                 message_responses = []
                 for message in messages:
-                    message_response = MessageResponse(
+                    message_response = Message(
                         message=message.message,
                         created_at=message.created_at,
                         role=message.role
@@ -446,6 +446,206 @@ class PipelineHandler:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error retrieving conversations: {str(e)}"
             )
+    
+    def create_chat_session(self, user_id: str, chatbot_id: str) -> CreateSessionResponse:
+        """Create a new chat session for a user and chatbot"""
+        import uuid
+        
+        try:
+            # Validate user and chatbot exist
+            user = User_Auth_Table.objects(id=ObjectId(user_id)).first()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=user).first()
+            if not chatbot:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chatbot not found or doesn't belong to user"
+                )
+            
+            # Deactivate and delete any existing active sessions for this user
+            existing_sessions = ChatSession.objects(user_id=user, is_active=True)
+            for session in existing_sessions:
+                session.is_active = False
+                session.save()
+                session.delete()
+                logger.info(f"Deactivated and deleted existing session {session.session_id} for user {user.user_name}")
+            
+            # Find existing conversation for this chatbot or create new one
+            conversation = Conversation.objects(chatbot=chatbot).first()
+            if not conversation:
+                conversation = Conversation(
+                    chatbot=chatbot,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                conversation.save()
+                logger.info(f"Created new conversation {conversation.id} for chatbot {chatbot.name}")
+            else:
+                conversation.updated_at = datetime.now()
+                conversation.save()
+            
+            # Create new session
+            session_id = str(uuid.uuid4())
+            chat_session = ChatSession(
+                user_id=user,
+                chatbot_id=chatbot,
+                conversation_id=conversation,
+                session_id=session_id,
+                created_at=datetime.now(),
+                last_activity=datetime.now(),
+                is_active=True
+            )
+            chat_session.save()
+            
+            # Get previous messages
+            messages = Messages.objects(conversation_id=conversation).order_by('created_at')
+            previous_messages = []
+            for msg in messages:
+                previous_messages.append(Message(
+                    message=msg.message,
+                    created_at=msg.created_at,
+                    role=msg.role
+                ))
+            
+            logger.info(f"Created chat session {session_id} for user {user.user_name} with chatbot {chatbot.name}")
+            
+            return CreateSessionResponse(
+                session_id=session_id,
+                conversation_id=str(conversation.id),
+                chatbot_id=str(chatbot.id),
+                chatbot_name=chatbot.name,
+                previous_messages=previous_messages
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error creating chat session: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error creating chat session: {str(e)}"
+            )
+    
+    def get_chat_session(self, session_id: str, user_id: str) -> ChatSession:
+        """Get an active chat session"""
+        try:
+            user = User_Auth_Table.objects(id=ObjectId(user_id)).first()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            session = ChatSession.objects(
+                session_id=session_id,
+                user_id=user,
+                is_active=True
+            ).first()
+            
+            if not session:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Active session not found"
+                )
+            
+            # Update last activity
+            session.last_activity = datetime.now()
+            session.save()
+            
+            return session
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error retrieving chat session: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error retrieving chat session: {str(e)}"
+            )
+    
+    def save_message_to_session(self, session_id: str, message: str, role: str) -> Messages:
+        """Save a message to the session's conversation"""
+        try:
+            session = ChatSession.objects(session_id=session_id, is_active=True).first()
+            if not session:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Active session not found"
+                )
+            
+            # Create and save message
+            msg = Messages(
+                conversation_id=session.conversation_id,
+                message=message,
+                role=role,
+                created_at=datetime.now()
+            )
+            msg.save()
+            
+            # Update session and conversation activity
+            session.last_activity = datetime.now()
+            session.save()
+            
+            session.conversation_id.updated_at = datetime.now()
+            session.conversation_id.save()
+            
+            return msg
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error saving message to session: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error saving message: {str(e)}"
+            )
+    
+    def close_chat_session(self, session_id: str, user_id: str):
+        """Close/deactivate a chat session"""
+        try:
+            user = User_Auth_Table.objects(id=ObjectId(user_id)).first()
+            if not user:
+                return  # User not found, nothing to close
+            
+            session = ChatSession.objects(
+                session_id=session_id,
+                user_id=user,
+                is_active=True
+            ).first()
+            
+            if session:
+                session.is_active = False
+                session.save()
+                logger.info(f"Closed chat session {session_id} for user {user.user_name}")
+                
+        except Exception as e:
+            logger.error(f"Error closing chat session: {e}")
+    
+    def cleanup_inactive_sessions(self, hours: int = 24):
+        """Cleanup sessions inactive for more than specified hours"""
+        try:
+            cutoff_time = datetime.now() - timedelta(hours=hours)
+            inactive_sessions = ChatSession.objects(
+                last_activity__lt=cutoff_time,
+                is_active=True
+            )
+            
+            count = 0
+            for session in inactive_sessions:
+                session.is_active = False
+                session.save()
+                count += 1
+            
+            if count > 0:
+                logger.info(f"Cleaned up {count} inactive sessions")
+                
+        except Exception as e:
+            logger.error(f"Error cleaning up inactive sessions: {e}")
     
     def close(self):
         """Close database connections"""

@@ -59,11 +59,21 @@ const ManageChatbotsModalComponent = ({
         setExpandedChatbot(expandedChatbot === chatbotId ? null : chatbotId);
     };
 
-    const handleSelectChatbot = (chatbot: CreatedChatbot) => {
+    const handleSelectChatbot = async (chatbot: CreatedChatbot) => {
         setLoadedChatbot(chatbot);
+        
+        try {
+            await (LoadedChatbotStore.getState() as any).createChatbotSession(chatbot.id);
+            console.log('Chatbot session created and WebSocket connected successfully');
+        } catch (error) {
+            console.error('Failed to create chatbot session:', error);
+            addError('Failed to create chatbot session');
+        }
+
         if (onSelectChatbot) {
             onSelectChatbot(chatbot);
         }
+
         onClose();
     };
 

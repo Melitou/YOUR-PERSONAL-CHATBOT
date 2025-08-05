@@ -148,13 +148,27 @@ class Message(BaseModel):
     created_at: datetime = Field(..., description="When the message was created")
     role: str = Field(..., description="Role of the message (user, agent)")
 
-class ConversationsResponse(BaseModel):
-    """Response model for conversations"""
+class ConversationSummary(BaseModel):
+    """Response model for conversation summary without messages"""
     conversation_id: str = Field(..., description="Conversation ID")
-    messages: List[Message] = Field(..., description="List of messages in the conversation")
+    conversation_title: str = Field(..., description="Title of the conversation")
     created_at: datetime = Field(..., description="When the conversation was created")
     belonging_user_uid: str = Field(..., description="User ID of the user who owns the conversation")
     belonging_chatbot_id: str = Field(..., description="Chatbot ID of the chatbot that the conversation belongs to")
+
+# class ConversationsResponse(BaseModel):
+#     """Response model for conversations"""
+#     conversation_id: str = Field(..., description="Conversation ID")
+#     conversation_title: str = Field(..., description="Title of the conversation")
+#     messages: List[Message] = Field(..., description="List of messages in the conversation")
+#     created_at: datetime = Field(..., description="When the conversation was created")
+#     belonging_user_uid: str = Field(..., description="User ID of the user who owns the conversation")
+#     belonging_chatbot_id: str = Field(..., description="Chatbot ID of the chatbot that the conversation belongs to")
+
+class ConversationMessagesResponse(BaseModel):
+    """Response model for conversation messages"""
+    conversation_id: str = Field(..., description="Conversation ID")
+    messages: List[Message] = Field(..., description="List of messages in the conversation")
 
 class CreateSessionRequest(BaseModel):
     """Request model for creating a chat session"""
@@ -163,10 +177,9 @@ class CreateSessionRequest(BaseModel):
 class CreateSessionResponse(BaseModel):
     """Response model for chat session creation"""
     session_id: str = Field(..., description="Unique session ID for WebSocket connection")
-    conversation_id: str = Field(..., description="Conversation ID for this session")
     chatbot_id: str = Field(..., description="Chatbot ID")
     chatbot_name: str = Field(..., description="Chatbot name")
-    previous_messages: List[Message] = Field(default=[], description="Previous messages if continuing a conversation")
+    conversations: List[ConversationSummary] = Field(default=[], description="List of conversations for this chatbot")
 
 class ChatMessageRequest(BaseModel):
     """Request model for chat messages via WebSocket"""

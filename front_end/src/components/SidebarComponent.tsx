@@ -1,102 +1,103 @@
 import { useState } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
-import UserComponent from "./UserComponent";
+//import UserComponent from "./UserComponent";    
 import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
 import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent";
 import UserAuthStore from "../stores/UserAuthStore";
 import ManageChatbotsModalComponent from "./ManageChatbotsModalComponent";
+import LoadedChatbotStore, { type ConversationSummary } from "../stores/LoadedChatbotStore";
 
 const SidebarComponent = () => {
     const user = UserAuthStore((state: any) => state.user);
-    //const loadedChatbotHistory = ChatbotStore((state: any) => state.loadedChatbotHistory);
+    const { loadedChatbot, loadedChatbotHistory } = LoadedChatbotStore((state: any) => state);
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [createBotModalOpen, setCreateBotModalOpen] = useState(false);
     const [existingChatbotsModalOpen, setExistingChatbotsModalOpen] = useState(false);
 
     //Fake conversation of a chatbot
-    const chatBotConversationHistory = [
-        {
-            chatbot_id: 1,
-            name: "Conversation 1"
-        },
-        {
-            chatbot_id: 2,
-            name: "Conversation 2"
-        },
-        {
-            chatbot_id: 3,
-            name: "Conversation 3"
-        },
-        {
-            chatbot_id: 4,
-            name: "Conversation 4"
-        },
-        {
-            chatbot_id: 5,
-            name: "Conversation 5"
-        },
-        {
-            chatbot_id: 6,
-            name: "Conversation 6"
-        },
-        {
-            chatbot_id: 7,
-            name: "Conversation 7"
-        },
-        {
-            chatbot_id: 8,
-            name: "Conversation 8"
-        },
-        {
-            chatbot_id: 9,
-            name: "Conversation 9"
-        },
-        {
-            chatbot_id: 10,
-            name: "Conversation 10"
-        },
-        {
-            chatbot_id: 11,
-            name: "Conversation 11"
-        },
-        {
-            chatbot_id: 12,
-            name: "Conversation 12"
-        },
-        {
-            chatbot_id: 13,
-            name: "Conversation 13"
-        },
-        {
-            chatbot_id: 14,
-            name: "Conversation 14"
-        },
-        {
-            chatbot_id: 15,
-            name: "Conversation 15"
-        },
-        {
-            chatbot_id: 16,
-            name: "Conversation 16"
-        },
-        {
-            chatbot_id: 17,
-            name: "Conversation 17"
-        },
-        {
-            chatbot_id: 18,
-            name: "Conversation 18"
-        },
-        {
-            chatbot_id: 19,
-            name: "Conversation 19"
-        },
-        {
-            chatbot_id: 20,
-            name: "Conversation 20"
-        },
-    ]
+    // const chatBotConversationHistory = [
+    //     {
+    //         chatbot_id: 1,
+    //         name: "Conversation 1"
+    //     },
+    //     {
+    //         chatbot_id: 2,
+    //         name: "Conversation 2"
+    //     },
+    //     {
+    //         chatbot_id: 3,
+    //         name: "Conversation 3"
+    //     },
+    //     {
+    //         chatbot_id: 4,
+    //         name: "Conversation 4"
+    //     },
+    //     {
+    //         chatbot_id: 5,
+    //         name: "Conversation 5"
+    //     },
+    //     {
+    //         chatbot_id: 6,
+    //         name: "Conversation 6"
+    //     },
+    //     {
+    //         chatbot_id: 7,
+    //         name: "Conversation 7"
+    //     },
+    //     {
+    //         chatbot_id: 8,
+    //         name: "Conversation 8"
+    //     },
+    //     {
+    //         chatbot_id: 9,
+    //         name: "Conversation 9"
+    //     },
+    //     {
+    //         chatbot_id: 10,
+    //         name: "Conversation 10"
+    //     },
+    //     {
+    //         chatbot_id: 11,
+    //         name: "Conversation 11"
+    //     },
+    //     {
+    //         chatbot_id: 12,
+    //         name: "Conversation 12"
+    //     },
+    //     {
+    //         chatbot_id: 13,
+    //         name: "Conversation 13"
+    //     },
+    //     {
+    //         chatbot_id: 14,
+    //         name: "Conversation 14"
+    //     },
+    //     {
+    //         chatbot_id: 15,
+    //         name: "Conversation 15"
+    //     },
+    //     {
+    //         chatbot_id: 16,
+    //         name: "Conversation 16"
+    //     },
+    //     {
+    //         chatbot_id: 17,
+    //         name: "Conversation 17"
+    //     },
+    //     {
+    //         chatbot_id: 18,
+    //         name: "Conversation 18"
+    //     },
+    //     {
+    //         chatbot_id: 19,
+    //         name: "Conversation 19"
+    //     },
+    //     {
+    //         chatbot_id: 20,
+    //         name: "Conversation 20"
+    //     },
+    // ]
 
     const handleNewChatbotClick = () => {
         // Open the create bot modal
@@ -106,6 +107,18 @@ const SidebarComponent = () => {
     const handleExistingChatbotsClick = () => {
         // Open the existing chatbots modal
         setExistingChatbotsModalOpen(true);
+    }
+
+    const handleConversationClick = (conversation: ConversationSummary) => {
+        console.log('Selected conversation:', conversation.conversation_id);
+        console.log('Conversation title:', conversation.conversation_title);
+        // TODO: Implement conversation loading logic - load full messages for this conversation
+    }
+
+    const handleNewConversationClick = () => {
+        console.log('Starting new conversation...');
+        // TODO: Implement new conversation logic - clear current messages and start fresh
+        // This might involve sending a special message to the WebSocket or just clearing the chat
     }
 
     return (
@@ -156,15 +169,52 @@ const SidebarComponent = () => {
 
                 {/* Scrollable chatbot conversation history list */}
                 <div className="flex-1 min-h-0 overflow-y-auto pt-3 px-3 pb-3">
-                    <div className="flex flex-col gap-2">
-                        {(!chatBotConversationHistory || chatBotConversationHistory.length === 0) && (
-                            <div className="text-center text-gray-500 text-xs sm:text-sm">You have not any conversations yet</div>
-                        )}
-                        {chatBotConversationHistory && chatBotConversationHistory.map((item: any) => (
-                            <div key={item.chatbot_id} className="p-2 rounded-md hover:bg-[#efefef] cursor-pointer transition-colors flex items-center text-black">
-                                <div className="truncate text-black text-xs sm:text-sm">{item.name}</div>
+                    {loadedChatbot && (
+                        <div className="mb-3">
+                            <div className="px-2 mb-2">
+                                <h3 className="text-sm font-medium text-gray-700 mb-1">Conversations</h3>
+                                <p className="text-xs text-gray-500">{loadedChatbot.name}</p>
                             </div>
-                        ))}
+                            <button 
+                                className="w-full p-2 mb-3 rounded-md bg-black hover:bg-gray-800 text-white text-sm transition-colors flex items-center justify-center gap-2"
+                                onClick={handleNewConversationClick}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                </svg>
+                                New Conversation
+                            </button>
+                        </div>
+                    )}
+                    <div className="flex flex-col gap-2">
+                        {(!loadedChatbotHistory || loadedChatbotHistory.length === 0) && loadedChatbot && (
+                            <div className="text-center text-gray-500 text-xs sm:text-sm px-2 py-4">No conversations yet</div>
+                        )}
+                        {!loadedChatbot && (
+                            <div className="text-center text-gray-500 text-xs sm:text-sm px-2 py-4">Select a chatbot to view conversations</div>
+                        )}
+                        {loadedChatbotHistory && loadedChatbotHistory.map((conversation: ConversationSummary) => {
+                            // Use the conversation_title from the session response
+                            const conversationTitle = conversation.conversation_title || `Conversation ${conversation.conversation_id.slice(-6)}`;
+                            
+                            return (
+                                <div 
+                                    key={conversation.conversation_id} 
+                                    className="p-3 rounded-md hover:bg-[#efefef] cursor-pointer transition-colors group"
+                                    onClick={() => handleConversationClick(conversation)}
+                                >
+                                    <div className="flex flex-col gap-1">
+                                        <div className="truncate text-black text-sm font-medium">
+                                            {conversationTitle}
+                                        </div>
+                                        <div className="text-xs text-gray-500 flex items-center justify-between">
+                                            <span>Click to open</span>
+                                            <span>{new Date(conversation.created_at).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 

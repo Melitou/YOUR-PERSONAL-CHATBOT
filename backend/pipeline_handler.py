@@ -16,7 +16,7 @@ from bson import ObjectId
 from master_pipeline import MasterPipeline
 
 from db_service import initialize_db, User_Auth_Table, ChatBots, Documents, Chunks, Conversation, Messages, ChatSession
-from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata, ChatbotDetailResponse, LoadedFileInfo, ConversationsResponse, Message, CreateSessionResponse
+from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata, ChatbotDetailResponse, LoadedFileInfo, Message, CreateSessionResponse, ConversationSummary, ConversationMessagesResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -378,74 +378,75 @@ class PipelineHandler:
                 detail=f"Error retrieving chatbots: {str(e)}"
             )
     
-    def get_chatbot_conversations(self, chatbot_id: str, user_id: str = None) -> List[ConversationsResponse]:
-        """Get all conversations for a specific chatbot with their messages"""
-        try:
-            # Find the chatbot by ObjectId
-            try:
-                chatbot = ChatBots.objects(id=ObjectId(chatbot_id)).first()
-            except Exception as e:
-                logger.error(f"Invalid chatbot ID format: {chatbot_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid chatbot ID format"
-                )
+    # def get_chatbot_conversations(self, chatbot_id: str, user_id: str = None) -> List[Conversation]:
+    #     """Get all conversations for a specific chatbot with their messages"""
+    #     try:
+    #         # Find the chatbot by ObjectId
+    #         try:
+    #             chatbot = ChatBots.objects(id=ObjectId(chatbot_id)).first()
+    #         except Exception as e:
+    #             logger.error(f"Invalid chatbot ID format: {chatbot_id}")
+    #             raise HTTPException(
+    #                 status_code=status.HTTP_400_BAD_REQUEST,
+    #                 detail="Invalid chatbot ID format"
+    #             )
             
-            if not chatbot:
-                logger.error(f"Chatbot not found: {chatbot_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Chatbot not found"
-                )
+    #         if not chatbot:
+    #             logger.error(f"Chatbot not found: {chatbot_id}")
+    #             raise HTTPException(
+    #                 status_code=status.HTTP_404_NOT_FOUND,
+    #                 detail="Chatbot not found"
+    #             )
             
-            # Optional: Validate that the user owns this chatbot (if user_id is provided)
-            if user_id:
-                if str(chatbot.user_id.id) != user_id:
-                    logger.error(f"User {user_id} does not own chatbot {chatbot_id}")
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="You do not have permission to access this chatbot's conversations"
-                    )
+    #         # Optional: Validate that the user owns this chatbot (if user_id is provided)
+    #         if user_id:
+    #             if str(chatbot.user_id.id) != user_id:
+    #                 logger.error(f"User {user_id} does not own chatbot {chatbot_id}")
+    #                 raise HTTPException(
+    #                     status_code=status.HTTP_403_FORBIDDEN,
+    #                     detail="You do not have permission to access this chatbot's conversations"
+    #                 )
             
-            # Get all conversations for this chatbot
-            conversations = Conversation.objects(chatbot=chatbot).order_by('-created_at')
+    #         # Get all conversations for this chatbot
+    #         conversations = Conversation.objects(chatbot=chatbot).order_by('-created_at')
             
-            conversation_responses = []
-            for conversation in conversations:
-                # Get all messages for this conversation
-                messages = Messages.objects(conversation_id=conversation).order_by('created_at')
+    #         conversation_responses = []
+    #         for conversation in conversations:
+    #             # Get all messages for this conversation
+    #             messages = Messages.objects(conversation_id=conversation).order_by('created_at')
                 
-                # Convert messages to MessageResponse objects
-                message_responses = []
-                for message in messages:
-                    message_response = Message(
-                        message=message.message,
-                        created_at=message.created_at,
-                        role=message.role
-                    )
-                    message_responses.append(message_response)
+    #             # Convert messages to MessageResponse objects
+    #             message_responses = []
+    #             for message in messages:
+    #                 message_response = Message(
+    #                     message=message.message,
+    #                     created_at=message.created_at,
+    #                     role=message.role
+    #                 )
+    #                 message_responses.append(message_response)
                 
-                # Create conversation response
-                conversation_response = ConversationsResponse(
-                    conversation_id=str(conversation.id),
-                    messages=message_responses,
-                    created_at=conversation.created_at,
-                    belonging_user_uid=str(chatbot.user_id.id),
-                    belonging_chatbot_id=str(chatbot.id)
-                )
-                conversation_responses.append(conversation_response)
+    #             # Create conversation response
+    #             conversation_response = ConversationsResponse(
+    #                 conversation_id=str(conversation.id),
+    #                 messages=message_responses,
+    #                 created_at=conversation.created_at,
+    #                 belonging_user_uid=str(chatbot.user_id.id),
+    #                 belonging_chatbot_id=str(chatbot.id),
+    #                 conversation_title=conversation.conversation_title
+    #             )
+    #             conversation_responses.append(conversation_response)
             
-            logger.info(f"Retrieved {len(conversation_responses)} conversations for chatbot {chatbot.name}")
-            return conversation_responses
+    #         logger.info(f"Retrieved {len(conversation_responses)} conversations for chatbot {chatbot.name}")
+    #         return conversation_responses
             
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error retrieving conversations for chatbot {chatbot_id}: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error retrieving conversations: {str(e)}"
-            )
+    #     except HTTPException:
+    #         raise
+    #     except Exception as e:
+    #         logger.error(f"Error retrieving conversations for chatbot {chatbot_id}: {e}")
+    #         raise HTTPException(
+    #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #             detail=f"Error retrieving conversations: {str(e)}"
+    #         )
     
     def create_chat_session(self, user_id: str, chatbot_id: str) -> CreateSessionResponse:
         """Create a new chat session for a user and chatbot"""
@@ -479,6 +480,7 @@ class PipelineHandler:
             conversation = Conversation.objects(chatbot=chatbot).first()
             if not conversation:
                 conversation = Conversation(
+                    conversation_title="New Conversation",
                     chatbot=chatbot,
                     created_at=datetime.now(),
                     updated_at=datetime.now()
@@ -502,24 +504,26 @@ class PipelineHandler:
             )
             chat_session.save()
             
-            # Get previous messages
-            messages = Messages.objects(conversation_id=conversation).order_by('created_at')
-            previous_messages = []
-            for msg in messages:
-                previous_messages.append(Message(
-                    message=msg.message,
-                    created_at=msg.created_at,
-                    role=msg.role
-                ))
+            # Get all conversations for this chatbot
+            conversations = Conversation.objects(chatbot=chatbot).order_by('-created_at')
+            conversations_basic_info = []
+            for conv in conversations:
+                conversation_summary = ConversationSummary(
+                    conversation_id=str(conv.id),
+                    conversation_title=conv.conversation_title,
+                    created_at=conv.created_at,
+                    belonging_user_uid=str(chatbot.user_id.id),
+                    belonging_chatbot_id=str(chatbot.id)
+                )
+                conversations_basic_info.append(conversation_summary)
             
             logger.info(f"Created chat session {session_id} for user {user.user_name} with chatbot {chatbot.name}")
             
             return CreateSessionResponse(
                 session_id=session_id,
-                conversation_id=str(conversation.id),
                 chatbot_id=str(chatbot.id),
                 chatbot_name=chatbot.name,
-                previous_messages=previous_messages
+                conversations=conversations_basic_info
             )
             
         except HTTPException:
@@ -531,6 +535,53 @@ class PipelineHandler:
                 detail=f"Error creating chat session: {str(e)}"
             )
     
+    def get_conversation_messages(self, conversation_id: str) -> ConversationMessagesResponse:
+        """Get all messages for a specific conversation"""
+        try:    
+            try:
+                conversation = Conversation.objects(id=ObjectId(conversation_id)).first()
+                if not conversation:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Conversation not found"
+                    )
+            except HTTPException:
+                # Re-raise HTTPExceptions as-is (404, 400, etc.)
+                raise
+            except Exception as e:
+                if "invalid ObjectId" in str(e).lower():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid conversation ID format"
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error retrieving conversation: {str(e)}"
+                )
+            
+            messages = Messages.objects(conversation_id=conversation).order_by('created_at')
+            message_responses = []
+            for message in messages:
+                message_response = Message(
+                    message=message.message,
+                    created_at=message.created_at,
+                    role=message.role
+                )
+                message_responses.append(message_response)
+            
+            return ConversationMessagesResponse(
+                conversation_id=str(conversation.id),
+                messages=message_responses
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error retrieving messages for conversation {conversation_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error retrieving messages: {str(e)}"
+            )
+
     def get_chat_session(self, session_id: str, user_id: str) -> ChatSession:
         """Get an active chat session"""
         try:
@@ -587,12 +638,27 @@ class PipelineHandler:
             )
             msg.save()
             
+            # Update conversation title with first user message
+            conversation = session.conversation_id
+            if role == "user" and (conversation.conversation_title == "New Conversation" or not conversation.conversation_title):
+                # Check if this is the first user message in the conversation
+                existing_user_messages = Messages.objects(
+                    conversation_id=conversation,
+                    role="user"
+                ).count()
+                
+                if existing_user_messages == 1:  # This is the first user message (just saved)
+                    # Truncate message if too long for title (limit to 50 characters)
+                    title = message[:50] + "..." if len(message) > 50 else message
+                    conversation.conversation_title = title
+                    logger.info(f"Updated conversation {conversation.id} title to: {title}")
+            
             # Update session and conversation activity
             session.last_activity = datetime.now()
             session.save()
             
-            session.conversation_id.updated_at = datetime.now()
-            session.conversation_id.save()
+            conversation.updated_at = datetime.now()
+            conversation.save()
             
             return msg
             

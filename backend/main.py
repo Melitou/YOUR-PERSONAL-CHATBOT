@@ -13,8 +13,8 @@ from fastapi.websockets import WebSocket, WebSocketDisconnect
 from api_models import (
     CreateAgentRequest, CreateAgentResponse, LoginRequest, LoginResponse,
     SigninRequest, SigninResponse, UserResponse, ErrorResponse,
-    ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse, ConversationsResponse,
-    CreateSessionRequest, CreateSessionResponse, ChatMessageRequest, ChatMessageResponse
+    ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse,
+    CreateSessionRequest, CreateSessionResponse, ChatMessageRequest, ChatMessageResponse, ConversationMessagesResponse
 )
 from auth_utils import (
     authenticate_user, create_user, create_access_token, verify_token,
@@ -353,17 +353,17 @@ async def get_user_chatbots(current_user: User_Auth_Table = Depends(get_current_
             detail="Error retrieving chatbots"
         )
 
-@app.get("/chatbot/conversations", response_model=List[ConversationsResponse], tags=["Chatbot"])
-async def get_chatbot_conversations(chatbot_id: str, current_user: User_Auth_Table = Depends(get_current_user)):
-    """Get all conversations for a specific chatbot"""
+@app.get("/chatbot/{conversation_id}/messages", response_model=ConversationMessagesResponse, tags=["Chatbot"])
+async def get_conversation_messages(conversation_id: str, current_user: User_Auth_Table = Depends(get_current_user)):
+    """Get all messages for a specific conversation"""
     try:
-        conversations = pipeline_handler.get_chatbot_conversations(chatbot_id, str(current_user.id))
-        return conversations
+        messages = pipeline_handler.get_conversation_messages(conversation_id) # we suppose we dont need the user_id, the user is already authenticated
+        return messages 
     except Exception as e:
-        logger.error(f"Error retrieving conversations for chatbot {chatbot_id}: {e}")
+        logger.error(f"Error retrieving messages for conversation {conversation_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error retrieving conversations"
+            detail="Error retrieving messages"
         )
 
 @app.post("/chatbot/{chatbot_id}/session", response_model=CreateSessionResponse, tags=["Chat Session"])

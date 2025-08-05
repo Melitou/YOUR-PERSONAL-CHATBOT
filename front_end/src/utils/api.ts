@@ -214,6 +214,17 @@ export const chatbotApi = {
     // Get chatbot details
     getChatbotDetails: (chatbotId: string) =>
         apiClient.get(`/chatbots/${chatbotId}`),
+
+    // Get conversations for a specific chatbot
+    getChatbotConversations: (chatbotId: string) =>
+        apiClient.get(`/chatbot/conversations?chatbot_id=${chatbotId}`),
+
+    // Create a chatbot session
+    createChatbotSession: (chatbotId: string) => {
+        const formData = new FormData();
+        formData.append('chatbot_id', chatbotId);
+        return apiClient.post(`/chatbot/${chatbotId}/session`, formData);
+    },
 };
 
 // ['token', 'semantic', 'line', 'recursive']

@@ -77,12 +77,14 @@ class ChatBots(Document):
 
 class Conversation(Document):
     """A conversation made between a user and a chatbot, it belongs to the chatbot"""
+    conversation_title = StringField(required=False, default="New Conversation")
     chatbot = ReferenceField(ChatBots, required=True)
     created_at = DateTimeField(required=True)
     updated_at = DateTimeField(required=True)
     meta = {
         'collection': 'conversations',
         'indexes': [
+            {'fields': ['conversation_title']},
             {'fields': ['chatbot']},
             {'fields': ['created_at']},
             {'fields': ['updated_at']}
@@ -90,7 +92,7 @@ class Conversation(Document):
     }
 
     def __str__(self) -> str:
-        return f"Conversation(chatbot={self.chatbot}, created_at={self.created_at}, updated_at={self.updated_at})"
+        return f"Conversation(conversation_title={self.conversation_title}, chatbot={self.chatbot}, created_at={self.created_at}, updated_at={self.updated_at})"
 
 class Messages(Document):
     """A message made between a user and a chatbot, it belongs to the conversation"""

@@ -928,6 +928,76 @@ async def ask_rag_assistant_stream(history: list, query: str) -> AsyncGenerator[
     else:
         yield f"Error: Unsupported model provider for model: {model}"
 
+def ask_rag_assistant_sync_stream(history: list, query: str) -> str:
+    """
+    Synchronous wrapper for streaming assistant that provides real-time output to CLI.
+    Handles the async streaming and displays chunks as they arrive.
+
+    Args:
+        history: List of previous conversation turns
+        query: User's current query
+
+    Returns:
+        Complete response string (for conversation history)
+    """
+    import sys
+    import time
+
+    # Create async event loop for this sync context
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        accumulated_response = ""
+
+        async def stream_and_display():
+            nonlocal accumulated_response
+
+            # Show streaming indicator
+            print("\nΓ£¿ Generating response", end="", flush=True)
+            for i in range(3):
+                time.sleep(0.05)
+                print(".", end="", flush=True)
+            print()
+
+            print("≡ƒñû Assistant: ", end="", flush=True)
+
+            chunk_count = 0
+            start_time = time.time()
+
+            async for chunk in ask_rag_assistant_stream(history, query):
+                # Print each chunk immediately
+                print(chunk, end="", flush=True)
+                accumulated_response += chunk
+                chunk_count += 1
+
+                # Add small delay to make streaming visible for very fast responses
+                if chunk_count % 5 == 0:
+                    await asyncio.sleep(0.01)
+
+            # Add final newline and completion indicator
+            print()
+
+            elapsed_time = time.time() - start_time
+            debug_print(
+                f"Streaming completed: {chunk_count} chunks in {elapsed_time:.2f}s")
+
+            return accumulated_response
+
+        # Run the async streaming
+        result = loop.run_until_complete(stream_and_display())
+        return result
+
+    except Exception as e:
+        print(f"\nΓ¥î Streaming error: {e}")
+        debug_print(f"Streaming error details: {type(e).__name__}: {e}")
+        print("≡ƒöä Falling back to non-streaming mode...")
+        # Fallback to non-streaming
+        fallback_response = ask_rag_assistant(history, query)
+        print(f"≡ƒñû Assistant: {fallback_response}")
+        return fallback_response
+    finally:
+        loop.close()
 
 def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, chatbot_model: str = "gpt-4.1"):
     """

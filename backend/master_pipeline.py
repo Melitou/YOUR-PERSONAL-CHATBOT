@@ -54,8 +54,7 @@ class MasterPipeline:
 
         # Initialize all pipelines
         logger.info("Initializing master pipeline...")
-        logger.info(
-            f"Chunking method: {chunking_method} with params: {self.chunking_params}")
+        logger.info(f"Chunking method: {chunking_method} with params: {self.chunking_params}")
 
         try:
             # Upload pipeline (document_pipeline.py)
@@ -468,288 +467,289 @@ class MasterPipeline:
             logger.error(f"Error closing master pipeline: {e}")
 
 
-def main():
-    """Complete CLI interface: Document Processing + RAG Chatbot"""
-    print("=" * 80)
-    print("🚀 COMPLETE RAG CHATBOT PIPELINE")
-    print("=" * 80)
-    print("Complete workflow: Documents → Processing → Embeddings → Chat")
-    print("• 📤 Upload and process your documents")
-    print("• 🧠 Create embeddings and store in vector database")
-    print("• 🤖 Start chatting with your personal document assistant")
-    print("=" * 80)
-    print()
+# def main():
+#     """Complete CLI interface: Document Processing + RAG Chatbot"""
+#     print("=" * 80)
+#     print("🚀 COMPLETE RAG CHATBOT PIPELINE")
+#     print("=" * 80)
+#     print("Complete workflow: Documents → Processing → Embeddings → Chat")
+#     print("• 📤 Upload and process your documents")
+#     print("• 🧠 Create embeddings and store in vector database")
+#     print("• 🤖 Start chatting with your personal document assistant")
+#     print("=" * 80)
+#     print()
 
-    try:
-        # STEP 1: Get folder path
-        while True:
-            folder_path = input(
-                "📁 Enter folder path containing documents: ").strip()
-            if folder_path:
-                folder_path = folder_path.strip('"\'')
-                if os.path.exists(folder_path):
-                    file_count = len([f for f in Path(folder_path).iterdir()
-                                      if f.is_file() and f.suffix.lower() in {'.pdf', '.docx', '.txt', '.csv'}])
-                    print(
-                        f"✅ Found {file_count} supported files in {folder_path}")
-                    break
-                else:
-                    print(
-                        f"❌ Folder '{folder_path}' does not exist. Please try again.")
-            else:
-                print("⚠️  Please enter a valid folder path.")
+#     try:
+#         # STEP 1: Get folder path
+#         while True:
+#             folder_path = input(
+#                 "📁 Enter folder path containing documents: ").strip()
+#             if folder_path:
+#                 folder_path = folder_path.strip('"\'')
+#                 if os.path.exists(folder_path):
+#                     file_count = len([f for f in Path(folder_path).iterdir()
+#                                       if f.is_file() and f.suffix.lower() in {'.pdf', '.docx', '.txt', '.csv'}])
+#                     print(
+#                         f"✅ Found {file_count} supported files in {folder_path}")
+#                     break
+#                 else:
+#                     print(
+#                         f"❌ Folder '{folder_path}' does not exist. Please try again.")
+#             else:
+#                 print("⚠️  Please enter a valid folder path.")
 
-        # STEP 2: Get namespace
-        while True:
-            namespace = input(
-                "🏷️  Enter namespace (e.g., 'my_documents', 'company_data'): ").strip()
-            if namespace:
-                # Comprehensive validation with immediate feedback
-                if not namespace.strip():
-                    print("⚠️  Namespace cannot be empty. Please try again.")
-                    continue
-                if ' ' in namespace:
-                    print("⚠️  Namespace cannot contain spaces. Please try again.")
-                    continue
-                if '|' in namespace:
-                    print(
-                        "⚠️  Namespace cannot contain pipe character (reserved for user ID separation). Please try again.")
-                    continue
-                if len(namespace) > 50:
-                    print(
-                        "⚠️  Namespace too long (max 50 characters). Please try again.")
-                    continue
+#         # STEP 2: Get namespace
+#         while True:
+#             namespace = input(
+#                 "🏷️  Enter namespace (e.g., 'my_documents', 'company_data'): ").strip()
+#             if namespace:
+#                 # Comprehensive validation with immediate feedback
+#                 if not namespace.strip():
+#                     print("⚠️  Namespace cannot be empty. Please try again.")
+#                     continue
+#                 if ' ' in namespace:
+#                     print("⚠️  Namespace cannot contain spaces. Please try again.")
+#                     continue
+#                 if '|' in namespace:
+#                     print(
+#                         "⚠️  Namespace cannot contain pipe character (reserved for user ID separation). Please try again.")
+#                     continue
+#                 if len(namespace) > 50:
+#                     print(
+#                         "⚠️  Namespace too long (max 50 characters). Please try again.")
+#                     continue
 
-                # All validation passed
-                print(f"✅ Namespace '{namespace}' is valid.")
-                break
-            else:
-                print("⚠️  Please enter a valid namespace.")
+#                 # All validation passed
+#                 print(f"✅ Namespace '{namespace}' is valid.")
+#                 break
+#             else:
+#                 print("⚠️  Please enter a valid namespace.")
 
-        # STEP 3: Get embedding model
-        print("\n🤖 Select embedding provider:")
-        print("1. OpenAI (text-embedding-3-small)")
-        print("2. Gemini (gemini-embedding-001)")
+#         # STEP 3: Get embedding model
+#         print("\n🤖 Select embedding provider:")
+#         print("1. OpenAI (text-embedding-3-small)")
+#         print("2. Gemini (gemini-embedding-001)")
 
-        while True:
-            choice = input("Choose provider (1 or 2): ").strip()
-            if choice == "1":
-                embedding_model = "text-embedding-3-small"
-                print("✅ Selected: OpenAI")
-                break
-            elif choice == "2":
-                embedding_model = "gemini-embedding-001"
-                print("✅ Selected: Gemini")
-                break
-            else:
-                print("⚠️  Please enter 1 or 2.")
+#         while True:
+#             choice = input("Choose provider (1 or 2): ").strip()
+#             if choice == "1":
+#                 embedding_model = "text-embedding-3-small"
+#                 print("✅ Selected: OpenAI")
+#                 break
+#             elif choice == "2":
+#                 embedding_model = "gemini-embedding-001"
+#                 print("✅ Selected: Gemini")
+#                 break
+#             else:
+#                 print("⚠️  Please enter 1 or 2.")
 
-        # STEP 4: Get chatbot model
-        print("\n🤖 Select chatbot model:")
-        print("Choose which AI model will power your personal document assistant:")
-        print()
-        print("📘 OpenAI Models:")
-        openai_models = [
-            ("gpt-4.1", "GPT-4.1 - Latest flagship model (recommended)"),
-            ("gpt-4o", "GPT-4o - Optimized for general use"),
-            ("gpt-4o-mini", "GPT-4o Mini - Fast and efficient"),
-            ("gpt-o3", "GPT-o3 - Advanced reasoning model"),
-            ("gpt-o3-pro", "GPT-o3 Pro - Enhanced reasoning"),
-            ("gpt-o3-mini", "GPT-o3 Mini - Compact reasoning model")
-        ]
+#         # STEP 4: Get chatbot model
+#         print("\n🤖 Select chatbot model:")
+#         print("Choose which AI model will power your personal document assistant:")
+#         print()
+#         print("📘 OpenAI Models:")
+#         openai_models = [
+#             ("gpt-4.1", "GPT-4.1 - Latest flagship model (recommended)"),
+#             ("gpt-4o", "GPT-4o - Optimized for general use"),
+#             ("gpt-4o-mini", "GPT-4o Mini - Fast and efficient"),
+#             ("gpt-o3", "GPT-o3 - Advanced reasoning model"),
+#             ("gpt-o3-pro", "GPT-o3 Pro - Enhanced reasoning"),
+#             ("gpt-o3-mini", "GPT-o3 Mini - Compact reasoning model")
+#         ]
 
-        print("🟢 Gemini Models:")
-        gemini_models = [
-            ("gemini-2.5-pro", "Gemini 2.5 Pro - Latest flagship model"),
-            ("gemini-2.5-flash", "Gemini 2.5 Flash - Fast and efficient"),
-            ("gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite - Lightweight"),
-            ("gemini-2.0-flash", "Gemini 2.0 Flash - Reliable performance"),
-            ("gemini-2.0-flash-lite", "Gemini 2.0 Flash Lite - Quick responses"),
-            ("gemini-1.5-pro", "Gemini 1.5 Pro - Proven performance"),
-            ("gemini-1.5-flash", "Gemini 1.5 Flash - Balanced option")
-        ]
+#         print("🟢 Gemini Models:")
+#         gemini_models = [
+#             ("gemini-2.5-pro", "Gemini 2.5 Pro - Latest flagship model"),
+#             ("gemini-2.5-flash", "Gemini 2.5 Flash - Fast and efficient"),
+#             ("gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite - Lightweight"),
+#             ("gemini-2.0-flash", "Gemini 2.0 Flash - Reliable performance"),
+#             ("gemini-2.0-flash-lite", "Gemini 2.0 Flash Lite - Quick responses"),
+#             ("gemini-1.5-pro", "Gemini 1.5 Pro - Proven performance"),
+#             ("gemini-1.5-flash", "Gemini 1.5 Flash - Balanced option")
+#         ]
 
-        # Display options with numbers
-        all_models = openai_models + gemini_models
-        for i, (model_id, description) in enumerate(all_models, 1):
-            provider = "🔵 OpenAI" if model_id.startswith("gpt") else "🟢 Gemini"
-            print(f"{i:2d}. {provider} - {description}")
+#         # Display options with numbers
+#         all_models = openai_models + gemini_models
+#         for i, (model_id, description) in enumerate(all_models, 1):
+#             provider = "🔵 OpenAI" if model_id.startswith("gpt") else "🟢 Gemini"
+#             print(f"{i:2d}. {provider} - {description}")
 
-        chatbot_model = None
-        while True:
-            try:
-                choice = input(
-                    f"\nChoose chatbot model (1-{len(all_models)}): ").strip()
-                if choice.isdigit():
-                    choice_num = int(choice)
-                    if 1 <= choice_num <= len(all_models):
-                        chatbot_model = all_models[choice_num - 1][0]
-                        provider = "OpenAI" if chatbot_model.startswith(
-                            "gpt") else "Gemini"
-                        print(f"✅ Selected: {chatbot_model} ({provider})")
-                        break
-                    else:
-                        print(
-                            f"⚠️  Please enter a number between 1 and {len(all_models)}.")
-                else:
-                    print(
-                        f"⚠️  Please enter a valid number between 1 and {len(all_models)}.")
-            except ValueError:
-                print(
-                    f"⚠️  Please enter a valid number between 1 and {len(all_models)}.")
+#         chatbot_model = None
+#         while True:
+#             try:
+#                 choice = input(
+#                     f"\nChoose chatbot model (1-{len(all_models)}): ").strip()
+#                 if choice.isdigit():
+#                     choice_num = int(choice)
+#                     if 1 <= choice_num <= len(all_models):
+#                         chatbot_model = all_models[choice_num - 1][0]
+#                         provider = "OpenAI" if chatbot_model.startswith(
+#                             "gpt") else "Gemini"
+#                         print(f"✅ Selected: {chatbot_model} ({provider})")
+#                         break
+#                     else:
+#                         print(
+#                             f"⚠️  Please enter a number between 1 and {len(all_models)}.")
+#                 else:
+#                     print(
+#                         f"⚠️  Please enter a valid number between 1 and {len(all_models)}.")
+#             except ValueError:
+#                 print(
+#                     f"⚠️  Please enter a valid number between 1 and {len(all_models)}.")
 
-        # STEP 5: Get chunking strategy
-        print("\n✂️  Select chunking strategy:")
-        print("1. Token-based (default) - Split by token count, good for general use")
-        print("2. Semantic - Split by meaning, requires OpenAI embeddings")
-        print("3. Line-based - Split by line count, good for structured text")
-        print("4. Recursive - Character-based recursive splitting")
+#         # STEP 5: Get chunking strategy
+#         print("\n✂️  Select chunking strategy:")
+#         print("1. Token-based (default) - Split by token count, good for general use")
+#         print("2. Semantic - Split by meaning, requires OpenAI embeddings")
+#         print("3. Line-based - Split by line count, good for structured text")
+#         print("4. Recursive - Character-based recursive splitting")
 
-        chunking_method = "token"  # default
-        while True:
-            choice = input(
-                "Choose chunking strategy (1-4, default 1): ").strip()
-            if choice == "1" or choice == "":
-                chunking_method = "token"
-                print("✅ Selected: Token-based chunking")
-                break
-            elif choice == "2":
-                chunking_method = "semantic"
-                print("✅ Selected: Semantic chunking")
-                break
-            elif choice == "3":
-                chunking_method = "line"
-                print("✅ Selected: Line-based chunking")
-                break
-            elif choice == "4":
-                chunking_method = "recursive"
-                print("✅ Selected: Recursive chunking")
-                break
-            else:
-                print("⚠️  Please enter 1, 2, 3, or 4.")
+#         chunking_method = "token"  # default
+#         while True:
+#             choice = input(
+#                 "Choose chunking strategy (1-4, default 1): ").strip()
+#             if choice == "1" or choice == "":
+#                 chunking_method = "token"
+#                 print("✅ Selected: Token-based chunking")
+#                 break
+#             elif choice == "2":
+#                 chunking_method = "semantic"
+#                 print("✅ Selected: Semantic chunking")
+#                 break
+#             elif choice == "3":
+#                 chunking_method = "line"
+#                 print("✅ Selected: Line-based chunking")
+#                 break
+#             elif choice == "4":
+#                 chunking_method = "recursive"
+#                 print("✅ Selected: Recursive chunking")
+#                 break
+#             else:
+#                 print("⚠️  Please enter 1, 2, 3, or 4.")
 
-        print(f"\n🔧 Configuration:")
-        print(f"   📁 Folder: {folder_path}")
-        print(f"   🏷️  Namespace: {namespace}")
-        print(f"   🔍 Embedding: {embedding_model}")
-        print(f"   🤖 Chatbot: {chatbot_model}")
-        print(f"   ✂️  Chunking: {chunking_method}")
+#         print(f"\n🔧 Configuration:")
+#         print(f"   📁 Folder: {folder_path}")
+#         print(f"   🏷️  Namespace: {namespace}")
+#         print(f"   🔍 Embedding: {embedding_model}")
+#         print(f"   🤖 Chatbot: {chatbot_model}")
+#         print(f"   ✂️  Chunking: {chunking_method}")
 
-        # Confirmation
-        confirm = input("\n🚀 Start processing? (Y/n): ").strip().lower()
-        if confirm in ['n', 'no']:
-            print("❌ Operation cancelled.")
-            return
+#         # Confirmation
+#         confirm = input("\n🚀 Start processing? (Y/n): ").strip().lower()
+#         if confirm in ['n', 'no']:
+#             print("❌ Operation cancelled.")
+#             return
 
-        print("\n" + "=" * 80)
-        print("🔄 STARTING DOCUMENT PROCESSING...")
-        print("=" * 80)
+#         print("\n" + "=" * 80)
+#         print("🔄 STARTING DOCUMENT PROCESSING...")
+#         print("=" * 80)
 
-        # Initialize master pipeline with user-selected chunking method
-        master_pipeline = MasterPipeline(
-            max_workers=4,
-            chunking_method=chunking_method,
-            user=None  # CLI mode uses default user creation
-        )
+#         # Initialize master pipeline with user-selected chunking method
+#         master_pipeline = MasterPipeline(
+#             max_workers=4,
+#             chunking_method=chunking_method,
+#             user=None  # CLI mode uses default user creation
+#         )
 
-        # Create unique namespace with retry loop
-        unique_namespace = None
-        while unique_namespace is None:
-            try:
-                unique_namespace = master_pipeline.upload_pipeline.create_unique_namespace(
-                    namespace)
-                print(f"✅ Created namespace: {unique_namespace}")
-            except ValueError as e:
-                print(f"❌ Namespace error: {e}")
-                print("Please enter a new namespace.")
+#         # Create unique namespace with retry loop
+#         unique_namespace = None
+#         while unique_namespace is None:
+#             try:
+#                 unique_namespace = master_pipeline.upload_pipeline.create_unique_namespace(
+#                     namespace)
+#                 print(f"✅ Created namespace: {unique_namespace}")
+#             except ValueError as e:
+#                 print(f"❌ Namespace error: {e}")
+#                 print("Please enter a new namespace.")
 
-                # Ask for new namespace
-                while True:
-                    namespace = input(
-                        "🏷️  Enter namespace (e.g., 'my_documents', 'company_data'): ").strip()
-                    if namespace:
-                        # Comprehensive validation with immediate feedback
-                        if not namespace.strip():
-                            print("⚠️  Namespace cannot be empty. Please try again.")
-                            continue
-                        if ' ' in namespace:
-                            print(
-                                "⚠️  Namespace cannot contain spaces. Please try again.")
-                            continue
-                        if '|' in namespace:
-                            print(
-                                "⚠️  Namespace cannot contain pipe character (reserved for user ID separation). Please try again.")
-                            continue
-                        if len(namespace) > 50:
-                            print(
-                                "⚠️  Namespace too long (max 50 characters). Please try again.")
-                            continue
+#                 # Ask for new namespace
+#                 while True:
+#                     namespace = input(
+#                         "🏷️  Enter namespace (e.g., 'my_documents', 'company_data'): ").strip()
+#                     if namespace:
+#                         # Comprehensive validation with immediate feedback
+#                         if not namespace.strip():
+#                             print("⚠️  Namespace cannot be empty. Please try again.")
+#                             continue
+#                         if ' ' in namespace:
+#                             print(
+#                                 "⚠️  Namespace cannot contain spaces. Please try again.")
+#                             continue
+#                         if '|' in namespace:
+#                             print(
+#                                 "⚠️  Namespace cannot contain pipe character (reserved for user ID separation). Please try again.")
+#                             continue
+#                         if len(namespace) > 50:
+#                             print(
+#                                 "⚠️  Namespace too long (max 50 characters). Please try again.")
+#                             continue
 
-                        # All validation passed
-                        print(f"✅ Namespace '{namespace}' is valid.")
-                        break
-                    else:
-                        print("⚠️  Please enter a valid namespace.")
-            except Exception as e:
-                print(f"❌ Unexpected error creating namespace: {e}")
-                return
+#                         # All validation passed
+#                         print(f"✅ Namespace '{namespace}' is valid.")
+#                         break
+#                     else:
+#                         print("⚠️  Please enter a valid namespace.")
+#             except Exception as e:
+#                 print(f"❌ Unexpected error creating namespace: {e}")
+#                 return
 
-        # Run complete workflow with embeddings
-        results = asyncio.run(master_pipeline.process_directory_complete_with_embeddings(
-            directory_path=folder_path,
-            namespace=unique_namespace,
-            user_id=None,  # Auto-determined
-            embedding_model=embedding_model,
-            use_parallel_upload=True,
-            use_parallel_processing=True
-        ))
+#         # Run complete workflow with embeddings
+#         results = asyncio.run(master_pipeline.process_directory_complete_with_embeddings(
+#             directory_path=folder_path,
+#             namespace=unique_namespace,
+#             user_id=None,  # Auto-determined
+#             embedding_model=embedding_model,
+#             use_parallel_upload=True,
+#             use_parallel_processing=True
+#         ))
 
-        # Check if processing was successful
-        if not results.get('complete_workflow_success'):
-            print(
-                f"\n❌ Processing failed: {results.get('message', 'Unknown error')}")
-            master_pipeline.close()
-            return
+#         # Check if processing was successful
+#         if not results.get('complete_workflow_success'):
+#             print(
+#                 f"\n❌ Processing failed: {results.get('message', 'Unknown error')}")
+#             master_pipeline.close()
+#             return
 
-        # Show results summary
-        print(f"\n✅ PROCESSING COMPLETE!")
-        if results.get('processing_results'):
-            pr = results['processing_results']
-            print(f"   📝 Created {pr['chunks_created']} chunks")
-        if results.get('embedding_results'):
-            er = results['embedding_results']
-            print(f"   🤖 Embedded {er.get('total_chunks_embedded', 0)} chunks")
+#         # Show results summary
+#         print(f"\n✅ PROCESSING COMPLETE!")
+#         if results.get('processing_results'):
+#             pr = results['processing_results']
+#             print(f"   📝 Created {pr['chunks_created']} chunks")
+#         if results.get('embedding_results'):
+#             er = results['embedding_results']
+#             print(f"   🤖 Embedded {er.get('total_chunks_embedded', 0)} chunks")
 
-        # Get user ID for chatbot
-        user_id = str(master_pipeline.upload_pipeline.user.id)
+#         # Get user ID for chatbot
+#         user_id = str(master_pipeline.upload_pipeline.user.id)
 
-        # Close the pipeline
-        master_pipeline.close()
+#         # Close the pipeline
+#         master_pipeline.close()
 
-        # PHASE 2: Start RAG Chatbot
-        print("\n" + "=" * 80)
-        print("🤖 INITIALIZING PERSONAL DOCUMENT ASSISTANT...")
-        print("=" * 80)
+#         # PHASE 2: Start RAG Chatbot
+#         print("\n" + "=" * 80)
+#         print("🤖 INITIALIZING PERSONAL DOCUMENT ASSISTANT...")
+#         print("=" * 80)
 
-        # Import and start the RAG chatbot
-        from LLM.rag_llm_call import start_rag_chat_session
+#         # Import and start the RAG chatbot
+#         from LLM.rag_llm_call import start_rag_chat_session
 
-        # Start the interactive chat session
-        start_rag_chat_session(
-            user_id=user_id,
-            namespace=namespace,  # Use original namespace (without user_id)
-            embedding_model=embedding_model,
-            chatbot_model=chatbot_model
-        )
+#         # Start the interactive chat session
+#         start_rag_chat_session(
+#             user_id=user_id,
+#             namespace=namespace,  # Use original namespace (without user_id)
+#             embedding_model=embedding_model,
+#             chatbot_model=chatbot_model
+#         )
 
-    except KeyboardInterrupt:
-        print("\n\n⚠️  Operation cancelled by user.")
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        logger.exception("Full error traceback:")
+#     except KeyboardInterrupt:
+#         print("\n\n⚠️  Operation cancelled by user.")
+#     except Exception as e:
+#         print(f"\n❌ Error: {e}")
+#         logger.exception("Full error traceback:")
 
-    print("\n🏁 Complete pipeline finished.")
+#     print("\n🏁 Complete pipeline finished.")
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    pass

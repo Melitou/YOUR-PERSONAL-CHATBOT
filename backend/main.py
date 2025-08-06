@@ -14,7 +14,7 @@ from api_models import (
     CreateAgentRequest, CreateAgentResponse, LoginRequest, LoginResponse,
     SigninRequest, SigninResponse, UserResponse, ErrorResponse,
     ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse,
-    CreateSessionRequest, CreateSessionResponse, ChatMessageRequest, ChatMessageResponse, ConversationMessagesResponse
+    CreateSessionRequest, CreateSessionResponse, ChatMessageRequest, ChatMessageResponse, ConversationMessagesResponse, ConversationSummary
 )
 from auth_utils import (
     authenticate_user, create_user, create_access_token, verify_token,
@@ -353,34 +353,53 @@ async def get_user_chatbots(current_user: User_Auth_Table = Depends(get_current_
             detail="Error retrieving chatbots"
         )
 
-@app.get("/conversation/{conversation_id}/messages", response_model=ConversationMessagesResponse, tags=["Conversation"])
-async def get_conversation_messages(conversation_id: str, current_user: User_Auth_Table = Depends(get_current_user)):
-    """Get all messages for a specific conversation"""
+@app.get("/chatbot/{chatbot_id}/conversations", response_model=List[ConversationSummary], tags=["Conversation"])
+async def get_chatbot_conversations(chatbot_id: str, current_user: User_Auth_Table = Depends(get_current_user)):
+    """Get all conversations for a chatbot"""
     try:
-        messages = pipeline_handler.get_conversation_messages(conversation_id) # we suppose we dont need the user_id, the user is already authenticated
-        return messages 
+        conversations = pipeline_handler.get_chatbot_conversations(chatbot_id, str(current_user.id))
+        logger.info(f"Retrieved {len(conversations)} conversations for user {current_user.user_name}")
+        return conversations
     except Exception as e:
-        logger.error(f"Error retrieving messages for conversation {conversation_id}: {e}")
+        logger.error(f"Error retrieving conversations for chatbot {chatbot_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error retrieving messages"
+            detail="Error retrieving conversations"
         )
 
-@app.post("/chatbot/{chatbot_id}/session", response_model=CreateSessionResponse, tags=["Chat Session"])
-async def create_chat_session(
+@app.post("/chatbot/{chatbot_id}/conversation/new", response_model=CreateSessionResponse, tags=["Conversation Session"])
+async def create_new_conversation_with_session(
     chatbot_id: str,
     current_user: User_Auth_Table = Depends(get_current_user)
 ):
-    """Create a new chat session for a chatbot"""
+    """Create a new conversation and session for a chatbot"""
     try:
-        session_response = pipeline_handler.create_chat_session(str(current_user.id), chatbot_id)
-        logger.info(f"Created chat session {session_response.session_id} for user {current_user.user_name}")
+        session_response = pipeline_handler.create_new_conversation_with_session(str(current_user.id), chatbot_id)
+        logger.info(f"Created new conversation session {session_response.session_id} for user {current_user.user_name}")
         return session_response
     except Exception as e:
-        logger.error(f"Error creating chat session for chatbot {chatbot_id}: {e}")
+        logger.error(f"Error creating new conversation session for chatbot {chatbot_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error creating chat session"
+            detail="Error creating new conversation session"
+        )
+
+@app.post("/chatbot/{chatbot_id}/conversation/{conversation_id}/session", response_model=CreateSessionResponse, tags=["Conversation Session"])
+async def create_conversation_session(
+    chatbot_id: str,
+    conversation_id: str,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Create a new conversation session"""
+    try:
+        session_response = pipeline_handler.create_conversation_session(str(current_user.id), chatbot_id, conversation_id)
+        logger.info(f"Created conversation session {session_response.session_id} for user {current_user.user_name}")
+        return session_response
+    except Exception as e:
+        logger.error(f"Error creating conversation session for chatbot {chatbot_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error creating conversation session"
         )
 
 async def authenticate_websocket(websocket: WebSocket, token: str) -> User_Auth_Table:
@@ -403,9 +422,9 @@ async def authenticate_websocket(websocket: WebSocket, token: str) -> User_Auth_
             detail="Invalid authentication token"
         )
 
-@app.websocket("/ws/chat/{session_id}")
-async def websocket_chat(websocket: WebSocket, session_id: str, token: str = Query(...)):
-    """Handle WebSocket chat session with streaming responses"""
+@app.websocket("/ws/conversation/session/{session_id}")
+async def websocket_conversation(websocket: WebSocket, session_id: str, token: str = Query(...)):
+    """Handle WebSocket conversation session with streaming responses"""
     user = None
     session = None
     
@@ -425,7 +444,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str, token: str = Que
     
     try:
         # Validate session belongs to user
-        session = pipeline_handler.get_chat_session(session_id, str(user.id))
+        session = pipeline_handler.get_conversation_session(session_id, str(user.id))
         chatbot = session.chatbot_id
         
         logger.info(f"WebSocket connected for session {session_id}, user {user.user_name}, chatbot {chatbot.name}")
@@ -498,7 +517,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str, token: str = Que
                     else:
                         i += 1  # Move to next message
                 
-                # Keep only last 5 pairs to avoid token limit issues
+                # Keep only last 5 pairs
                 history = history[-5:]
                 
                 logger.info(f"Built conversation history with {len(history)} pairs for RAG")
@@ -568,7 +587,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str, token: str = Que
         # Cleanup session if we have user info
         if user and session_id:
             try:
-                pipeline_handler.close_chat_session(session_id, str(user.id))
+                pipeline_handler.close_conversation_session(session_id, str(user.id))
             except Exception as e:
                 logger.error(f"Error closing session in cleanup: {e}")
 
@@ -594,20 +613,20 @@ async def safe_websocket_close(websocket: WebSocket, code: int = 1000, reason: s
         logger.debug(f"Failed to close WebSocket: {e}")
     return False
 
-@app.delete("/chatbot/session/{session_id}", tags=["Chat Session"])
-async def close_chat_session(
+@app.delete("/conversation/session/{session_id}", tags=["Conversation Session"])
+async def close_conversation_session(
     session_id: str,
     current_user: User_Auth_Table = Depends(get_current_user)
 ):
-    """Close/deactivate a chat session"""
+    """Close/deactivate a conversation session"""
     try:
-        pipeline_handler.close_chat_session(session_id, str(current_user.id))
+        pipeline_handler.close_conversation_session(session_id, str(current_user.id))
         return {"message": "Session closed successfully"}
     except Exception as e:
-        logger.error(f"Error closing chat session {session_id}: {e}")
+        logger.error(f"Error closing conversation session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error closing chat session"
+            detail="Error closing conversation session"
         )
 
 @app.post("/admin/cleanup-sessions", tags=["Admin"])

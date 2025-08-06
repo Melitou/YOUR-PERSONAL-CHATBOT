@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
 //import UserComponent from "./UserComponent";    
 import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
@@ -6,10 +6,11 @@ import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent
 import UserAuthStore from "../stores/UserAuthStore";
 import ManageChatbotsModalComponent from "./ManageChatbotsModalComponent";
 import LoadedChatbotStore, { type ConversationSummary } from "../stores/LoadedChatbotStore";
+import { chatbotApi } from "../utils/api";
 
 const SidebarComponent = () => {
     const user = UserAuthStore((state: any) => state.user);
-    const { loadedChatbot, loadedChatbotHistory, fetchConversationMessages } = LoadedChatbotStore((state: any) => state);
+    const { loadedChatbot, loadedChatbotHistory, startConversationSession, setLoadedChatbotHistory, connectToWebSocket, createNewConversationWithSession, webSocket } = LoadedChatbotStore((state: any) => state);
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [createBotModalOpen, setCreateBotModalOpen] = useState(false);
@@ -26,22 +27,42 @@ const SidebarComponent = () => {
     }
 
     const handleConversationClick = async (conversation: ConversationSummary) => {
-        console.log('Selected conversation:', conversation.conversation_id);
-        console.log('Conversation title:', conversation.conversation_title);
+        console.log('Selected conversation:', conversation);
         try {
-            // Fetch conversation messages
-            const messages = await fetchConversationMessages(conversation.conversation_id);
-            console.log('Conversation messages fetched successfully:', messages);
+            // Start conversation session
+            const session_id = await startConversationSession(conversation.conversation_id, loadedChatbot.id);
+            console.log('Conversation session started successfully:', session_id);
+            // Connect to WebSocket
+            const ws = await connectToWebSocket(session_id);
+            console.log('WebSocket connected successfully:', ws);
         } catch (error) {
-            console.error('Failed to load conversation:', error);
+            console.error('Failed to start conversation session:', error);
         }
     }
 
-    const handleNewConversationClick = () => {
-        console.log('Starting new conversation...');
-        // TODO: Implement new conversation logic - clear current messages and start fresh
-        // This might involve sending a special message to the WebSocket or just clearing the chat
+    const handleNewConversationClick = async () => {
+        try {
+            // Create a new conversation
+            const session_id = await createNewConversationWithSession(loadedChatbot.id);
+            console.log('New conversation created successfully:', session_id);
+            // Connect to WebSocket
+            const ws = await connectToWebSocket(session_id);
+            console.log('WebSocket connected successfully:', ws);
+        } catch (error) {
+            console.error('Failed to start new conversation:', error);
+        }
     }
+
+    useEffect(() => {
+        if (loadedChatbot) {
+            // Load the conversations of the chatbot selected
+            const loadConversations = async () => {
+                const conversations = await chatbotApi.getChatbotConversations(loadedChatbot.id);
+                setLoadedChatbotHistory(conversations);
+            }
+            loadConversations();
+        }
+    }, [loadedChatbot, webSocket]);
 
     return (
         <>

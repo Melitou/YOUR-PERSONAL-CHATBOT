@@ -149,7 +149,7 @@ class Message(BaseModel):
     role: str = Field(..., description="Role of the message (user, agent)")
 
 class ConversationSummary(BaseModel):
-    """Response model for conversation summary without messages"""
+    """Response model for conversation summary/basic information without the messages"""
     conversation_id: str = Field(..., description="Conversation ID")
     conversation_title: str = Field(..., description="Title of the conversation")
     created_at: datetime = Field(..., description="When the conversation was created")
@@ -177,9 +177,10 @@ class CreateSessionRequest(BaseModel):
 class CreateSessionResponse(BaseModel):
     """Response model for chat session creation"""
     session_id: str = Field(..., description="Unique session ID for WebSocket connection")
+    conversation_id: str = Field(..., description="Conversation ID")
     chatbot_id: str = Field(..., description="Chatbot ID")
     chatbot_name: str = Field(..., description="Chatbot name")
-    conversations: List[ConversationSummary] = Field(default=[], description="List of conversations for this chatbot")
+    messages: List[Message] = Field(default=[], description="List of messages in the conversation")
 
 class ChatMessageRequest(BaseModel):
     """Request model for chat messages via WebSocket"""

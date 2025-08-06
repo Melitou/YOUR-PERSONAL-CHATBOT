@@ -113,10 +113,10 @@ class Messages(Document):
     def __str__(self) -> str:
         return f"Messages(conversation_id={self.conversation_id}, message={self.message}, role={self.role}, created_at={self.created_at})"
 
-class ChatSession(Document):
-    """Active chat sessions for real-time conversations"""
+class ConversationSession(Document):
+    """Active conversation sessions for real-time conversations"""
     user_id = ReferenceField(User_Auth_Table, required=True)
-    chatbot_id = ReferenceField(ChatBots, required=True)
+    chatbot_id = ReferenceField(ChatBots, required=True) # The chatbot that the conversation belongs to
     conversation_id = ReferenceField(Conversation, required=True)
     session_id = StringField(required=True, unique=True)  # UUID for WebSocket connection
     created_at = DateTimeField(required=True)
@@ -124,7 +124,7 @@ class ChatSession(Document):
     is_active = BooleanField(required=True, default=True)
 
     meta = {
-        'collection': 'chat_sessions',
+        'collection': 'conversation_sessions',
         'indexes': [
             {'fields': ['user_id']},
             {'fields': ['chatbot_id']},
@@ -137,7 +137,7 @@ class ChatSession(Document):
     }
 
     def __str__(self) -> str:
-        return f"ChatSession(user_id={self.user_id}, chatbot_id={self.chatbot_id}, session_id={self.session_id}, is_active={self.is_active})"
+        return f"ConversationSession(user_id={self.user_id}, chatbot_id={self.chatbot_id}, session_id={self.session_id}, is_active={self.is_active})"
 
 class Documents(Document):
     user = ReferenceField(User_Auth_Table, required=True)

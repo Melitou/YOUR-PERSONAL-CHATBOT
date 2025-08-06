@@ -48,7 +48,20 @@ export interface LoadedChatbot {
 
 const LoadedChatbotStore = create((set, get) => ({
     loadedChatbot: null,
-    setLoadedChatbot: (loadedChatbot: LoadedChatbot) => set({ loadedChatbot }),
+    setLoadedChatbot: (loadedChatbot: LoadedChatbot) => {
+        // Reset conversation state when a new chatbot is loaded
+        const state = get() as any;
+        if (state.webSocket) {
+            state.webSocket.close();
+        }
+        set({ 
+            loadedChatbot,
+            conversationMessages: [], // Clear previous conversation
+            chatbotSession: null,     // Clear previous session
+            webSocket: null,          // Clear WebSocket connection
+            isThinking: false         // Reset thinking state
+        });
+    },
 
     // The conversations of the chatbot that is loaded
     loadedChatbotHistory: [],
@@ -58,10 +71,6 @@ const LoadedChatbotStore = create((set, get) => ({
     chatbotSession: null,
     setChatbotSession: (session: ChatbotSession | null) => set({ chatbotSession: session }),
 
-    // WebSocket connection
-    webSocket: null,
-    setWebSocket: (ws: WebSocket | null) => set({ webSocket: ws }),
-
     isThinking: false,
     setIsThinking: (isThinking: boolean) => set({ isThinking }),
 
@@ -69,67 +78,131 @@ const LoadedChatbotStore = create((set, get) => ({
     conversationMessages: [],
     setConversationMessages: (conversationMessages: Message[]) => set({ conversationMessages }),
 
-    // Fetch conversation messages
-    fetchConversationMessages: async (conversationId: string) => {
+    // WebSocket connection
+    webSocket: null,
+    setWebSocket: (ws: WebSocket | null) => set({ webSocket: ws }),
+
+    // Start a conversation session and connect via WebSocket
+    startConversationSession: async (conversationId: string, chatbotId: string): Promise<string> => {
         try {
-            console.log('Fetching conversation messages for conversationId:', conversationId);
-            const messages = await chatbotApi.getConversationMessages(conversationId);
-            console.log('Conversation messages fetched successfully:', messages);
-            set({ conversationMessages: messages || [] });
-            return messages;
+            console.log('Starting conversation session for conversationId:', conversationId);
+            
+            // 1. Disconnect existing WebSocket first
+            const state = get() as any;
+            if (state.webSocket) {
+                state.webSocket.close();
+            }
+            
+            const response = await chatbotApi.createConversationSession(chatbotId, conversationId);
+            console.log('Conversation session created successfully:', response);
+            set({ chatbotSession: response });
+            set({ conversationMessages: response || [] });
+            
+            return response.session_id; // return the session_id to later connect to WebSocket
         } catch (error) {
-            console.error('Failed to fetch conversation messages:', error);
-            set({ conversationMessages: [] });
+            console.error('Failed to start conversation session:', error);
+            throw error; // Re-throw to allow caller to handle
+        }
+    },
+
+    // Create a new conversation (and a session)
+    createNewConversationWithSession: async (chatbotId: string) => {
+        /*
+        This function creates a new conversation and a session id for it.
+        It returns the conversation_id to later connect to WebSocket.
+        */  
+        try {
+            const response = await chatbotApi.createNewConversationWithSession(chatbotId);
+            console.log('New conversation created successfully:', response);
+            
+            set({ conversationMessages: response || [] }); // we expect the messages to be empty, because it is a new conversation
+
+            return response.session_id; // return the session_id to later connect to WebSocket
+        } catch (error) {
+            console.error('Failed to create new conversation:', error);
             throw error;
         }
     },
 
-    // Create a chatbot session and connect via WebSocket
-     createChatbotSession: async (chatbotId: string) => {
-         try {
-             console.log('Creating chatbot session for chatbotId:', chatbotId);
-             
-             const response: ChatbotSession = await chatbotApi.createChatbotSession(chatbotId);
-             console.log('Chatbot session created successfully:', response);
-             
-             // Store the session
-             set({ chatbotSession: response });
-             
-             // Update conversation history with session conversations
-             set({ loadedChatbotHistory: response.conversations || [] });
-             
-             // Connect to WebSocket
-             const userToken = localStorage.getItem('authToken');
-             if (userToken) {
-                 const wsUrl = `ws://localhost:8000/ws/chat/${response.session_id}?token=${userToken}`;
-                 const ws = new WebSocket(wsUrl);
-                 
-                 ws.onopen = () => {
-                     console.log('WebSocket connected successfully');
-                     set({ webSocket: ws });
-                 };
-                 
-                 ws.onmessage = (event) => {
-                     console.log('WebSocket message received:', event.data);
-                     // TODO: Handle incoming messages
-                 };
-                 
-                 ws.onerror = (error) => {
-                     console.error('WebSocket error:', error);
-                 };
-                 
-                 ws.onclose = () => {
-                     console.log('WebSocket connection closed');
-                     set({ webSocket: null });
-                 };
-             }
-             
-             return response;
-         } catch (error) {
-             console.error('Failed to create chatbot session:', error);
-             throw error;
-         }
-     },
+    connectToWebSocket: async (sessionId: string) => {
+        try {
+            const userToken = localStorage.getItem('authToken');
+            if (!userToken) {
+                throw new Error('No authentication token found');
+            }
+    
+            const wsUrl = `ws://localhost:8000/ws/conversation/session/${sessionId}?token=${userToken}`;
+            const ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected successfully for session:', sessionId);
+                set({ webSocket: ws });
+            };
+            
+            ws.onmessage = (event) => {
+                console.log('WebSocket message received:', event.data);
+                try {
+                    const messageData = JSON.parse(event.data);
+                    
+                    if (messageData.type === 'session_info') {
+                        console.log('Session info received:', messageData);
+                    } else if (messageData.type === 'message_received') {
+                        console.log('Message acknowledgment received:', messageData);
+                    } else if (messageData.type === 'assistant_response_chunk') {
+                        // Handle streaming response chunks
+                        const currentMessages = get().conversationMessages;
+                        const lastMessage = currentMessages[currentMessages.length - 1];
+                        
+                        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming) {
+                            // Update the last message with new chunk
+                            const updatedMessages = [...currentMessages];
+                            updatedMessages[updatedMessages.length - 1] = {
+                                ...lastMessage,
+                                message: lastMessage.message + messageData.chunk
+                            };
+                            set({ conversationMessages: updatedMessages });
+                        } else {
+                            // Create new streaming message
+                            const newMessage = {
+                                message: messageData.chunk,
+                                role: 'agent',
+                                created_at: new Date().toISOString(),
+                                isStreaming: true
+                            };
+                            set({ conversationMessages: [...currentMessages, newMessage] });
+                        }
+                    } else if (messageData.type === 'assistant_response_complete') {
+                        // Mark streaming as complete
+                        const currentMessages = get().conversationMessages;
+                        const updatedMessages = currentMessages.map(msg => ({
+                            ...msg,
+                            isStreaming: false
+                        }));
+                        set({ conversationMessages: updatedMessages });
+                    } else if (messageData.type === 'error') {
+                        console.error('WebSocket error message:', messageData.message);
+                    }
+                } catch (parseError) {
+                    console.error('Failed to parse WebSocket message:', parseError);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                set({ webSocket: null });
+            };
+            
+            ws.onclose = (event) => {
+                console.log('WebSocket connection closed:', event.code, event.reason);
+                set({ webSocket: null });
+            };
+            
+            return ws;
+        } catch (error) {
+            console.error('Failed to connect to WebSocket:', error);
+            throw error;
+        }
+    },
 
      // Disconnect WebSocket
      disconnectWebSocket: () => {

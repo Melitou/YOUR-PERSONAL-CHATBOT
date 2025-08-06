@@ -1,37 +1,9 @@
 import { useState } from 'react';
 import LoadedChatbotStore from '../stores/LoadedChatbotStore';
 
-interface Message {
-    id: number;
-    text: string;
-    sender: 'user' | 'agent';
-    timestamp: Date;
-}
-
 const ChatComponent = () => {
     
     const { isThinking, setIsThinking, loadedChatbot, conversationMessages } = LoadedChatbotStore((state: any) => state);
-
-    const [messages] = useState<Message[]>([
-        {
-            id: 1,
-            text: "Hello! I'm your AI assistant. How can I help you today?",
-            sender: 'agent',
-            timestamp: new Date()
-        },
-        {
-            id: 2,
-            text: "Hi there! Can you help me with some questions?",
-            sender: 'user',
-            timestamp: new Date()
-        },
-        {
-            id: 3,
-            text: "Of course! I'd be happy to help you with any questions you have. What would you like to know?",
-            sender: 'agent',
-            timestamp: new Date()
-        }
-    ]);
     
     const [inputMessage, setInputMessage] = useState('');
 
@@ -40,7 +12,7 @@ const ChatComponent = () => {
         setTimeout(() => {
             setIsThinking(false);
         }, 5000);
-    };  
+    };
 
     return (
         <div className="flex flex-col flex-1 h-full w-full max-w-5xl mx-auto">
@@ -73,34 +45,54 @@ const ChatComponent = () => {
 
             {/* Chat Messages Container */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/*Small Header that displays the conversation ID*/}
-                <div className="text-xs text-gray-500 text-center border-b border-gray-200 pb-2">
-                    Loaded conversation ID: {conversationMessages.conversation_id}
-                </div>
-                {conversationMessages.messages && conversationMessages.messages.map((message: any, index: number) => (
-                    <div
-                        key={index}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                        <div
-                            className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-2 rounded-lg shadow-sm ${
-                                message.role === 'user'
-                                    ? 'bg-[#f4f4f4] text-black rounded-bl-none'
-                                    : 'bg-white text-gray-800 border border-gray-200 rounded-br-none'
-                            }`}
-                        >
-                            <p className="text-sm">{message.message}</p>
-                            <p className={`text-xs mt-1 text-gray-500 ${
-                                message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
-                            }`}>
-                                {new Date(message.created_at).toLocaleTimeString([], { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
-                                })}
-                            </p>
+                {conversationMessages?.conversation_id ? (
+                    <>
+                        {/*Small Header that displays the conversation ID*/}
+                        <div className="text-xs text-gray-500 text-center border-b border-gray-200 pb-2">
+                            Loaded conversation ID: {conversationMessages.conversation_id}
+                        </div>
+                        {conversationMessages?.messages && conversationMessages.messages.length > 0 ? (
+                            conversationMessages.messages.map((message: any, index: number) => (
+                                <div
+                                    key={index}
+                                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                >
+                                    <div
+                                        className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-2 rounded-lg shadow-sm ${
+                                            message.role === 'user'
+                                                ? 'bg-[#f4f4f4] text-black rounded-bl-none'
+                                                : 'bg-white text-gray-800 border border-gray-200 rounded-br-none'
+                                        }`}
+                                    >
+                                        <p className="text-sm">{message.message}</p>
+                                        <p className={`text-xs mt-1 text-gray-500 ${
+                                            message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
+                                        }`}>
+                                            {new Date(message.created_at).toLocaleTimeString([], { 
+                                                hour: '2-digit', 
+                                                minute: '2-digit'
+                                            })}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <>
+                                <div className="flex justify-center items-center h-min">
+                                    <p className="text-gray-500 text-sm">No messages yet</p>
+                                </div>
+                            </>
+                        )}
+                    </>
+                ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                        <div className="text-center text-gray-500">
+                            <div className="text-6xl mb-4">💬</div>
+                            <h3 className="text-lg font-medium mb-2">No conversation loaded</h3>
+                            <p className="text-sm">Start a new conversation or select an existing one from the sidebar</p>
                         </div>
                     </div>
-                ))}
+                )}
             </div>
 
             {/* Message Input Bar */}

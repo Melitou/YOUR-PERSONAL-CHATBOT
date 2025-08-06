@@ -217,7 +217,7 @@ export const chatbotApi = {
 
     // Get conversations for a specific chatbot
     getChatbotConversations: (chatbotId: string) =>
-        apiClient.get(`/chatbot/conversations?chatbot_id=${chatbotId}`),
+        apiClient.get(`/chatbot/${chatbotId}/conversations`),
 
     // Create a chatbot session
     createChatbotSession: (chatbotId: string) => {
@@ -226,9 +226,17 @@ export const chatbotApi = {
         return apiClient.post(`/chatbot/${chatbotId}/session`, formData);
     },
 
-    // Get conversation messages
-    getConversationMessages: (conversationId: string) =>
-        apiClient.get(`/conversation/${conversationId}/messages`),
+    // Create a conversation session
+    createConversationSession: (chatbotId: string, conversationId: string) => {
+        const formData = new FormData();
+        formData.append('conversation_id', conversationId);
+        return apiClient.post(`/chatbot/${chatbotId}/conversation/${conversationId}/session`, formData);
+    },
+
+    // Create a new conversation (and a session)
+    createNewConversationWithSession: (chatbotId: string) => {
+        return apiClient.post(`/chatbot/${chatbotId}/conversation/new`, {});
+    },
 };
 
 // ['token', 'semantic', 'line', 'recursive']

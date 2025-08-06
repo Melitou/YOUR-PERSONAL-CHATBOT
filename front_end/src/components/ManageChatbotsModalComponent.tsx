@@ -25,16 +25,16 @@ const ManageChatbotsModalComponent = ({
     const { setLoadedChatbot } = LoadedChatbotStore((state: any) => state);
     const { addError } = ViewStore();
 
-    // Fetch real chatbots when component mounts
+    // Fetch real chatbots when modal opens
     useEffect(() => {
-        if (open && chatbots.length === 0) {
+        if (open) {
             fetchChatbots().catch((error) => {
                 const errorMsg = 'Failed to load chatbots';
                 console.error('Error fetching chatbots on mount:', error);
                 addError(errorMsg);
             });
         }
-    }, [open, chatbots.length, fetchChatbots, addError]);
+    }, [open, fetchChatbots, addError]);
 
     const formatFileSize = (bytes: number): string => {
         if (bytes === 0) return '0 Bytes';
@@ -62,14 +62,6 @@ const ManageChatbotsModalComponent = ({
     const handleSelectChatbot = async (chatbot: CreatedChatbot) => {
         setLoadedChatbot(chatbot);
         
-        try {
-            await (LoadedChatbotStore.getState() as any).createChatbotSession(chatbot.id);
-            console.log('Chatbot session created and WebSocket connected successfully');
-        } catch (error) {
-            console.error('Failed to create chatbot session:', error);
-            addError('Failed to create chatbot session');
-        }
-
         if (onSelectChatbot) {
             onSelectChatbot(chatbot);
         }

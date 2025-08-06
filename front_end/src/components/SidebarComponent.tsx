@@ -9,95 +9,11 @@ import LoadedChatbotStore, { type ConversationSummary } from "../stores/LoadedCh
 
 const SidebarComponent = () => {
     const user = UserAuthStore((state: any) => state.user);
-    const { loadedChatbot, loadedChatbotHistory } = LoadedChatbotStore((state: any) => state);
+    const { loadedChatbot, loadedChatbotHistory, fetchConversationMessages } = LoadedChatbotStore((state: any) => state);
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [createBotModalOpen, setCreateBotModalOpen] = useState(false);
     const [existingChatbotsModalOpen, setExistingChatbotsModalOpen] = useState(false);
-
-    //Fake conversation of a chatbot
-    // const chatBotConversationHistory = [
-    //     {
-    //         chatbot_id: 1,
-    //         name: "Conversation 1"
-    //     },
-    //     {
-    //         chatbot_id: 2,
-    //         name: "Conversation 2"
-    //     },
-    //     {
-    //         chatbot_id: 3,
-    //         name: "Conversation 3"
-    //     },
-    //     {
-    //         chatbot_id: 4,
-    //         name: "Conversation 4"
-    //     },
-    //     {
-    //         chatbot_id: 5,
-    //         name: "Conversation 5"
-    //     },
-    //     {
-    //         chatbot_id: 6,
-    //         name: "Conversation 6"
-    //     },
-    //     {
-    //         chatbot_id: 7,
-    //         name: "Conversation 7"
-    //     },
-    //     {
-    //         chatbot_id: 8,
-    //         name: "Conversation 8"
-    //     },
-    //     {
-    //         chatbot_id: 9,
-    //         name: "Conversation 9"
-    //     },
-    //     {
-    //         chatbot_id: 10,
-    //         name: "Conversation 10"
-    //     },
-    //     {
-    //         chatbot_id: 11,
-    //         name: "Conversation 11"
-    //     },
-    //     {
-    //         chatbot_id: 12,
-    //         name: "Conversation 12"
-    //     },
-    //     {
-    //         chatbot_id: 13,
-    //         name: "Conversation 13"
-    //     },
-    //     {
-    //         chatbot_id: 14,
-    //         name: "Conversation 14"
-    //     },
-    //     {
-    //         chatbot_id: 15,
-    //         name: "Conversation 15"
-    //     },
-    //     {
-    //         chatbot_id: 16,
-    //         name: "Conversation 16"
-    //     },
-    //     {
-    //         chatbot_id: 17,
-    //         name: "Conversation 17"
-    //     },
-    //     {
-    //         chatbot_id: 18,
-    //         name: "Conversation 18"
-    //     },
-    //     {
-    //         chatbot_id: 19,
-    //         name: "Conversation 19"
-    //     },
-    //     {
-    //         chatbot_id: 20,
-    //         name: "Conversation 20"
-    //     },
-    // ]
 
     const handleNewChatbotClick = () => {
         // Open the create bot modal
@@ -109,10 +25,16 @@ const SidebarComponent = () => {
         setExistingChatbotsModalOpen(true);
     }
 
-    const handleConversationClick = (conversation: ConversationSummary) => {
+    const handleConversationClick = async (conversation: ConversationSummary) => {
         console.log('Selected conversation:', conversation.conversation_id);
         console.log('Conversation title:', conversation.conversation_title);
-        // TODO: Implement conversation loading logic - load full messages for this conversation
+        try {
+            // Fetch conversation messages
+            const messages = await fetchConversationMessages(conversation.conversation_id);
+            console.log('Conversation messages fetched successfully:', messages);
+        } catch (error) {
+            console.error('Failed to load conversation:', error);
+        }
     }
 
     const handleNewConversationClick = () => {

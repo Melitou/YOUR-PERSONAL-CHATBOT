@@ -225,6 +225,10 @@ export const chatbotApi = {
         formData.append('chatbot_id', chatbotId);
         return apiClient.post(`/chatbot/${chatbotId}/session`, formData);
     },
+
+    // Get conversation messages
+    getConversationMessages: (conversationId: string) =>
+        apiClient.get(`/conversation/${conversationId}/messages`),
 };
 
 // ['token', 'semantic', 'line', 'recursive']

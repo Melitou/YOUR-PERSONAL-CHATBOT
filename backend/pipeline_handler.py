@@ -541,6 +541,7 @@ class PipelineHandler:
             try:
                 conversation = Conversation.objects(id=ObjectId(conversation_id)).first()
                 if not conversation:
+                    logger.error(f"Conversation not found: {conversation_id}")
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail="Conversation not found"
@@ -550,6 +551,7 @@ class PipelineHandler:
                 raise
             except Exception as e:
                 if "invalid ObjectId" in str(e).lower():
+                    logger.error(f"Invalid conversation ID format: {conversation_id}")
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Invalid conversation ID format"

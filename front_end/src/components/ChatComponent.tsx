@@ -10,7 +10,7 @@ interface Message {
 
 const ChatComponent = () => {
     
-    const { isThinking, setIsThinking, loadedChatbot } = LoadedChatbotStore((state: any) => state);
+    const { isThinking, setIsThinking, loadedChatbot, conversationMessages } = LoadedChatbotStore((state: any) => state);
 
     const [messages] = useState<Message[]>([
         {
@@ -73,23 +73,27 @@ const ChatComponent = () => {
 
             {/* Chat Messages Container */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => (
+                {/*Small Header that displays the conversation ID*/}
+                <div className="text-xs text-gray-500 text-center border-b border-gray-200 pb-2">
+                    Loaded conversation ID: {conversationMessages.conversation_id}
+                </div>
+                {conversationMessages.messages && conversationMessages.messages.map((message: any, index: number) => (
                     <div
-                        key={message.id}
-                        className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                        key={index}
+                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                         <div
                             className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-2 rounded-lg shadow-sm ${
-                                message.sender === 'user'
+                                message.role === 'user'
                                     ? 'bg-[#f4f4f4] text-black rounded-bl-none'
                                     : 'bg-white text-gray-800 border border-gray-200 rounded-br-none'
                             }`}
                         >
-                            <p className="text-sm">{message.text}</p>
+                            <p className="text-sm">{message.message}</p>
                             <p className={`text-xs mt-1 text-gray-500 ${
-                                message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
+                                message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
                             }`}>
-                                {message.timestamp.toLocaleTimeString([], { 
+                                {new Date(message.created_at).toLocaleTimeString([], { 
                                     hour: '2-digit', 
                                     minute: '2-digit' 
                                 })}

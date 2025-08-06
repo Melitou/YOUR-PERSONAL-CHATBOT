@@ -353,7 +353,7 @@ async def get_user_chatbots(current_user: User_Auth_Table = Depends(get_current_
             detail="Error retrieving chatbots"
         )
 
-@app.get("/chatbot/{conversation_id}/messages", response_model=ConversationMessagesResponse, tags=["Chatbot"])
+@app.get("/conversation/{conversation_id}/messages", response_model=ConversationMessagesResponse, tags=["Conversation"])
 async def get_conversation_messages(conversation_id: str, current_user: User_Auth_Table = Depends(get_current_user)):
     """Get all messages for a specific conversation"""
     try:

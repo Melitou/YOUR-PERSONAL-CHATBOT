@@ -65,22 +65,26 @@ const LoadedChatbotStore = create((set, get) => ({
     isThinking: false,
     setIsThinking: (isThinking: boolean) => set({ isThinking }),
 
-    // Fetch conversations for the loaded chatbot
-    // fetchChatbotConversations: async (chatbotId: string) => {
-    //     try {
-    //         console.log('Fetching chatbot conversations for chatbotId:', chatbotId);
-    //         const conversations = await chatbotApi.getChatbotConversations(chatbotId);
-    //         console.log('Chatbot conversations fetched successfully:', conversations);
-    //         set({ loadedChatbotHistory: conversations || [] });
-    //         return conversations;
-    //     } catch (error) {
-    //         console.error('Failed to fetch chatbot conversations:', error);
-    //         set({ loadedChatbotHistory: [] });
-    //         throw error;
-    //     }
-    // },
+    // Conversation messages
+    conversationMessages: [],
+    setConversationMessages: (conversationMessages: Message[]) => set({ conversationMessages }),
 
-         // Create a chatbot session and connect via WebSocket
+    // Fetch conversation messages
+    fetchConversationMessages: async (conversationId: string) => {
+        try {
+            console.log('Fetching conversation messages for conversationId:', conversationId);
+            const messages = await chatbotApi.getConversationMessages(conversationId);
+            console.log('Conversation messages fetched successfully:', messages);
+            set({ conversationMessages: messages || [] });
+            return messages;
+        } catch (error) {
+            console.error('Failed to fetch conversation messages:', error);
+            set({ conversationMessages: [] });
+            throw error;
+        }
+    },
+
+    // Create a chatbot session and connect via WebSocket
      createChatbotSession: async (chatbotId: string) => {
          try {
              console.log('Creating chatbot session for chatbotId:', chatbotId);

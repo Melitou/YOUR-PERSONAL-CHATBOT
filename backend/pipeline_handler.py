@@ -501,10 +501,8 @@ class PipelineHandler:
             # Deactivate and delete any existing active sessions for this user
             existing_sessions = ConversationSession.objects(user_id=user, is_active=True)
             for session in existing_sessions:
-                session.is_active = False
-                session.save()
+                logger.info(f"Deleting existing session {session.session_id} for user {user.user_name}")
                 session.delete()
-                logger.info(f"Deactivated and deleted existing session {session.session_id} for user {user.user_name}")
             
             # Create new session
             session_id = str(uuid.uuid4())

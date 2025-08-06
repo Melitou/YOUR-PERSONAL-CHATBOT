@@ -1,18 +1,92 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import LoadedChatbotStore from '../stores/LoadedChatbotStore';
+
+// Typewriter component for smooth text animation
+const TypewriterText = ({ text, isStreaming, speed = 25, onComplete }: { text: string, isStreaming: boolean, speed?: number, onComplete?: () => void }) => {
+    const [displayedText, setDisplayedText] = useState('');
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const previousTextRef = useRef('');
+    const previousLengthRef = useRef(0);
+
+    useEffect(() => {
+        // If this is a completely new message (different text), reset everything
+        if (text !== previousTextRef.current && !text.startsWith(previousTextRef.current)) {
+            setCurrentIndex(0);
+            setDisplayedText('');
+            previousTextRef.current = text;
+            previousLengthRef.current = 0;
+        }
+        // If text grew (streaming chunk added), continue from where we were
+        else if (text.length > previousLengthRef.current) {
+            previousTextRef.current = text;
+            previousLengthRef.current = text.length;
+        }
+    }, [text]);
+
+    useEffect(() => {
+        if (isStreaming && currentIndex < text.length) {
+            const timer = setTimeout(() => {
+                setDisplayedText(text.slice(0, currentIndex + 1));
+                setCurrentIndex(currentIndex + 1);
+            }, speed);
+
+            return () => clearTimeout(timer);
+        } else if (!isStreaming) {
+            // When streaming stops, show full text immediately
+            setDisplayedText(text);
+            setCurrentIndex(text.length);
+        }
+    }, [currentIndex, text, speed, isStreaming]);
+
+    // Call onComplete when animation finishes
+    useEffect(() => {
+        if (!isStreaming && currentIndex >= text.length && onComplete) {
+            // Small delay to ensure the final character is displayed
+            const timer = setTimeout(() => {
+                onComplete();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isStreaming, currentIndex, text.length, onComplete]);
+
+    // If not streaming, show full text immediately
+    if (!isStreaming) {
+        return <span>{text}</span>;
+    }
+
+    return (
+        <span>
+            {displayedText}
+            {isStreaming && currentIndex < text.length && (
+                <span className="animate-pulse text-gray-400 ml-1">|</span>
+            )}
+        </span>
+    );
+};
 
 const ChatComponent = () => {
     
-    const { isThinking, setIsThinking, loadedChatbot, conversationMessages } = LoadedChatbotStore((state: any) => state);
+    const { isThinking, loadedChatbot, conversationMessages, sendMessage, markStreamingComplete } = LoadedChatbotStore((state: any) => state);
     
     const [inputMessage, setInputMessage] = useState('');
 
     const handleSendMessage = () => {
-        setIsThinking(true);
-        setTimeout(() => {
-            setIsThinking(false);
-        }, 5000);
+        if (!inputMessage.trim()) return; // Don't send empty messages
+        
+        const success = sendMessage(inputMessage.trim());
+        if (success) {
+            setInputMessage(''); // Clear input after successful send
+        }
     };
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    };
+
+
 
     return (
         <div className="flex flex-col flex-1 h-full w-full max-w-5xl mx-auto">
@@ -64,7 +138,27 @@ const ChatComponent = () => {
                                                 : 'bg-white text-gray-800 border border-gray-200 rounded-br-none'
                                         }`}
                                     >
-                                        <p className="text-sm">{message.message}</p>
+                                        <p className="text-sm">
+                                            <TypewriterText 
+                                                text={message.message} 
+                                                isStreaming={message.isStreaming || false}
+                                                speed={30}
+                                                onComplete={() => {
+                                                    // Mark as complete when animation finishes
+                                                    markStreamingComplete();
+                                                }}
+                                            />
+                                        </p>
+                                        {message.isStreaming && (
+                                            <div className="flex items-center mt-2 p-2 bg-gray-100 rounded-md">
+                                                <div className="flex space-x-1">
+                                                    <div className="w-2 h-2 bg-black rounded-full animate-bounce"></div>
+                                                    <div className="w-2 h-2 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '1.5s' }}></div>
+                                                    <div className="w-2 h-2 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.6s', animationDuration: '1.5s' }}></div>
+                                                </div>
+                                                <span className="text-sm text-black ml-3 font-medium">Agent is thinking...</span>
+                                            </div>
+                                        )}
                                         <p className={`text-xs mt-1 text-gray-500 ${
                                             message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
                                         }`}>
@@ -102,10 +196,12 @@ const ChatComponent = () => {
                         <textarea
                             value={inputMessage}
                             onChange={(e) => setInputMessage(e.target.value)}
+                            onKeyPress={handleKeyPress}
                             placeholder="Type your message here..."
                             className="w-full px-4 py-2 text-black border border-gray-300 rounded-lg resize-none outline-none border-transparent focus:border-transparent"
                             rows={1}
                             style={{ minHeight: '40px', maxHeight: '120px' }}
+                            disabled={isThinking}
                         />
                     </div>
                     {isThinking ? (
@@ -119,7 +215,8 @@ const ChatComponent = () => {
                     ) : (
                         <button
                             onClick={handleSendMessage}
-                            className="justify-center p-3 items-center justify-center text-black rounded-lg hover:bg-[#f4f4f4] hover:bg-opacity-10 transition-colors"
+                            disabled={isThinking || !inputMessage.trim()}
+                            className="justify-center p-3 items-center justify-center text-black rounded-lg hover:bg-[#f4f4f4] hover:bg-opacity-10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <span className="material-symbols-outlined text-black text-5xl">
                                 send

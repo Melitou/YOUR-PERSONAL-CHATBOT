@@ -7,6 +7,7 @@ export interface Message {
     message: string;
     created_at: string;
     role: 'user' | 'agent';
+    isStreaming?: boolean; // Optional flag for streaming messages
 }
 
 export interface Conversation {
@@ -56,7 +57,7 @@ const LoadedChatbotStore = create((set, get) => ({
         }
         set({ 
             loadedChatbot,
-            conversationMessages: [], // Clear previous conversation
+            conversationMessages: null, // Clear previous conversation
             chatbotSession: null,     // Clear previous session
             webSocket: null,          // Clear WebSocket connection
             isThinking: false         // Reset thinking state
@@ -74,9 +75,74 @@ const LoadedChatbotStore = create((set, get) => ({
     isThinking: false,
     setIsThinking: (isThinking: boolean) => set({ isThinking }),
 
-    // Conversation messages
-    conversationMessages: [],
-    setConversationMessages: (conversationMessages: Message[]) => set({ conversationMessages }),
+    // Conversation messages (complete conversation object)
+    conversationMessages: null,
+    setConversationMessages: (conversationMessages: Conversation | null) => set({ conversationMessages }),
+
+    // Handle the streaming chunk received
+    // This corresponds to ONE agent response message
+    handleStreamingChunk: (chunk: string) => {
+        const state = get() as any;
+        const conversation = state.conversationMessages;
+        const currentMessages = [...(conversation?.messages || [])];
+        
+        // Check if the last message is an agent message that's still being built
+        const lastMessage = currentMessages[currentMessages.length - 1];
+        
+        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming) {
+            // Append to existing streaming message
+            lastMessage.message += chunk;
+            set({ conversationMessages: { ...conversation, messages: currentMessages } });
+        } else {
+            // Create a new agent message for streaming
+            const newMessage: Message = {
+                message: chunk,
+                created_at: new Date().toISOString(),
+                role: 'agent',
+                isStreaming: true
+            };
+            currentMessages.push(newMessage);
+            set({ conversationMessages: { ...conversation, messages: currentMessages } });
+        }
+    },
+
+    // Complete the streaming agent response
+    completeStreamingResponse: (_messageId: string, timestamp: string, fullResponse: string) => {
+        const state = get() as any;
+        const conversation = state.conversationMessages;
+        const currentMessages = [...(conversation?.messages || [])];
+        
+        // Find and update the last agent message that was streaming
+        const lastMessage = currentMessages[currentMessages.length - 1];
+        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming) {
+            lastMessage.message = fullResponse;
+            lastMessage.created_at = timestamp;
+            // Don't remove streaming flag yet - let the UI component handle it
+            // The UI will remove isStreaming when animation completes
+        }
+        
+        set({ 
+            conversationMessages: { ...conversation, messages: currentMessages },
+            isThinking: false 
+        });
+    },
+
+    // Mark streaming as complete (called by UI when animation finishes)
+    markStreamingComplete: () => {
+        const state = get() as any;
+        const conversation = state.conversationMessages;
+        const currentMessages = [...(conversation?.messages || [])];
+        
+        // Find and update the last agent message that was streaming
+        const lastMessage = currentMessages[currentMessages.length - 1];
+        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming) {
+            delete lastMessage.isStreaming; // Remove streaming flag
+        }
+        
+        set({ 
+            conversationMessages: { ...conversation, messages: currentMessages }
+        });
+    },
 
     // WebSocket connection
     webSocket: null,
@@ -94,9 +160,8 @@ const LoadedChatbotStore = create((set, get) => ({
             }
             
             const response = await chatbotApi.createConversationSession(chatbotId, conversationId);
-            console.log('Conversation session created successfully:', response);
             set({ chatbotSession: response });
-            set({ conversationMessages: response || [] });
+            set({ conversationMessages: response });
             
             return response.session_id; // return the session_id to later connect to WebSocket
         } catch (error) {
@@ -113,9 +178,8 @@ const LoadedChatbotStore = create((set, get) => ({
         */  
         try {
             const response = await chatbotApi.createNewConversationWithSession(chatbotId);
-            console.log('New conversation created successfully:', response);
             
-            set({ conversationMessages: response || [] }); // we expect the messages to be empty, because it is a new conversation
+            set({ conversationMessages: response }); // we expect the messages to be empty, because it is a new conversation
 
             return response.session_id; // return the session_id to later connect to WebSocket
         } catch (error) {
@@ -135,50 +199,24 @@ const LoadedChatbotStore = create((set, get) => ({
             const ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {
-                console.log('WebSocket connected successfully for session:', sessionId);
                 set({ webSocket: ws });
             };
             
             ws.onmessage = (event) => {
-                console.log('WebSocket message received:', event.data);
                 try {
                     const messageData = JSON.parse(event.data);
                     
-                    if (messageData.type === 'session_info') {
-                        console.log('Session info received:', messageData);
-                    } else if (messageData.type === 'message_received') {
-                        console.log('Message acknowledgment received:', messageData);
-                    } else if (messageData.type === 'assistant_response_chunk') {
-                        // Handle streaming response chunks
-                        const currentMessages = get().conversationMessages;
-                        const lastMessage = currentMessages[currentMessages.length - 1];
-                        
-                        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming) {
-                            // Update the last message with new chunk
-                            const updatedMessages = [...currentMessages];
-                            updatedMessages[updatedMessages.length - 1] = {
-                                ...lastMessage,
-                                message: lastMessage.message + messageData.chunk
-                            };
-                            set({ conversationMessages: updatedMessages });
-                        } else {
-                            // Create new streaming message
-                            const newMessage = {
-                                message: messageData.chunk,
-                                role: 'agent',
-                                created_at: new Date().toISOString(),
-                                isStreaming: true
-                            };
-                            set({ conversationMessages: [...currentMessages, newMessage] });
-                        }
-                    } else if (messageData.type === 'assistant_response_complete') {
-                        // Mark streaming as complete
-                        const currentMessages = get().conversationMessages;
-                        const updatedMessages = currentMessages.map(msg => ({
-                            ...msg,
-                            isStreaming: false
-                        }));
-                        set({ conversationMessages: updatedMessages });
+                    if (messageData.type === 'response_chunk') { // Streaming response chunks
+                        const state = get() as any;
+                        state.handleStreamingChunk(messageData.chunk);
+                    } else if (messageData.type === 'response_complete') { // The response is complete
+                        const state = get() as any;
+                        state.completeStreamingResponse(
+                            messageData.message_id,
+                            messageData.timestamp,
+                            messageData.full_response
+                        );
+
                     } else if (messageData.type === 'error') {
                         console.error('WebSocket error message:', messageData.message);
                     }
@@ -192,8 +230,7 @@ const LoadedChatbotStore = create((set, get) => ({
                 set({ webSocket: null });
             };
             
-            ws.onclose = (event) => {
-                console.log('WebSocket connection closed:', event.code, event.reason);
+            ws.onclose = () => {
                 set({ webSocket: null });
             };
             
@@ -217,13 +254,27 @@ const LoadedChatbotStore = create((set, get) => ({
      sendMessage: (message: string) => {
          const state = get() as any;
          if (state.webSocket && state.webSocket.readyState === WebSocket.OPEN) {
+             // Add user message to conversation immediately
+             const userMessage: Message = {
+                 message: message,
+                 created_at: new Date().toISOString(),
+                 role: 'user'
+             };
+             
+             const conversation = state.conversationMessages;
+             const currentMessages = [...(conversation?.messages || [])];
+             currentMessages.push(userMessage);
+             set({ 
+                 conversationMessages: { ...conversation, messages: currentMessages },
+                 isThinking: true // Set thinking state while waiting for response
+             });
+
              const messageData = {
                  message: message,
                  timestamp: new Date().toISOString()
              };
-             state.webSocket.send(JSON.stringify(messageData));
-             console.log('Message sent:', messageData);
-             return true;
+                         state.webSocket.send(JSON.stringify(messageData));
+            return true;
          } else {
              console.error('WebSocket is not connected');
              return false;
@@ -239,6 +290,7 @@ const LoadedChatbotStore = create((set, get) => ({
             loadedChatbot: null,
             loadedChatbotHistory: [],
             chatbotSession: null,
+            conversationMessages: null,
             webSocket: null,
             isThinking: false,
         });

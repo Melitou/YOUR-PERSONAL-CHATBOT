@@ -84,17 +84,23 @@ const LoadedChatbotStore = create((set, get) => ({
     handleStreamingChunk: (chunk: string) => {
         const state = get() as any;
         const conversation = state.conversationMessages;
-        const currentMessages = [...(conversation?.messages || [])];
+        if (!conversation) return;
+        
+        const currentMessages = [...(conversation.messages || [])];
         
         // Check if the last message is an agent message that's still being built
         const lastMessage = currentMessages[currentMessages.length - 1];
         
-        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming) {
+        console.log('handleStreamingChunk - lastMessage:', lastMessage);
+        console.log('handleStreamingChunk - chunk:', chunk);
+        
+        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming === true) {
             // Append to existing streaming message
+            console.log('Appending to existing streaming message');
             lastMessage.message += chunk;
-            set({ conversationMessages: { ...conversation, messages: currentMessages } });
         } else {
-            // Create a new agent message for streaming
+            // Create a new agent message for streaming only if there isn't one already
+            console.log('Creating new streaming message');
             const newMessage: Message = {
                 message: chunk,
                 created_at: new Date().toISOString(),
@@ -102,20 +108,28 @@ const LoadedChatbotStore = create((set, get) => ({
                 isStreaming: true
             };
             currentMessages.push(newMessage);
-            set({ conversationMessages: { ...conversation, messages: currentMessages } });
         }
+        
+        set({ conversationMessages: { ...conversation, messages: currentMessages } });
     },
 
     // Complete the streaming agent response
     completeStreamingResponse: (_messageId: string, timestamp: string, fullResponse: string) => {
         const state = get() as any;
         const conversation = state.conversationMessages;
-        const currentMessages = [...(conversation?.messages || [])];
+        if (!conversation) return;
+        
+        const currentMessages = [...(conversation.messages || [])];
         
         // Find and update the last agent message that was streaming
         const lastMessage = currentMessages[currentMessages.length - 1];
-        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming) {
-            lastMessage.message = fullResponse;
+        console.log('completeStreamingResponse - lastMessage:', lastMessage);
+        console.log('completeStreamingResponse - fullResponse length:', fullResponse?.length);
+        
+        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming === true) {
+            console.log('Completing streaming response');
+            // Just update the timestamp - the chunked content should already be complete
+            // Avoid replacing the content to prevent UI flicker/double boxes
             lastMessage.created_at = timestamp;
             // Don't remove streaming flag yet - let the UI component handle it
             // The UI will remove isStreaming when animation completes
@@ -131,11 +145,13 @@ const LoadedChatbotStore = create((set, get) => ({
     markStreamingComplete: () => {
         const state = get() as any;
         const conversation = state.conversationMessages;
-        const currentMessages = [...(conversation?.messages || [])];
+        if (!conversation) return;
+        
+        const currentMessages = [...(conversation.messages || [])];
         
         // Find and update the last agent message that was streaming
         const lastMessage = currentMessages[currentMessages.length - 1];
-        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming) {
+        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming === true) {
             delete lastMessage.isStreaming; // Remove streaming flag
         }
         

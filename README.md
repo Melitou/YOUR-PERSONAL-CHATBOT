@@ -24,30 +24,25 @@ YOUR-PERSONAL-CHATBOT is an AI-powered chatbot that helps users search their own
 
 The project follows a master pipeline that orchestrates the entire workflow from document processing to chatbot interaction.
 
-graph TD
-    subgraph "Phase 1: Document Ingestion & Processing"
-        s1["1. User Uploads Docs<br>& Selects Model"] --> s2["2. Upload to GridFS<br>w/ Namespace"];
-        s2 --> s3["3. Hash Documents"];
-        s3 --> s4["4. Parse for Raw Text"];
-        s4 --> s5["5. Chunk Text"];
-        s5 --> s6["6. Generate Summaries"];
-        s6 --> s7["7. Embed Chunks & Summaries"];
-        s7 --> PineconeDB[(Pinecone Vector Store)];
-    end
+flowchart TD
+  A[1. User uploads documents & selects chatbot name/model] --> B[2. Upload documents to GridFS<br>with unique namespace (chatbot name + user ID)]
+  B --> C[3. Hash the documents]
+  C --> D[4. Parse documents<br>→ Extract raw text]
+  D --> E[5. Chunk the text]
+  E --> F[6. Generate summary for each chunk]
+  F --> G[7. Embed chunks & summaries<br>→ Store in Pinecone]
 
-    subgraph "Phase 2: Retrieval & Answering"
-        s8["8. Initialize LLM Client<br>w/ RAG Tool"]
-        s9["9. User Asks Query"]
-        Agent{RAG Agent}
-        Answer["User Receives Answer"]
+  subgraph Retrieval Process
+    H[8. Initialize Gemini or OpenAI client<br>with RAG tool]
+    H --> I[9. User submits a query]
+    I --> J[10. Search Pinecone<br>for relevant chunks]
+    J --> K[11. Retrieve top 5 relevant documents]
+    K --> L[12. Pass retrieved documents<br>to the agent]
+    L --> M[13. Generate and return answer]
+  end
 
-        s8 --> Agent
-        s9 --> Agent
-        Agent -- "10. Search Pinecone" --> s11["11. Retrieve Top 5<br>Relevant Chunks"];
-        PineconeDB --> s11
-        s11 -- "12. Pass as Context" --> Agent;
-        Agent -- "13. Generate Final Answer" --> Answer;
-    end
+  G --> H
+
 
 ## Getting Started
 

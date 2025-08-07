@@ -1,3 +1,4 @@
+
 1. Add the option for the user to select which documents to chunk and how to chunk.
 
 2. Add documents' version to pinecone
@@ -36,6 +37,6 @@ After: user_namespace|userid
 
 ***PROBLEMS*** 
 
-- Database initialized successfully! --> move that to the top
-- Optimize timing 
+- Database initialized successfully! --> move that to the top ✅
+- Optimize timing ~17-18s from 23s ✅
 - Create README.md✅

@@ -9,6 +9,10 @@ from pinecone import Pinecone, ServerlessSpec
 from db_service import Chunks, User_Auth_Table
 from bson import ObjectId
 
+# Import the new vector store manager
+from vector_store_manager import get_vector_store_manager
+from config import get_config
+
 # Load environment variables
 load_dotenv()
 
@@ -24,6 +28,11 @@ class EmbeddingService:
     """
 
     def __init__(self):
+        # Use the centralized vector store manager for all connections
+        self.vector_store_manager = get_vector_store_manager()
+        self.config = get_config()
+
+        # Keep backward compatibility - these will be deprecated gradually
         self.openai_client = None
         self.google_initialized = False
         self.google_client = None
@@ -45,6 +54,7 @@ class EmbeddingService:
                                    max_fallbacks: int = 3) -> Optional[str]:
         """
         Initialize the embedding model with fallback support.
+        Now uses VectorStoreManager for persistent connections.
 
         Args:
             model_name: The primary embedding model to use
@@ -61,48 +71,42 @@ class EmbeddingService:
                 logger.info(
                     f"Attempting to initialize model: {current_model} (attempt {attempts + 1})")
 
-                if current_model.startswith("text-embedding"):
-                    # Initialize OpenAI client
-                    if not self.openai_client:
-                        api_key = os.getenv("OPENAI_API_KEY")
-                        base_url = os.getenv("OPENAI_BASE_URL")
-
-                        if not api_key:
-                            raise ValueError(
-                                "OPENAI_API_KEY environment variable not set")
-
-                        self.openai_client = OpenAI(
-                            api_key=api_key,
-                            base_url=base_url
-                        )
+                if self.config.is_openai_model(current_model):
+                    # Use VectorStoreManager for OpenAI client
+                    openai_client = self.vector_store_manager.get_openai_client()
+                    if not openai_client:
+                        raise ValueError(
+                            "Failed to get OpenAI client from VectorStoreManager")
 
                     # Test the connection
-                    test_response = self.openai_client.embeddings.create(
+                    test_response = openai_client.embeddings.create(
                         model=current_model,
                         input=["test"]
                     )
+
+                    # Update backward compatibility attribute
+                    self.openai_client = openai_client
 
                     logger.info(
                         f"Successfully initialized OpenAI model: {current_model}")
                     return current_model
 
-                elif current_model.startswith("gemini"):
-                    # Initialize Google client
-                    if not self.google_initialized:
-                        api_key = os.getenv("GOOGLE_API_KEY")
-
-                        if not api_key:
-                            raise ValueError(
-                                "GOOGLE_API_KEY environment variable not set")
-
-                        self.google_client = genai.Client(api_key=api_key)
-                        self.google_initialized = True
+                elif self.config.is_google_model(current_model):
+                    # Use VectorStoreManager for Google client
+                    google_client = self.vector_store_manager.get_google_client()
+                    if not google_client:
+                        raise ValueError(
+                            "Failed to get Google client from VectorStoreManager")
 
                     # Test the connection
-                    test_result = self.google_client.models.embed_content(
+                    test_result = google_client.models.embed_content(
                         model=current_model,
                         contents=["test"]
                     )
+
+                    # Update backward compatibility attributes
+                    self.google_client = google_client
+                    self.google_initialized = True
 
                     logger.info(
                         f"Successfully initialized Google model: {current_model}")
@@ -153,11 +157,14 @@ class EmbeddingService:
 
         for attempt in range(1, max_retries + 1):
             try:
-                if model_name.startswith("text-embedding"):
-                    if not self.openai_client:
-                        raise RuntimeError("OpenAI client not initialized")
+                if self.config.is_openai_model(model_name):
+                    # Use VectorStoreManager for OpenAI client
+                    openai_client = self.vector_store_manager.get_openai_client()
+                    if not openai_client:
+                        raise RuntimeError(
+                            "OpenAI client not available from VectorStoreManager")
 
-                    response = self.openai_client.embeddings.create(
+                    response = openai_client.embeddings.create(
                         model=model_name,
                         input=chunks
                     )
@@ -165,11 +172,14 @@ class EmbeddingService:
                     embeddings = [item.embedding for item in response.data]
                     return embeddings
 
-                elif model_name.startswith("gemini"):
-                    if not self.google_client:
-                        raise RuntimeError("Google client not initialized")
+                elif self.config.is_google_model(model_name):
+                    # Use VectorStoreManager for Google client
+                    google_client = self.vector_store_manager.get_google_client()
+                    if not google_client:
+                        raise RuntimeError(
+                            "Google client not available from VectorStoreManager")
 
-                    result = self.google_client.models.embed_content(
+                    result = google_client.models.embed_content(
                         model=model_name,
                         contents=chunks
                     )
@@ -197,6 +207,7 @@ class EmbeddingService:
     def _is_model_initialized(self, model_name: str) -> bool:
         """
         Check if the specified model is properly initialized.
+        Now uses VectorStoreManager to check client availability.
 
         Args:
             model_name: The model name to check
@@ -204,10 +215,12 @@ class EmbeddingService:
         Returns:
             True if the model is initialized, False otherwise
         """
-        if model_name.startswith("text-embedding"):
-            return self.openai_client is not None
-        elif model_name.startswith("gemini"):
-            return self.google_initialized
+        if self.config.is_openai_model(model_name):
+            openai_client = self.vector_store_manager.get_openai_client()
+            return openai_client is not None
+        elif self.config.is_google_model(model_name):
+            google_client = self.vector_store_manager.get_google_client()
+            return google_client is not None
         else:
             return False
 
@@ -272,24 +285,23 @@ class EmbeddingService:
 
     def initialize_pinecone_client(self) -> bool:
         """
-        Initialize Pinecone client.
+        Initialize Pinecone client using VectorStoreManager.
 
         Returns:
             True if initialization successful, False otherwise
         """
         try:
-            if self.pinecone_client is not None:
-                logger.info("Pinecone client already initialized")
-                return True
+            # Use VectorStoreManager for Pinecone client
+            pinecone_client = self.vector_store_manager.get_pinecone_client()
+            if not pinecone_client:
+                logger.error(
+                    "Failed to get Pinecone client from VectorStoreManager")
+                return False
 
-            api_key = os.getenv("PINECONE_API_KEY")
-            if not api_key:
-                raise ValueError(
-                    "PINECONE_API_KEY environment variable not set")
-
-            self.pinecone_client = Pinecone(
-                api_key=api_key, environment="eu-west4-gcp")
-            logger.info("Successfully initialized Pinecone client")
+            # Update backward compatibility attribute
+            self.pinecone_client = pinecone_client
+            logger.info(
+                "Successfully initialized Pinecone client via VectorStoreManager")
             return True
 
         except Exception as e:
@@ -299,7 +311,7 @@ class EmbeddingService:
     def ensure_pinecone_index_exists(self, index_name: str, dimension: int = None) -> bool:
         """
         Ensure Pinecone index exists, create if it doesn't.
-        Auto-determines dimension based on index name if not provided.
+        Now uses VectorStoreManager for index management.
 
         Args:
             index_name: Name of the Pinecone index
@@ -308,50 +320,20 @@ class EmbeddingService:
         Returns:
             True if index exists or was created successfully
         """
-        # Auto-determine dimension based on index name if not provided
-        if dimension is None:
-            if "google" in index_name.lower():
-                dimension = 3072  # Gemini embeddings dimension
-            else:
-                dimension = 1536  # OpenAI embeddings dimension
         try:
-            if not self.pinecone_client:
-                if not self.initialize_pinecone_client():
-                    return False
-
-            # Check if index exists
-            existing_indexes = self.pinecone_client.list_indexes()
-            index_names = [idx.name for idx in existing_indexes]
-
-            if index_name in index_names:
-                # Validate existing index has correct dimensions
-                index_info = next(
-                    (idx for idx in existing_indexes if idx.name == index_name), None)
-                if index_info and hasattr(index_info, 'dimension'):
-                    existing_dimension = index_info.dimension
-                    if existing_dimension != dimension:
-                        logger.warning(
-                            f"Pinecone index '{index_name}' exists but has wrong dimension: {existing_dimension} (expected: {dimension})")
-                        logger.warning(
-                            f"❌ Dimension mismatch! Please delete index '{index_name}' and re-run to create with correct dimensions")
-                        return False
-
-                logger.info(
-                    f"Pinecone index '{index_name}' already exists with correct dimensions ({dimension})")
-                return True
-
-            # Create index if it doesn't exist
-            logger.info(
-                f"Creating Pinecone index '{index_name}' with dimension {dimension}")
-            self.pinecone_client.create_index(
-                name=index_name,
-                dimension=dimension,
-                metric="cosine",
-                spec=ServerlessSpec(cloud="aws", region="us-east-1")
+            # Use VectorStoreManager to ensure index exists
+            # It auto-determines dimension based on index name if not provided
+            success = self.vector_store_manager.ensure_pinecone_index_exists(
+                index_name=index_name,
+                model_name=None  # Let VectorStoreManager auto-determine
             )
 
-            logger.info(f"Successfully created Pinecone index '{index_name}'")
-            return True
+            if success:
+                # Update backward compatibility attribute
+                pinecone_client = self.vector_store_manager.get_pinecone_client()
+                self.pinecone_client = pinecone_client
+
+            return success
 
         except Exception as e:
             logger.error(
@@ -496,16 +478,18 @@ class EmbeddingService:
                 logger.warning("No vectors to upsert")
                 return []
 
-            if not self.pinecone_client:
-                if not self.initialize_pinecone_client():
+            # Use VectorStoreManager to get index with caching
+            index = self.vector_store_manager.get_pinecone_index(index_name)
+            if not index:
+                # Try to ensure index exists and get it
+                if self.vector_store_manager.ensure_pinecone_index_exists(index_name):
+                    index = self.vector_store_manager.get_pinecone_index(
+                        index_name)
+
+                if not index:
+                    logger.error(
+                        f"Failed to get Pinecone index '{index_name}'")
                     return []
-
-            # Ensure index exists
-            if not self.ensure_pinecone_index_exists(index_name):
-                return []
-
-            # Get index
-            index = self.pinecone_client.Index(index_name)
 
             logger.info(
                 f"Upserting {len(vectors)} vectors to Pinecone namespace '{namespace}' in index '{index_name}'")
@@ -774,4 +758,6 @@ class EmbeddingService:
             results["errors"].append(error_msg)
             results["processing_time"] = time.time() - start_time
             logger.error(error_msg)
+            return results
+
             return results

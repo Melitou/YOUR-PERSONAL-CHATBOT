@@ -5,9 +5,41 @@ from pymongo import MongoClient
 from gridfs import GridFS
 import hashlib
 
+# Import VectorStoreManager for persistent connections
+try:
+    from vector_store_manager import get_vector_store_manager
+    VECTOR_STORE_AVAILABLE = True
+except ImportError:
+    VECTOR_STORE_AVAILABLE = False
+
+
+def get_persistent_db_connection():
+    """
+    Get persistent database connection using VectorStoreManager.
+    Falls back to traditional initialization if VectorStoreManager is not available.
+
+    Returns:
+        tuple: (client, db, gridfs) or (None, None, None) if failed
+    """
+    if VECTOR_STORE_AVAILABLE:
+        try:
+            vector_manager = get_vector_store_manager()
+            return vector_manager.get_mongodb_connection()
+        except Exception as e:
+            print(
+                f"Failed to get persistent connection from VectorStoreManager: {e}")
+            # Fall back to traditional initialization
+            return initialize_db()
+    else:
+        # Fall back to traditional initialization
+        return initialize_db()
+
 
 def initialize_db(db_url: str = "mongodb://localhost:27017/"):
-    """Initialize MongoDB connection and create necessary indexes"""
+    """
+    Initialize MongoDB connection and create necessary indexes.
+    This is the legacy function - prefer get_persistent_db_connection() for new code.
+    """
     try:
         database_name = "your_personal_chatbot_db"
 
@@ -27,6 +59,33 @@ def initialize_db(db_url: str = "mongodb://localhost:27017/"):
     except Exception as e:
         print(f"Error initializing database: {e}")
         return None, None, None
+
+
+def ensure_db_connection():
+    """
+    Ensure database connection is established using the most efficient method available.
+
+    Returns:
+        bool: True if connection is available, False otherwise
+    """
+    if VECTOR_STORE_AVAILABLE:
+        try:
+            vector_manager = get_vector_store_manager()
+            client, db, gridfs = vector_manager.get_mongodb_connection()
+            return client is not None
+        except Exception:
+            pass
+
+    # Fall back to traditional connection check
+    try:
+        client, db, fs = initialize_db()
+        if client:
+            client.close()  # Clean up test connection
+            return True
+    except Exception:
+        pass
+
+    return False
 
 
 class User_Auth_Table(Document):

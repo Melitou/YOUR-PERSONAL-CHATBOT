@@ -16,6 +16,10 @@ from embeddings import EmbeddingService
 from LLM.search_rag_openai import search_rag as search_rag_openai
 from LLM.search_rag_google import search_rag as search_rag_google
 
+# Import the new vector store manager
+from vector_store_manager import get_vector_store_manager
+from config import get_config
+
 # Load environment variables
 load_dotenv()
 
@@ -33,6 +37,9 @@ class RAGService:
 
     def __init__(self):
         self.embedding_service = EmbeddingService()
+        self.vector_store_manager = get_vector_store_manager()
+        self.config = get_config()
+        # Keep backward compatibility
         self.pinecone_client = None
 
     def initialize_embedding_client(self, embedding_model: str) -> bool:
@@ -66,21 +73,22 @@ class RAGService:
 
     def initialize_pinecone_client(self) -> bool:
         """
-        Initialize Pinecone client
+        Initialize Pinecone client using VectorStoreManager
 
         Returns:
             True if initialization successful, False otherwise
         """
         try:
-            if not self.pinecone_client:
-                api_key = os.getenv("PINECONE_API_KEY")
-                if not api_key:
-                    raise ValueError(
-                        "PINECONE_API_KEY environment variable not set")
+            # Use VectorStoreManager for Pinecone client
+            pinecone_client = self.vector_store_manager.get_pinecone_client()
+            if not pinecone_client:
+                logger.error(
+                    "Failed to get Pinecone client from VectorStoreManager")
+                return False
 
-                self.pinecone_client = Pinecone(api_key=api_key)
-                logger.info("✅ Pinecone client initialized")
-
+            # Update backward compatibility attribute
+            self.pinecone_client = pinecone_client
+            logger.info("✅ Pinecone client initialized via VectorStoreManager")
             return True
 
         except Exception as e:
@@ -90,7 +98,7 @@ class RAGService:
     def determine_pinecone_index(self, embedding_model: str) -> str:
         """
         Determine the correct Pinecone index based on embedding model
-        Follows the same logic as master_pipeline.py
+        Now uses configuration for consistent index naming
 
         Args:
             embedding_model: The embedding model being used
@@ -98,10 +106,7 @@ class RAGService:
         Returns:
             The appropriate Pinecone index name
         """
-        if "gemini" in embedding_model.lower():
-            return "chatbot-vectors-google"
-        else:
-            return "chatbot-vectors-openai"
+        return self.config.get_pinecone_index_name(embedding_model)
 
     def create_query_embedding(self, query: str, embedding_model: str) -> List[float]:
         """
@@ -153,8 +158,14 @@ class RAGService:
             Exception: If Pinecone query fails
         """
         try:
-            # Get the index
-            index = self.pinecone_client.Index(pinecone_index)
+            # Use VectorStoreManager to get index with caching
+            index = self.vector_store_manager.get_pinecone_index(
+                pinecone_index)
+            if not index:
+                logger.error(
+                    f"Failed to get Pinecone index '{pinecone_index}' from VectorStoreManager")
+                raise Exception(
+                    f"Pinecone index '{pinecone_index}' not available")
 
             # Query the index
             query_response = index.query(
@@ -323,7 +334,8 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
                 namespace=full_namespace,
                 index_name=pinecone_index,
                 embedding_model=embedding_model,
-                top_k=top_k * 2,  # Get more initial results for better reranking
+                # Use 6 as minimum, or requested top_k if higher
+                top_k=max(6, top_k),
                 top_reranked=top_k  # Return the requested number after reranking
             )
 
@@ -338,7 +350,8 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
                 namespace=full_namespace,
                 index_name=pinecone_index,
                 embedding_model=embedding_model,
-                top_k=top_k * 2,  # Get more initial results for better reranking
+                # Use 6 as minimum, or requested top_k if higher
+                top_k=max(6, top_k),
                 top_reranked=top_k  # Return the requested number after reranking
             )
 

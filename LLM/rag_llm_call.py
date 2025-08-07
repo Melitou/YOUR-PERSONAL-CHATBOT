@@ -126,6 +126,59 @@ def initialize_rag_config(user_id: str, namespace: str, embedding_model: str, ch
     print(f"   🤖 Chatbot Model: {chatbot_model} ({provider.upper()})")
 
 
+def should_use_rag(query: str) -> bool:
+    """
+    Determine if a query obviously needs document search without LLM call.
+
+    Args:
+        query: User's query
+
+    Returns:
+        True if RAG should be used, False if unclear (defer to LLM)
+    """
+    query_lower = query.lower().strip()
+
+    # Strong indicators that RAG is needed
+    rag_indicators = [
+        # Direct document references
+        "in the document", "from the document", "document says", "according to the document",
+        "in my documents", "from my files", "what does", "what is", "what are",
+
+        # Information seeking
+        "tell me about", "explain", "describe", "summarize", "summary of",
+        "find", "search", "look for", "show me", "give me information",
+
+        # Question words about content
+        "how", "why", "when", "where", "who", "which",
+
+        # Specific content requests
+        "contains", "mentions", "talks about", "discusses", "covers",
+        "definition of", "meaning of", "details about", "information on",
+
+        # Analysis requests
+        "compare", "contrast", "analyze", "review", "evaluate",
+        "key points", "main ideas", "important", "highlights"
+    ]
+
+    # Check for strong RAG indicators
+    for indicator in rag_indicators:
+        if indicator in query_lower:
+            return True
+
+    # Check for question patterns (starts with question words)
+    question_starters = ["what", "how", "why",
+                         "when", "where", "who", "which", "can you"]
+    for starter in question_starters:
+        if query_lower.startswith(starter):
+            return True
+
+    # If query is long enough, likely needs documents
+    if len(query.split()) >= 5:
+        return True
+
+    return False  # Unclear - let LLM decide
+
+
 def rag_search_tool(query: str) -> str:
     """
     Wrapper function for rag_search that uses the global configuration
@@ -363,7 +416,7 @@ def ask_openai_assistant(history: list, query: str, model: str) -> str:
     """
     Ask OpenAI models to search documents and provide answers using the RAG tool.
     Supports multi-turn context by including the last 8 turns of user/assistant.
-    Allows up to MAX_TOOL_CALLS sequential invocations before finalizing.
+    Uses smart pre-filtering to skip decision calls for obvious document questions.
 
     Args:
         history: List of previous conversation turns
@@ -373,6 +426,62 @@ def ask_openai_assistant(history: list, query: str, model: str) -> str:
     Returns:
         Assistant's response string
     """
+    # Check if we can skip the decision LLM call
+    if should_use_rag(query):
+        debug_print(f"🚀 Auto-detected RAG need for query: {query[:50]}...")
+
+        # Pre-fetch document context
+        try:
+            rag_context = rag_search_tool(query)
+            debug_print(f"RAG context retrieved: {len(rag_context)} chars")
+
+            # Create optimized prompt with context already included
+            optimized_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+            # Include last 6 turns (fewer to make room for context)
+            for turn in history[-6:]:
+                optimized_messages.append(
+                    {"role": "user", "content": turn["user"]})
+                optimized_messages.append(
+                    {"role": "assistant", "content": turn["assistant"]})
+
+            # Add current query with pre-fetched context
+            user_message = f"""User Query: {query}
+
+Relevant Document Context:
+{rag_context}
+
+Please provide a comprehensive answer based on the above document context."""
+
+            optimized_messages.append(
+                {"role": "user", "content": user_message})
+
+            # Check token count
+            total_tokens = count_tokens_in_messages(optimized_messages)
+            if total_tokens > MAX_TOTAL_TOKENS:
+                token_logger.warning(
+                    f"⚠️ Token limit exceeded with context: {total_tokens} > {MAX_TOTAL_TOKENS}")
+                # Fallback to normal flow if context is too large
+                debug_print(
+                    "Falling back to normal tool-calling flow due to token limit")
+            else:
+                # Direct LLM call with context - no tool calling needed!
+                resp = openai_client.responses.create(
+                    model=model,
+                    input=optimized_messages
+                    # No tools - we already have the context
+                )
+                debug_print(
+                    "✅ Direct response generated with pre-fetched context")
+                return resp.output_text
+
+        except Exception as e:
+            debug_print(
+                f"RAG pre-fetch failed: {e}, falling back to normal flow")
+
+    # Standard flow for unclear queries or fallback cases
+    debug_print("Using standard tool-calling flow")
+
     # Initialize message history
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
@@ -461,7 +570,7 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
     """
     Streaming version of ask_openai_assistant.
     Returns an async generator that yields content deltas as they're received.
-    Tool calls are still processed synchronously before streaming the final response.
+    Uses smart pre-filtering to skip decision calls for obvious document questions.
 
     Args:
         history: List of previous conversation turns
@@ -471,6 +580,87 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
     Yields:
         Content deltas as they're received from the model
     """
+    # Check if we can skip the decision LLM call
+    if should_use_rag(query):
+        debug_print(
+            f"🚀 Auto-detected RAG need for streaming query: {query[:50]}...")
+
+        # Pre-fetch document context
+        try:
+            rag_context = rag_search_tool(query)
+            debug_print(
+                f"RAG context retrieved for streaming: {len(rag_context)} chars")
+
+            # Create optimized prompt with context already included
+            optimized_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+            # Include last 6 turns (fewer to make room for context)
+            for turn in history[-6:]:
+                optimized_messages.append(
+                    {"role": "user", "content": turn["user"]})
+                optimized_messages.append(
+                    {"role": "assistant", "content": turn["assistant"]})
+
+            # Add current query with pre-fetched context
+            user_message = f"""User Query: {query}
+
+Relevant Document Context:
+{rag_context}
+
+Please provide a comprehensive answer based on the above document context."""
+
+            optimized_messages.append(
+                {"role": "user", "content": user_message})
+
+            # Check token count
+            total_tokens = count_tokens_in_messages(optimized_messages)
+            if total_tokens > MAX_TOTAL_TOKENS:
+                token_logger.warning(
+                    f"⚠️ Token limit exceeded with context: {total_tokens} > {MAX_TOTAL_TOKENS}")
+                # Fallback to normal flow if context is too large
+                debug_print(
+                    "Falling back to normal tool-calling flow due to token limit")
+            else:
+                # Direct streaming with context - no tool calling needed!
+                try:
+                    streaming_model = model if "mini" in model else f"{model}-mini-2025-04-14" if "gpt-4.1" in model else model
+
+                    stream = await openai_async_client.responses.create(
+                        model=streaming_model,
+                        input=optimized_messages,
+                        stream=True
+                        # No tools - we already have the context
+                    )
+
+                    got_content = False
+                    async for event in stream:
+                        if event.type == "response.output_text.delta":
+                            got_content = True
+                            yield event.delta
+                        elif event.type == "text_delta":
+                            got_content = True
+                            yield event.delta
+                        elif event.type == "content_part_added":
+                            if event.content_part.type == "text":
+                                got_content = True
+                                yield event.content_part.text
+
+                    debug_print(
+                        "✅ Direct streaming response generated with pre-fetched context")
+                    if got_content:
+                        return  # Successfully streamed with optimized flow
+
+                except Exception as stream_error:
+                    debug_print(
+                        f"Streaming with context failed: {stream_error}")
+
+        except Exception as e:
+            debug_print(
+                f"RAG pre-fetch for streaming failed: {e}, falling back to normal flow")
+
+    # Standard streaming flow for unclear queries or fallback cases
+    debug_print("Using standard tool-calling streaming flow")
+
     # Initialize message history
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
@@ -604,6 +794,7 @@ def ask_gemini_assistant(history: list, query: str, model: str) -> str:
     """
     Ask Gemini models to search documents and provide answers using the RAG tool.
     Supports multi-turn context by including the last 8 turns of user/assistant.
+    Uses smart pre-filtering to skip decision calls for obvious document questions.
 
     Args:
         history: List of previous conversation turns
@@ -613,6 +804,65 @@ def ask_gemini_assistant(history: list, query: str, model: str) -> str:
     Returns:
         Assistant's response string
     """
+    # Check if we can skip the decision LLM call
+    if should_use_rag(query):
+        debug_print(
+            f"🚀 Auto-detected RAG need for Gemini query: {query[:50]}...")
+
+        # Pre-fetch document context
+        try:
+            rag_context = rag_search_tool(query)
+            debug_print(
+                f"RAG context retrieved for Gemini: {len(rag_context)} chars")
+
+            # Create optimized conversation with context already included
+            contents = []
+
+            # Add system instruction
+            contents.append({
+                "role": "user",
+                "parts": [{"text": f"System instructions: {SYSTEM_PROMPT}"}]
+            })
+            contents.append({
+                "role": "model",
+                "parts": [{"text": "I understand. I will help you search and answer questions about your uploaded documents using the available tools."}]
+            })
+
+            # Include last 6 turns (fewer to make room for context)
+            for turn in history[-6:]:
+                contents.append(
+                    {"role": "user", "parts": [{"text": turn["user"]}]})
+                contents.append({"role": "model", "parts": [
+                                {"text": turn["assistant"]}]})
+
+            # Add current query with pre-fetched context
+            user_message = f"""User Query: {query}
+
+Relevant Document Context:
+{rag_context}
+
+Please provide a comprehensive answer based on the above document context."""
+
+            contents.append(
+                {"role": "user", "parts": [{"text": user_message}]})
+
+            # Direct Gemini call with context - no function calling needed!
+            response = gemini_client.models.generate_content(
+                model=model,
+                contents=contents
+                # No tools - we already have the context
+            )
+
+            debug_print(
+                "✅ Direct Gemini response generated with pre-fetched context")
+            return response.text
+
+        except Exception as e:
+            debug_print(
+                f"RAG pre-fetch for Gemini failed: {e}, falling back to normal flow")
+
+    # Standard flow for unclear queries or fallback cases
+    debug_print("Using standard Gemini tool-calling flow")
     # Convert conversation history to Gemini format
     contents = []
 

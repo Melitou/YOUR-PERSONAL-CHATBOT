@@ -3,6 +3,7 @@
 IASPIS Search Module - Retrieves relevant chunks from Pinecone using semantic search with OpenAI embeddings
 """
 
+from vector_store_manager import get_vector_store_manager
 import os
 import json
 from typing import List, Dict, Any
@@ -10,18 +11,26 @@ from openai import OpenAI
 from pinecone import Pinecone
 from dotenv import load_dotenv
 from bson import ObjectId
-from db_service import Chunks, initialize_db
+from db_service import Chunks
+
+# Import the new vector store manager
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 load_dotenv()
 
-# Initialize clients
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
+# Use VectorStoreManager for clients
+vector_manager = get_vector_store_manager()
+
+# Keep backward compatibility - these will get the clients from VectorStoreManager
+client = None
+pc = None
 
 
 def get_embedding(text: str, model: str = "text-embedding-3-small") -> List[float]:
     """
     Generate an embedding for the given text using OpenAI embedding model.
+    Now uses VectorStoreManager for persistent connections.
 
     Args:
         text: The input text to embed
@@ -30,7 +39,13 @@ def get_embedding(text: str, model: str = "text-embedding-3-small") -> List[floa
     Returns:
         List of float values representing the embedding vector
     """
-    response = client.embeddings.create(
+    # Get OpenAI client from VectorStoreManager
+    openai_client = vector_manager.get_openai_client()
+    if not openai_client:
+        raise RuntimeError(
+            "OpenAI client not available from VectorStoreManager")
+
+    response = openai_client.embeddings.create(
         input=text,
         model=model
     )
@@ -38,7 +53,7 @@ def get_embedding(text: str, model: str = "text-embedding-3-small") -> List[floa
 
 
 def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-openai",
-               embedding_model: str = "text-embedding-3-small", top_k: int = 9, top_reranked: int = 4) -> str:
+               embedding_model: str = "text-embedding-3-small", top_k: int = 6, top_reranked: int = 4) -> str:
     """
     Search for relevant chunks in the Pinecone index based on the query.
     Retrieves top_k results and reranks using Cohere to select top_reranked.
@@ -48,7 +63,7 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-op
         namespace: Pinecone namespace to search in
         index_name: Pinecone index name
         embedding_model: OpenAI embedding model to use
-        top_k: Number of chunks to retrieve initially
+        top_k: Number of chunks to retrieve initially (default: 6, optimized for performance)
         top_reranked: Number of chunks to keep after reranking
 
     Returns:
@@ -58,8 +73,11 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-op
         # Get embedding for the query
         query_embedding = get_embedding(query, embedding_model)
 
-        # Connect directly to the existing index
-        index = pc.Index(index_name)
+        # Use VectorStoreManager to get index with caching
+        index = vector_manager.get_pinecone_index(index_name)
+        if not index:
+            raise RuntimeError(
+                f"Pinecone index '{index_name}' not available from VectorStoreManager")
 
         # Query the index
         query_response = index.query(
@@ -78,8 +96,11 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-op
             except Exception:
                 continue
 
-        # Initialize database connection
-        initialize_db()
+        # Use VectorStoreManager to get MongoDB connection
+        mongo_client, mongo_db, gridfs = vector_manager.get_mongodb_connection()
+        if not mongo_client:
+            raise RuntimeError(
+                "MongoDB connection not available from VectorStoreManager")
 
         # Query MongoDB for full chunk data
         chunks = Chunks.objects(id__in=chunk_object_ids)
@@ -119,8 +140,12 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-op
         if not documents:
             return "No relevant documents found for the query."
 
-        # Apply Cohere reranking
-        reranked_results = pc.inference.rerank(
+        # Apply Cohere reranking - get full Pinecone client for inference
+        pinecone_client = vector_manager.get_pinecone_client()
+        if not pinecone_client:
+            raise RuntimeError("Pinecone client not available for reranking")
+
+        reranked_results = pinecone_client.inference.rerank(
             model="cohere-rerank-3.5",
             query=query,
             documents=documents,

@@ -13,8 +13,11 @@ from typing import List, Tuple, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 
-from db_service import initialize_db, User_Auth_Table, Documents, upload_file_to_gridfs, Chunks, Conversation, Messages
+from db_service import initialize_db, User_Auth_Table, Documents, upload_file_to_gridfs, Chunks, Conversation, Messages, ChatbotDocumentsMapper, ChatBots
 from file_type import doc_type_check
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentPipeline:
@@ -163,7 +166,7 @@ class DocumentPipeline:
             document.save()
             return document.id
 
-    def process_single_file(self, file_path: str, namespace: str) -> Dict:
+    def process_single_file(self, file_path: str, namespace: str, chatbot: ChatBots) -> Dict:
         """Process a single file and return processing result"""
         result = {
             'file_path': file_path,
@@ -204,6 +207,26 @@ class DocumentPipeline:
                 result['message'] = "File already exists (duplicate hash)"
                 print(f"  Status: SKIPPED - {result['message']}")
                 self._update_stats('skipped')
+
+                # Take the exising document
+                existing_document = Documents.objects(
+                    user=self.user,
+                    full_hash=file_hash
+                ).first()
+
+                # Add the association in the chatbot_documents_mapper collection
+                try:
+                    chatbot_documents_mapper = ChatbotDocumentsMapper(
+                        chatbot=chatbot,
+                        document=existing_document,
+                        user=self.user,
+                        assigned_at=datetime.now()
+                    )   
+                    chatbot_documents_mapper.save()
+                    print(f"  Added document to chatbot mapping")
+                except Exception as e:
+                    logger.error(f"Error adding association to chatbot_documents_mapper: {e}")
+
                 return result
 
             # Determine content type for GridFS
@@ -254,7 +277,23 @@ class DocumentPipeline:
                 created_at=datetime.now()
             )
 
+            # Save the document first
             result['document_id'] = self._safe_document_save(document)
+
+            # Add the association in the chatbot_documents_mapper collection
+            try:
+                chatbot_documents_mapper = ChatbotDocumentsMapper(
+                    chatbot=chatbot,
+                    document=document,
+                    user=self.user,
+                    assigned_at=datetime.now()
+                )   
+                chatbot_documents_mapper.save()
+                print(f"  Added document to chatbot mapping")   
+            except Exception as e:
+                logger.error(f"Error adding association to chatbot_documents_mapper: {e}")
+            
+            # Chatbot associations will be created centrally after the chatbot is saved
             print(f"  Document ID: {result['document_id']}")
             print(f"  Status: SUCCESS - Uploaded to GridFS and created document record")
 
@@ -269,7 +308,7 @@ class DocumentPipeline:
 
         return result
 
-    def process_directory(self, directory_path: str, namespace: str, use_parallel: bool = True) -> Dict:
+    def process_directory(self, directory_path: str, namespace: str, use_parallel: bool = True, chatbot: ChatBots = None) -> Dict:
         """Process all supported files in a directory with optional parallel processing"""
         print(f"\n=== Starting Document Upload Pipeline ===")
         print(f"Directory: {directory_path}")
@@ -299,9 +338,9 @@ class DocumentPipeline:
             }
 
         if use_parallel and len(files) > 1:
-            results = self._process_files_parallel(files, namespace)
+            results = self._process_files_parallel(files, namespace, chatbot)
         else:
-            results = self._process_files_sequential(files, namespace)
+            results = self._process_files_sequential(files, namespace, chatbot)
 
         # Calculate final statistics
         with self._stats_lock:
@@ -327,19 +366,19 @@ class DocumentPipeline:
 
         return summary
 
-    def _process_files_sequential(self, files: List[str], namespace: str) -> List[Dict]:
+    def _process_files_sequential(self, files: List[str], namespace: str, chatbot: ChatBots) -> List[Dict]:
         """Process files sequentially (fallback method)"""
         print(f"Processing {len(files)} files sequentially...")
         results = []
 
         for i, file_path in enumerate(files, 1):
             print(f"\n[{i}/{len(files)}] Processing file...")
-            result = self.process_single_file(file_path, namespace)
+            result = self.process_single_file(file_path, namespace, chatbot)
             results.append(result)
 
         return results
 
-    def _process_files_parallel(self, files: List[str], namespace: str) -> List[Dict]:
+    def _process_files_parallel(self, files: List[str], namespace: str, chatbot: ChatBots) -> List[Dict]:
         """Process files in parallel using ThreadPoolExecutor"""
         print(
             f"Processing {len(files)} files in parallel ({self.max_workers} workers)...")
@@ -349,7 +388,7 @@ class DocumentPipeline:
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 # Submit all files for processing
                 future_to_file = {
-                    executor.submit(self.process_single_file, file_path, namespace): file_path
+                    executor.submit(self.process_single_file, file_path, namespace, chatbot): file_path
                     for file_path in files
                 }
 
@@ -391,7 +430,7 @@ class DocumentPipeline:
         except Exception as e:
             print(f"Parallel processing error: {e}")
             print("Falling back to sequential processing...")
-            return self._process_files_sequential(files, namespace)
+            return self._process_files_sequential(files, namespace, chatbot)
 
         # Sort results by original file order for consistency
         file_order = {file_path: i for i, file_path in enumerate(files)}

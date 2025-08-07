@@ -21,7 +21,7 @@ from typing import Dict, Optional
 from document_pipeline import DocumentPipeline
 from document_processor import DocumentProcessor
 from embeddings import EmbeddingService
-from db_service import User_Auth_Table
+from db_service import User_Auth_Table, ChatBots    
 
 # Configure logging
 logging.basicConfig(
@@ -86,7 +86,8 @@ class MasterPipeline:
 
     async def process_directory_complete(self, directory_path: str, namespace: str,
                                    use_parallel_upload: bool = True,
-                                   use_parallel_processing: bool = True) -> Dict:
+                                   use_parallel_processing: bool = True,
+                                   chatbot: ChatBots = None) -> Dict:
         """Complete processing workflow: upload → process → chunk → summarize
 
         Args:
@@ -118,7 +119,8 @@ class MasterPipeline:
             upload_results = self.upload_pipeline.process_directory(
                 directory_path=directory_path,
                 namespace=namespace,
-                use_parallel=use_parallel_upload
+                use_parallel=use_parallel_upload,
+                chatbot=chatbot
             )
 
             # Log upload summary
@@ -262,7 +264,8 @@ class MasterPipeline:
                                                    user_id: str = None,
                                                    embedding_model: str = "text-embedding-3-small",
                                                    use_parallel_upload: bool = True,
-                                                   use_parallel_processing: bool = True) -> Dict:
+                                                   use_parallel_processing: bool = True,
+                                                   chatbot: ChatBots = None) -> Dict:
         """Complete workflow: upload → process → chunk → summarize → embed → store in Pinecone
 
         Args:
@@ -301,7 +304,8 @@ class MasterPipeline:
             directory_path=directory_path,
             namespace=namespace,
             use_parallel_upload=use_parallel_upload,
-            use_parallel_processing=use_parallel_processing
+            use_parallel_processing=use_parallel_processing,
+            chatbot=chatbot
         )
 
         # Check if document processing was successful

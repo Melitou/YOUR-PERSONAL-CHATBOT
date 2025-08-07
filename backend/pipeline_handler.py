@@ -213,7 +213,7 @@ class PipelineHandler:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Namespace already exists"
                 )
-            
+
             # Determine settings for normal users
             if agent_provider is not None:  # Normal user
                 chunking_method, embedding_model = self.determine_default_settings(agent_provider)
@@ -224,6 +224,20 @@ class PipelineHandler:
                 if not embedding_model:
                     embedding_model = EmbeddingModel.OPENAI_SMALL
                 logger.info(f"Super user - using specified settings: chunking={chunking_method}, embedding={embedding_model}")
+            
+            chatbot = ChatBots(
+                name=user_namespace,
+                description=agent_description,
+                embedding_model=embedding_model.value,
+                chunking_method=chunking_method.value,
+                date_created=datetime.now(),
+                user_id=user,
+                namespace=namespace
+            )
+            
+            # Save the chatbot first so it can be referenced in ChatbotDocumentsMapper
+            chatbot.save()
+            logger.info(f"✅ ChatBot record created: {user_namespace} (namespace: {namespace})")
             
             # Initialize master pipeline with the specified settings
             if MasterPipeline is None:
@@ -251,7 +265,8 @@ class PipelineHandler:
                 user_id=str(user.id),
                 embedding_model=embedding_model.value,
                 use_parallel_upload=True,
-                use_parallel_processing=True
+                use_parallel_processing=True,
+                chatbot=chatbot
             )
             
             # Close pipeline connections
@@ -260,25 +275,17 @@ class PipelineHandler:
             # Process results
             success = results.get('complete_workflow_success', False)
             
-            # If processing was successful, create ChatBot record
+            # If processing was successful, keep the ChatBot record
+            # If processing failed, delete the ChatBot record to maintain data integrity
             if success:
+                logger.info(f"✅ ChatBot record created: {user_namespace} (namespace: {namespace})")
+            else:
                 try:
-                    #chatbot_name = self.generate_chatbot_name(agent_description)
-                    chatbot = ChatBots(
-                        name=user_namespace,
-                        description=agent_description,
-                        embedding_model=embedding_model.value,
-                        chunking_method=chunking_method.value,
-                        date_created=datetime.now(),
-                        user_id=user,
-                        namespace=namespace
-                    )
-                    chatbot.save()
-                    logger.info(f"✅ ChatBot record created: {user_namespace} (namespace: {namespace})")
+                    # Delete the chatbot record if processing failed
+                    chatbot.delete()
+                    logger.info(f"🗑️ Deleted ChatBot record due to processing failure: {user_namespace} (namespace: {namespace})")
                 except Exception as e:
-                    logger.error(f"❌ Error creating ChatBot record: {e}")
-                    # Don't fail the entire process if ChatBot creation fails
-                    success = False
+                    logger.error(f"❌ Error deleting ChatBot record: {e}")
             
             response_data = {
                 'success': success,

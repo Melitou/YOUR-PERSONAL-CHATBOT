@@ -38,4 +38,4 @@ After: user_namespace|userid
 
 - Database initialized successfully! --> move that to the top
 - Optimize timing 
-- Create README.md
+- Create README.md✅

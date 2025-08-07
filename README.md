@@ -24,7 +24,10 @@ YOUR-PERSONAL-CHATBOT is an AI-powered chatbot that helps users search their own
 
 The project follows a master pipeline that orchestrates the entire workflow from document processing to chatbot interaction.
 
-![RAG Chatbot Flowchart](Mermaid_graph.png)
+<p align="center">
+  <img src="Mermaid_graph.png" width="400" alt="RAG Flowchart">
+</p>
+
 
 
 
@@ -115,8 +118,3 @@ Please make sure to update tests as appropriate.
 3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4.  Push to the branch (`git push origin feature/AmazingFeature`)
 5.  Open a Pull Request
-
-```
-.
-```
-

@@ -24,27 +24,8 @@ YOUR-PERSONAL-CHATBOT is an AI-powered chatbot that helps users search their own
 
 The project follows a master pipeline that orchestrates the entire workflow from document processing to chatbot interaction.
 
-<pre>
-```mermaid flowchart TD
-  A[1. User uploads documents and selects chatbot name/model] --> B[2. Upload documents to GridFS with unique namespace (chatbot name and user ID)]
-  B --> C[3. Hash the documents]
-  C --> D[4. Parse documents and extract raw text]
-  D --> E[5. Chunk the text]
-  E --> F[6. Generate summary for each chunk]
-  F --> G[7. Embed chunks and summaries, then store in Pinecone]
+![RAG Chatbot Flowchart](Mermaid_graph.png)
 
-  subgraph Retrieval_Process [Retrieval Process]
-    H[8. Initialize Gemini or OpenAI client with RAG tool]
-    H --> I[9. User submits a query]
-    I --> J[10. Search Pinecone for relevant chunks]
-    J --> K[11. Retrieve top 5 relevant documents]
-    K --> L[12. Pass retrieved documents to the agent]
-    L --> M[13. Generate and return answer]
-  end
-
-  G --> H
-``` 
-</pre>
 
 
 ## Getting Started

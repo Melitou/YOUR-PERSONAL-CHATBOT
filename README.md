@@ -24,6 +24,7 @@ YOUR-PERSONAL-CHATBOT is an AI-powered chatbot that helps users search their own
 
 The project follows a master pipeline that orchestrates the entire workflow from document processing to chatbot interaction.
 
+```mermaid
 flowchart TD
   A[1. User uploads documents & selects chatbot name/model] --> B[2. Upload documents to GridFS<br>with unique namespace (chatbot name + user ID)]
   B --> C[3. Hash the documents]
@@ -42,6 +43,7 @@ flowchart TD
   end
 
   G --> H
+```
 
 
 ## Getting Started

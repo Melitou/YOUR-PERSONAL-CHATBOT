@@ -10,7 +10,7 @@
 - Why does the chatbot say that it see the summary context column ✅
 - 200K token count we start deleting the earliest messages. Remove ai and user message✅
 - User decides the final client✅
-- Show the already hashed files and skip 
+- Show the already hashed files and skip✅ 
 
 
 
@@ -36,4 +36,6 @@ After: user_namespace|userid
 
 ***PROBLEMS*** 
 
-1. When the user uploads the same documents but changes the namespace name, the bot cannot retrieve the documents.
+- Database initialized successfully! --> move that to the top
+- Optimize timing 
+- Create README.md

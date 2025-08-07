@@ -149,14 +149,17 @@ class PipelineHandler:
             raise ValueError(
                 "Namespace cannot contain underscores (used for user ID separation)")
 
-        if len(user_namespace) > 50:  # Leave room for user ID
-            raise ValueError("Namespace prefix too long (max 50 characters)")
-
         if not user_namespace.strip():
             raise ValueError("Namespace cannot be empty")
 
+        # Clean the namespace by removing spaces and normalizing
+        clean_namespace = "".join(user_namespace.strip().split())
+        
+        if len(clean_namespace) > 50:  # Leave room for user ID
+            raise ValueError("Namespace prefix too long (max 50 characters)")
+
         # Create unique namespace
-        unique_namespace = f"{user_namespace.strip()}_{user.id}"
+        unique_namespace = f"{clean_namespace}_{user.id}"
         return unique_namespace
     
     def generate_chatbot_name(self, agent_description: str) -> str:
@@ -202,6 +205,14 @@ class PipelineHandler:
         try:
             # Generate unique namespace using user input and user ID
             namespace = self.create_unique_namespace(user_namespace, user)
+
+            # Check if namespace already exists
+            # We check the final namespace, {name}_{user_id}
+            if ChatBots.objects(namespace=namespace).first():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Namespace already exists"
+                )
             
             # Determine settings for normal users
             if agent_provider is not None:  # Normal user

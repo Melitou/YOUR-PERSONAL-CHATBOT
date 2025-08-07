@@ -94,7 +94,7 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
             onClose();
             setName("");
             setDescription("");
-            setAiProvider("gemini");
+            setAiProvider("Gemini");
             setSelectedFiles([]);
             setErrorMessage("");
         } else {

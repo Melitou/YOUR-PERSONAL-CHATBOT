@@ -303,9 +303,16 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
     logger.info(f"📊 Top K: {top_k}")
 
     try:
-        # Step 1: Create user's full namespace (namespace|userid) - must match document storage format
-        full_namespace = f"{namespace}_{user_id}"
+        # Step 1: Use the namespace as-is since it already includes the user_id
+        # The namespace parameter already contains the user_id (e.g., "DeepSeekChatbot_689484a1d2513e61085cf246")
+        full_namespace = namespace
         logger.info(f"🔗 Full namespace: {full_namespace}")
+        
+        # Debug: Check if documents exist for this namespace
+        from db_service import Documents, Chunks
+        doc_count = Documents.objects(namespace=namespace).count()
+        chunk_count = Chunks.objects(namespace=namespace).count()
+        logger.info(f"🔍 Found {doc_count} documents and {chunk_count} chunks for namespace: {namespace}")
 
         # Step 2: Auto-determine Pinecone index and route to correct search function
         if "gemini" in embedding_model.lower():

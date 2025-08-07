@@ -209,6 +209,24 @@ class Chunks(Document):
     def __str__(self) -> str:
         return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, file_name={self.file_name}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, vector_id={self.vector_id}, created_at={self.created_at})"
 
+class ChatbotDocumentsMapper(Document):
+    """Mapping table between ChatBots and Documents"""
+    chatbot = ReferenceField(ChatBots, required=True)
+    document = ReferenceField(Documents, required=True)
+    user = ReferenceField(User_Auth_Table, required=True)
+    assigned_at = DateTimeField(required=True)
+
+    meta = {
+        'collection': 'chatbot_documents_mapper',
+        'indexes': [
+            {'fields': ['chatbot']},
+            {'fields': ['document']},
+            {'fields': [('chatbot', 1), ('document', 1)], 'unique': True}
+        ]
+    }
+
+    def __str__(self) -> str:
+        return f"ChatbotDocumentsMapper(chatbot={self.chatbot}, document={self.document}, user={self.user}, assigned_at={self.assigned_at})"
 
 def upload_file_to_gridfs(fs: GridFS, file_content: bytes, filename: str, content_type: str = "text/plain") -> ObjectId:
     """Upload a file to GridFS and return the file ObjectId"""

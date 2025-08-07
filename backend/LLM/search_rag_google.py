@@ -12,6 +12,9 @@ from pinecone import Pinecone
 from dotenv import load_dotenv
 from bson import ObjectId
 from db_service import Chunks, initialize_db
+import logging
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -121,13 +124,20 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
             return "No relevant documents found for the query."
 
         # Apply Cohere reranking
-        reranked_results = pc.inference.rerank(
-            model="cohere-rerank-3.5",
-            query=query,
-            documents=documents,
-            top_n=top_reranked,
-            return_documents=True
-        )
+        try:
+            reranked_results = pc.inference.rerank(
+                model="cohere-rerank-3.5",
+                query=query,
+                documents=documents,
+                top_n=top_reranked,
+                return_documents=True
+            )
+        except Exception as rerank_error:
+            # Fallback: use original results without reranking
+            logger.info(f"Reranking failed, using original results: {rerank_error}")
+            reranked_matches = [(match, match.score) for match in query_response.matches[:top_reranked]]
+            chunk_ids = [match.id for match in query_response.matches[:top_reranked]]
+            return format_results_without_reranking(query_response.matches[:top_reranked], chunk_dict)
 
         # Get chunk IDs for MongoDB retrieval
         chunk_ids = []
@@ -164,6 +174,8 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
             chunk_text += f"**Chunk Index**: {chunk.chunk_index + 1}\n"
             chunk_text += f"**Relevance Score**: {score:.4f}\n\n"
 
+            logger.info(f"\n\nRAG search results:\n Source file: {source_file}\n Chunk index: {chunk.chunk_index + 1}\n Relevance score: {score:.4f}\n Full content: {full_content}\n Full summary: {full_summary}")
+
             if full_summary.strip():
                 chunk_text += f"**Summary**: {full_summary}\n\n"
 
@@ -178,7 +190,55 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
         return final_text
 
     except Exception as e:
+        logger.error(f"Error performing search: {str(e)}")
         return f"Error performing search: {str(e)}"
+
+
+def format_results_without_reranking(matches, chunk_dict):
+    """
+    Format results without reranking when the reranking service is unavailable
+    
+    Args:
+        matches: List of Pinecone matches
+        chunk_dict: Dictionary of chunk data from MongoDB
+        
+    Returns:
+        Formatted string with chunk information
+    """
+    results = []
+    for i, match in enumerate(matches):
+        chunk_id = match.id
+        metadata = match.metadata or {}
+
+        # Get full chunk data from MongoDB
+        chunk = chunk_dict.get(chunk_id)
+        if not chunk:
+            continue  # Skip if chunk not found in MongoDB
+
+        # Extract metadata elements
+        source_file = metadata.get("file_name", "") or chunk.file_name
+
+        # Use full content and summary from MongoDB
+        full_content = chunk.content if chunk.content else ""
+        full_summary = chunk.summary if chunk.summary else ""
+
+        # Format the chunk with full data for LLM consumption
+        chunk_text = f"Document {i+1}:\n\n"
+        chunk_text += f"**Source File**: {source_file}\n"
+        chunk_text += f"**Chunk Index**: {chunk.chunk_index + 1}\n"
+        chunk_text += f"**Relevance Score**: {match.score:.4f}\n\n"
+
+        if full_summary.strip():
+            chunk_text += f"**Summary**: {full_summary}\n\n"
+
+        chunk_text += f"**Full Content**: {full_content}\n\n"
+        chunk_text += "---\n"
+
+        results.append(chunk_text)
+
+    # Combine all chunks
+    final_text = "\n".join(results)
+    return final_text
 
 
 def test_search():

@@ -138,6 +138,9 @@ def rag_search_tool(query: str) -> str:
     if not all(RAG_CONFIG.values()):
         return "Error: RAG system not properly initialized. Please contact support."
 
+    debug_print(f"🔍 RAG Search Tool called with query: {query}")
+    debug_print(f"📊 RAG Config: {RAG_CONFIG}")
+
     try:
         result = rag_search(
             query=query,
@@ -146,8 +149,10 @@ def rag_search_tool(query: str) -> str:
             embedding_model=RAG_CONFIG['embedding_model'],
             top_k=5  # Default to top 5 results
         )
+        debug_print(f"✅ RAG Search returned result length: {len(result)}")
         return result
     except Exception as e:
+        debug_print(f"❌ RAG Search error: {str(e)}")
         return f"Error retrieving documents: {str(e)}"
 
 

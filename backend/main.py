@@ -445,7 +445,13 @@ async def websocket_conversation(websocket: WebSocket, session_id: str, token: s
     try:
         # Validate session belongs to user
         session = pipeline_handler.get_conversation_session(session_id, str(user.id))
-        chatbot = session.chatbot_id
+        
+        # Get the actual chatbot object from the session
+        from db_service import ChatBots
+        chatbot = ChatBots.objects(id=session.chatbot_id.id).first()
+        if not chatbot:
+            await safe_websocket_close(websocket, code=1008, reason="Chatbot not found")
+            return
         
         logger.info(f"WebSocket connected for session {session_id}, user {user.user_name}, chatbot {chatbot.name}")
         
@@ -485,6 +491,8 @@ async def websocket_conversation(websocket: WebSocket, session_id: str, token: s
                 
                 # Initialize RAG for this chatbot
                 from LLM.rag_llm_call import initialize_rag_config, ask_rag_assistant_stream
+                
+                logger.info(f"Initializing RAG with user_id={str(user.id)}, namespace={chatbot.namespace}, embedding_model={chatbot.embedding_model}")
                 
                 initialize_rag_config(
                     user_id=str(user.id),

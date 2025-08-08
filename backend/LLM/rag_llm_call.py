@@ -59,7 +59,8 @@ GEMINI_MODELS = [
 # Global variables for RAG configuration (will be set during initialization)
 RAG_CONFIG = {
     'user_id': None,
-    'namespace': None,
+    # namespace: None 
+    'namespaces': [], # This is the new approach
     'embedding_model': None,
     'chatbot_model': None
 }
@@ -96,12 +97,12 @@ def get_model_provider(model: str) -> str:
         return 'unknown'
 
 
-def initialize_rag_config(user_id: str, namespace: str, embedding_model: str, chatbot_model: str = "gpt-4.1"):
+def initialize_rag_config(user_id: str, namespaces: list, embedding_model: str, chatbot_model: str = "gpt-4.1"):
     """Initialize RAG configuration for the chatbot session
 
     Args:
         user_id: MongoDB ObjectId string of the user
-        namespace: Document namespace (without user_id suffix)
+        namespaces: List of document namespaces
         embedding_model: Embedding model used for the documents
         chatbot_model: Model to use for chat generation (default: gpt-4.1)
     """
@@ -113,14 +114,14 @@ def initialize_rag_config(user_id: str, namespace: str, embedding_model: str, ch
             f"Unsupported chatbot model: {chatbot_model}. Supported models: {OPENAI_MODELS + GEMINI_MODELS}")
 
     RAG_CONFIG['user_id'] = user_id
-    RAG_CONFIG['namespace'] = namespace
+    RAG_CONFIG['namespaces'] = namespaces
     RAG_CONFIG['embedding_model'] = embedding_model
     RAG_CONFIG['chatbot_model'] = chatbot_model
 
     provider = get_model_provider(chatbot_model)
     print(f"✅ RAG Configuration initialized:")
     print(f"   👤 User ID: {user_id}")
-    print(f"   🏷️  Namespace: {namespace}")
+    print(f"   🏷️  Namespaces: {namespaces}")
     print(f"   🔍 Embedding Model: {embedding_model}")
     print(f"   🤖 Chatbot Model: {chatbot_model} ({provider.upper()})")
 
@@ -145,7 +146,8 @@ def rag_search_tool(query: str) -> str:
         result = rag_search(
             query=query,
             user_id=RAG_CONFIG['user_id'],
-            namespace=RAG_CONFIG['namespace'],
+            #namespace=RAG_CONFIG['namespace'],
+            namespaces=RAG_CONFIG['namespaces'],
             embedding_model=RAG_CONFIG['embedding_model'],
             top_k=5  # Default to top 5 results
         )
@@ -1064,19 +1066,19 @@ def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, c
 
 
 # For backward compatibility and testing
-if __name__ == "__main__":
-    # Test mode - requires manual configuration
-    print("🧪 RAG Assistant Test Mode")
-    print("Note: In production, this will be called from the master pipeline")
+# if __name__ == "__main__":
+#     # Test mode - requires manual configuration
+#     print("🧪 RAG Assistant Test Mode")
+#     print("Note: In production, this will be called from the master pipeline")
 
-    # Example configuration (would normally come from the pipeline)
-    test_user_id = input("Enter user ID: ").strip()
-    test_namespace = input("Enter namespace: ").strip()
-    test_embedding_model = input(
-        "Enter embedding model (text-embedding-3-small/gemini-embedding-001): ").strip()
+#     # Example configuration (would normally come from the pipeline)
+#     test_user_id = input("Enter user ID: ").strip()
+#     test_namespace = input("Enter namespace: ").strip()
+#     test_embedding_model = input(
+#         "Enter embedding model (text-embedding-3-small/gemini-embedding-001): ").strip()
 
-    if test_user_id and test_namespace and test_embedding_model:
-        start_rag_chat_session(
-            test_user_id, test_namespace, test_embedding_model)
-    else:
-        print("❌ All fields are required for testing.")
+#     if test_user_id and test_namespace and test_embedding_model:
+#         start_rag_chat_session(
+#             test_user_id, test_namespace, test_embedding_model)
+#     else:
+#         print("❌ All fields are required for testing.")

@@ -251,68 +251,155 @@ class RAGService:
         logger.info(f"Formatted {len(chunks)} chunks for LLM consumption")
         return final_result
 
+# def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, top_k: int = 5) -> str:
+#     """
+#     Main RAG search function that retrieves relevant document chunks for a user query
+#     Now uses optimized search functions with Cohere reranking for better results
 
-def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, top_k: int = 5) -> str:
+#     This function:
+#     1. Auto-determines the correct Pinecone index and search function based on embedding model
+#     2. Routes to either OpenAI or Google search pipeline with reranking
+#     3. Returns formatted results with relevance scores and metadata
+
+#     Args:
+#         query: User's search query
+#         user_id: MongoDB ObjectId string of the user
+#         namespace: User's namespace (without user_id suffix, will be auto-appended)
+#         embedding_model: Embedding model from master pipeline choice
+#                         - "text-embedding-3-small" for OpenAI
+#                         - "gemini-embedding-001" for Gemini
+#         top_k: Number of most relevant chunks to return (default: 5, used as top_reranked)
+
+#     Returns:
+#         Formatted string containing relevant document chunks with:
+#         - Source file names
+#         - Content and summary previews  
+#         - Cohere rerank scores
+#         - Chunk metadata
+
+#     Example:
+#         >>> result = rag_search(
+#         ...     query="What is the company policy on remote work?",
+#         ...     user_id="507f1f77bcf86cd799439011", 
+#         ...     namespace="company_docs",
+#         ...     embedding_model="text-embedding-3-small"
+#         ... )
+#         >>> print(result)
+#         1
+#         ##ID: 64f7b2...
+#         ##content_preview: "Company policy states..."
+#         ##summary_preview: "Remote work guidelines..."
+#         ##source_file: "employee_handbook.pdf"
+#         ##rerank_score: 0.8945
+#     """
+#     logger.info("=" * 60)
+#     logger.info("🔍 STARTING OPTIMIZED RAG SEARCH")
+#     logger.info("=" * 60)
+#     logger.info(f"📝 Query: {query}")
+#     logger.info(f"👤 User ID: {user_id}")
+#     logger.info(f"🏷️  Namespace: {namespace}")
+#     logger.info(f"🤖 Embedding Model: {embedding_model}")
+#     logger.info(f"📊 Top K: {top_k}")
+
+#     try:
+#         # Step 1: Use the namespace as-is since it already includes the user_id
+#         # The namespace parameter already contains the user_id (e.g., "DeepSeekChatbot_689484a1d2513e61085cf246")
+#         full_namespace = namespace
+#         logger.info(f"🔗 Full namespace: {full_namespace}")
+        
+#         # Debug: Check if documents exist for this namespace
+#         from db_service import Documents, Chunks
+#         doc_count = Documents.objects(namespace=namespace).count()
+#         chunk_count = Chunks.objects(namespace=namespace).count()
+#         logger.info(f"🔍 Found {doc_count} documents and {chunk_count} chunks for namespace: {namespace}")
+
+#         # Step 2: Auto-determine Pinecone index and route to correct search function
+#         if "gemini" in embedding_model.lower():
+#             # Use Google/Gemini search pipeline
+#             pinecone_index = "chatbot-vectors-google"
+#             logger.info(f"📊 Using Google/Gemini search pipeline with index: {pinecone_index}")
+            
+#             result = search_rag_google(
+#                 query=query,
+#                 namespace=full_namespace,
+#                 index_name=pinecone_index,
+#                 embedding_model=embedding_model,
+#                 top_k=top_k * 2,  # Get more initial results for better reranking
+#                 top_reranked=top_k  # Return the requested number after reranking
+#             )
+            
+#         else:
+#             # Use OpenAI search pipeline  
+#             pinecone_index = "chatbot-vectors-openai"
+#             logger.info(f"📊 Using OpenAI search pipeline with index: {pinecone_index}")
+            
+#             result = search_rag_openai(
+#                 query=query,
+#                 namespace=full_namespace,
+#                 index_name=pinecone_index,
+#                 embedding_model=embedding_model,
+#                 top_k=top_k * 2,  # Get more initial results for better reranking
+#                 top_reranked=top_k  # Return the requested number after reranking
+#             )
+
+#         logger.info("✅ RAG search completed successfully using optimized pipeline")
+#         logger.info("=" * 60)
+
+#         return result
+
+#     except Exception as e:
+#         error_msg = f"RAG search failed: {str(e)}"
+#         logger.error(error_msg)
+#         logger.error("=" * 60)
+#         return f"Error retrieving relevant documents: {str(e)}"
+
+def rag_search(query: str, user_id: str, namespaces: list, embedding_model: str, top_k: int = 5) -> str:
     """
     Main RAG search function that retrieves relevant document chunks for a user query
-    Now uses optimized search functions with Cohere reranking for better results
-
-    This function:
-    1. Auto-determines the correct Pinecone index and search function based on embedding model
-    2. Routes to either OpenAI or Google search pipeline with reranking
-    3. Returns formatted results with relevance scores and metadata
+    Now supports multiple namespaces for searching across multiple document collections
 
     Args:
         query: User's search query
         user_id: MongoDB ObjectId string of the user
-        namespace: User's namespace (without user_id suffix, will be auto-appended)
+        namespaces: List of namespaces to search in (can be single string or list)
         embedding_model: Embedding model from master pipeline choice
-                        - "text-embedding-3-small" for OpenAI
-                        - "gemini-embedding-001" for Gemini
-        top_k: Number of most relevant chunks to return (default: 5, used as top_reranked)
+        top_k: Number of most relevant chunks to return
 
     Returns:
-        Formatted string containing relevant document chunks with:
-        - Source file names
-        - Content and summary previews  
-        - Cohere rerank scores
-        - Chunk metadata
-
-    Example:
-        >>> result = rag_search(
-        ...     query="What is the company policy on remote work?",
-        ...     user_id="507f1f77bcf86cd799439011", 
-        ...     namespace="company_docs",
-        ...     embedding_model="text-embedding-3-small"
-        ... )
-        >>> print(result)
-        1
-        ##ID: 64f7b2...
-        ##content_preview: "Company policy states..."
-        ##summary_preview: "Remote work guidelines..."
-        ##source_file: "employee_handbook.pdf"
-        ##rerank_score: 0.8945
+        Formatted string containing relevant document chunks
     """
     logger.info("=" * 60)
     logger.info("🔍 STARTING OPTIMIZED RAG SEARCH")
     logger.info("=" * 60)
     logger.info(f"📝 Query: {query}")
     logger.info(f"👤 User ID: {user_id}")
-    logger.info(f"🏷️  Namespace: {namespace}")
+    logger.info(f"🏷️  Namespaces: {namespaces}")
     logger.info(f"🤖 Embedding Model: {embedding_model}")
     logger.info(f"📊 Top K: {top_k}")
 
     try:
-        # Step 1: Use the namespace as-is since it already includes the user_id
-        # The namespace parameter already contains the user_id (e.g., "DeepSeekChatbot_689484a1d2513e61085cf246")
-        full_namespace = namespace
-        logger.info(f"🔗 Full namespace: {full_namespace}")
+        # Convert single namespace to list for consistency
+        if isinstance(namespaces, str):
+            namespaces = [namespaces]
         
-        # Debug: Check if documents exist for this namespace
+        # Use full namespaces for both MongoDB and Pinecone
+        full_namespaces = namespaces
+        
+        logger.info(f"🔗 Full namespaces: {full_namespaces}")
+        
+        # Debug: Check if documents exist for these namespaces
         from db_service import Documents, Chunks
-        doc_count = Documents.objects(namespace=namespace).count()
-        chunk_count = Chunks.objects(namespace=namespace).count()
-        logger.info(f"🔍 Found {doc_count} documents and {chunk_count} chunks for namespace: {namespace}")
+        total_doc_count = 0
+        total_chunk_count = 0
+        
+        for full_ns in full_namespaces:
+            doc_count = Documents.objects(namespace=full_ns).count()
+            chunk_count = Chunks.objects(namespace=full_ns).count()
+            total_doc_count += doc_count
+            total_chunk_count += chunk_count
+            logger.info(f"🔍 Found {doc_count} documents and {chunk_count} chunks for namespace: {full_ns}")
+        
+        logger.info(f"📊 Total: {total_doc_count} documents and {total_chunk_count} chunks across all namespaces")
 
         # Step 2: Auto-determine Pinecone index and route to correct search function
         if "gemini" in embedding_model.lower():
@@ -320,28 +407,56 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
             pinecone_index = "chatbot-vectors-google"
             logger.info(f"📊 Using Google/Gemini search pipeline with index: {pinecone_index}")
             
-            result = search_rag_google(
-                query=query,
-                namespace=full_namespace,
-                index_name=pinecone_index,
-                embedding_model=embedding_model,
-                top_k=top_k * 2,  # Get more initial results for better reranking
-                top_reranked=top_k  # Return the requested number after reranking
-            )
+            # Search each namespace and combine results
+            all_results = []
+            for full_namespace in full_namespaces:
+                logger.info(f"🔍 Searching namespace: {full_namespace}")
+                result = search_rag_google(
+                    query=query,
+                    namespace=full_namespace,
+                    index_name=pinecone_index,
+                    embedding_model=embedding_model,
+                    top_k=top_k * 2,
+                    top_reranked=top_k * 2
+                )
+                
+                # Just append the result if it's not empty
+                if result and result != "No relevant documents found for the query.":
+                    all_results.append(result)
+            
+            # Simple combination - just join the results
+            if all_results:
+                result = "\n\n".join(all_results)
+            else:
+                result = "No relevant documents found for the query."
             
         else:
             # Use OpenAI search pipeline  
             pinecone_index = "chatbot-vectors-openai"
             logger.info(f"📊 Using OpenAI search pipeline with index: {pinecone_index}")
             
-            result = search_rag_openai(
-                query=query,
-                namespace=full_namespace,
-                index_name=pinecone_index,
-                embedding_model=embedding_model,
-                top_k=top_k * 2,  # Get more initial results for better reranking
-                top_reranked=top_k  # Return the requested number after reranking
-            )
+            # Search each namespace and combine results
+            all_results = []
+            for full_namespace in full_namespaces:
+                logger.info(f"🔍 Searching namespace: {full_namespace}")
+                result = search_rag_openai(
+                    query=query,
+                    namespace=full_namespace,
+                    index_name=pinecone_index,
+                    embedding_model=embedding_model,
+                    top_k=top_k * 2,
+                    top_reranked=top_k * 2
+                )
+                
+                # Just append the result if it's not empty
+                if result and result != "No relevant documents found for the query.":
+                    all_results.append(result)
+            
+            # Simple combination - just join the results
+            if all_results:
+                result = "\n\n".join(all_results)
+            else:
+                result = "No relevant documents found for the query."
 
         logger.info("✅ RAG search completed successfully using optimized pipeline")
         logger.info("=" * 60)
@@ -355,37 +470,7 @@ def rag_search(query: str, user_id: str, namespace: str, embedding_model: str, t
         return f"Error retrieving relevant documents: {str(e)}"
 
 
-def test_rag_search():
-    """Test function to demonstrate RAG search usage"""
-    # This would typically be called with real user data
-    print("🧪 Testing RAG Search Function")
-    print("=" * 50)
-
-    # Example usage (would need real user data to work)
-    test_query = "summarise alice in wonderland?"
-    test_user_id = "688b48416faad142f66ca95e"  # Example ObjectId
-    test_namespace = "ex"
-    test_embedding_model = "gemini-embedding-001"
-
-    print(f"Query: {test_query}")
-    print(f"User ID: {test_user_id}")
-    print(f"Namespace: {test_namespace}")
-    print(f"Embedding Model: {test_embedding_model}")
-    print()
-
-    result = rag_search(
-        query=test_query,
-        user_id=test_user_id,
-        namespace=test_namespace,
-        embedding_model=test_embedding_model,
-        top_k=3
-    )
-
-    print("Results:")
-    print("=" * 50)
-    print(result)
-
-
 if __name__ == "__main__":
     # Test the RAG search function
-    test_rag_search()
+    # test_rag_search()
+    pass

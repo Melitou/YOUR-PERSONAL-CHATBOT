@@ -492,6 +492,7 @@ class DocumentPipeline:
         """
         try:
             # Query all documents in the namespace that are processed
+            # TODO: THIS MIGHT NEED TO BE CHANGED TO USE (ALSO) THE MAPPING TABLE!!!!
             processed_docs = Documents.objects(
                 user=self.user,
                 namespace=namespace,
@@ -569,6 +570,7 @@ class DocumentPipeline:
             inventory = []
 
             # Get all documents in namespace
+            # TODO: THIS MIGHT NEED TO BE CHANGED TO USE (ALSO) THE MAPPING TABLE!!!!
             docs = Documents.objects(user=self.user, namespace=namespace)
 
             for doc in docs:

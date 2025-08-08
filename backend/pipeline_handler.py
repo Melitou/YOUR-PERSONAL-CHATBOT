@@ -15,7 +15,7 @@ from bson import ObjectId
 
 from master_pipeline import MasterPipeline
 
-from db_service import initialize_db, User_Auth_Table, ChatBots, Documents, Chunks, Conversation, Messages, ConversationSession
+from db_service import initialize_db, User_Auth_Table, ChatBots, Documents, Chunks, Conversation, Messages, ConversationSession, ChatbotDocumentsMapper
 from api_models import ChunkingMethod, EmbeddingModel, AgentProvider, FileMetadata, ChatbotDetailResponse, LoadedFileInfo, Message, CreateSessionResponse, ConversationSummary, ConversationMessagesResponse
 
 # Configure logging
@@ -331,6 +331,84 @@ class PipelineHandler:
             except Exception as e:
                 logger.warning(f"Error cleaning up temp directory {temp_dir}: {e}")
     
+    # def get_user_chatbots(self, user_id: str) -> List[ChatbotDetailResponse]:
+    #     """Get all chatbots for a user with detailed information including loaded files"""
+    #     try:
+    #         # Find user by ObjectId
+    #         user = User_Auth_Table.objects(id=ObjectId(user_id)).first()
+    #         if not user:
+    #             logger.error(f"User not found: {user_id}")
+    #             return []
+            
+    #         # Get all chatbots for this user
+    #         chatbots = ChatBots.objects(user_id=user).order_by('-date_created')
+            
+    #         chatbot_details = []
+    #         for chatbot in chatbots:
+    #             # Get documents for this chatbot (by namespace) - case insensitive
+    #             logger.info(f"Getting documents for chatbot, by namespace (1 attempt) {chatbot.name}")
+    #             documents = Documents.objects(
+    #                 user=user,
+    #                 namespace__iexact=chatbot.namespace
+    #             ).order_by('created_at')
+
+    #             if documents.count() == 0:
+    #                 logger.info(f"No documents found for chatbot {chatbot.name}, search in the Mapping table.")
+    #                 # Search in the Mapping table
+    #                 mapping = ChatbotDocumentsMapper.objects(chatbot=chatbot).first()
+    #                 if mapping:
+    #                     documents = Documents.objects(id=mapping.document) # get the documents ID's from the mapping table
+    #                     logger.info(f"Documents found for chatbot (2 attempt) {chatbot.name}: {documents.count()}")
+    #                 else:
+    #                     logger.info(f"No mapping found for chatbot (2 attempt) {chatbot.name}")    
+    #             else:
+    #                 logger.info(f"Documents found for chatbot (1 attempt) {chatbot.name}: {documents.count()}")
+                
+    #             # Create loaded file info
+    #             loaded_files = []
+    #             total_chunks_across_files = 0
+                
+    #             for doc in documents:
+    #                 # Count chunks for this document
+    #                 chunk_count = Chunks.objects(document=doc).count()
+    #                 total_chunks_across_files += chunk_count
+                    
+    #                 loaded_file = LoadedFileInfo(
+    #                     file_name=doc.file_name,
+    #                     file_type=doc.file_type,
+    #                     status=doc.status,
+    #                     upload_date=doc.created_at,
+    #                     total_chunks=chunk_count
+    #                 )
+    #                 loaded_files.append(loaded_file)
+
+    #             logger.info(f"Chatbot {chatbot.name} has {len(loaded_files)} loaded files and {total_chunks_across_files} total chunks")
+                
+    #             # Create detailed chatbot response
+    #             chatbot_detail = ChatbotDetailResponse(
+    #                 id=str(chatbot.id),
+    #                 name=chatbot.name,
+    #                 description=chatbot.description,
+    #                 embedding_model=chatbot.embedding_model,
+    #                 chunking_method=chatbot.chunking_method,
+    #                 namespace=chatbot.namespace,
+    #                 date_created=chatbot.date_created,
+    #                 loaded_files=loaded_files,
+    #                 total_files=len(loaded_files),
+    #                 total_chunks=total_chunks_across_files
+    #             )
+    #             chatbot_details.append(chatbot_detail)
+            
+    #         logger.info(f"Retrieved {len(chatbot_details)} chatbots for user {user.user_name}")
+    #         return chatbot_details
+            
+    #     except Exception as e:
+    #         logger.error(f"Error retrieving user chatbots: {e}")
+    #         raise HTTPException(
+    #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #             detail=f"Error retrieving chatbots: {str(e)}"
+    #         )
+
     def get_user_chatbots(self, user_id: str) -> List[ChatbotDetailResponse]:
         """Get all chatbots for a user with detailed information including loaded files"""
         try:
@@ -345,11 +423,25 @@ class PipelineHandler:
             
             chatbot_details = []
             for chatbot in chatbots:
-                # Get documents for this chatbot (by namespace) - case insensitive
-                documents = Documents.objects(
-                    user=user,
-                    namespace__iexact=chatbot.namespace
-                ).order_by('created_at')
+                documents = []
+                
+                # Primary method: Search in the Mapping table (for newer chatbots)
+                logger.info(f"Getting documents for chatbot via mapping table: {chatbot.name}")
+                mappings = ChatbotDocumentsMapper.objects(chatbot=chatbot)  # Get ALL mappings
+                
+                if mappings.count() > 0:
+                    # Get all document IDs from mappings
+                    document_ids = [mapping.document.id for mapping in mappings]
+                    documents = Documents.objects(id__in=document_ids, user=user).order_by('created_at')
+                    logger.info(f"Documents found via mapping table for {chatbot.name}: {documents.count()}")
+                else:
+                    # Fallback: Search by namespace (for legacy chatbots)
+                    logger.info(f"No mappings found, trying namespace search for: {chatbot.name}")
+                    documents = Documents.objects(
+                        user=user,
+                        namespace__iexact=chatbot.namespace
+                    ).order_by('created_at')
+                    logger.info(f"Documents found via namespace for {chatbot.name}: {documents.count()}")
                 
                 # Create loaded file info
                 loaded_files = []

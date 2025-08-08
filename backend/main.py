@@ -448,12 +448,16 @@ async def websocket_conversation(websocket: WebSocket, session_id: str, token: s
         
         # Get the actual chatbot object from the session
         from db_service import ChatBots
-        chatbot = ChatBots.objects(id=session.chatbot_id.id).first()
+        chatbot = ChatBots.objects(id=session.chatbot_id.id, user_id=user.id).first()
         if not chatbot:
             await safe_websocket_close(websocket, code=1008, reason="Chatbot not found")
             return
         
         logger.info(f"WebSocket connected for session {session_id}, user {user.user_name}, chatbot {chatbot.name}")
+
+        if not chatbot:
+            await safe_websocket_close(websocket, code=1008, reason="Chatbot not found")
+            return
         
         # Send initial session info
         await safe_websocket_send(websocket, {
@@ -494,9 +498,20 @@ async def websocket_conversation(websocket: WebSocket, session_id: str, token: s
                 
                 logger.info(f"Initializing RAG with user_id={str(user.id)}, namespace={chatbot.namespace}, embedding_model={chatbot.embedding_model}")
                 
+                # TODO: THIS MIGHT NEED TO BE CHANGED TO USE (ALSO) THE MAPPING TABLE!!!!
+                # We have in the chatbot.namespace the namespace of the chatbot, we have to:
+                # Retreive the documents (initial) namespaces that are mapped to this chatbot.
+                # This will a list of namespaces, and also it might include different namespaces (make the list a set to have unique namespaces).
+                # Then we will use the namespace to initialize the RAG config.
+                # --
+                # NOTE: if the chatbot.namespace is the initial namespace, this approach will also work because we also map the initial namespace to the chatbot.
+
+                unique_namespaces_list = _fetch_initial_documents_namespaces_for_current_chatbot(chatbot.id, user.id)
+
                 initialize_rag_config(
                     user_id=str(user.id),
-                    namespace=chatbot.namespace,
+                    # namespace=chatbot.namespace,
+                    namespaces=unique_namespaces_list,
                     embedding_model=chatbot.embedding_model
                 )
                 
@@ -598,6 +613,54 @@ async def websocket_conversation(websocket: WebSocket, session_id: str, token: s
                 pipeline_handler.close_conversation_session(session_id, str(user.id))
             except Exception as e:
                 logger.error(f"Error closing session in cleanup: {e}")
+
+def _fetch_initial_documents_namespaces_for_current_chatbot(chatbot_id: str, user_id: str) -> list:
+    """
+    This function will find from the MongoDB the initial 
+    namespaces that are assigned to the documents
+    the chatbot is mapped to.
+    Args:
+        chatbot_id: The id of the chatbot that the user is in the socket connection
+        user_id: The user id of the user that is in the socket connection and the chatbot is mapped to.
+    Returns:
+        A list of initial namespaces that are assigned to the documents the chatbot is mapped to.
+    """
+    try:
+        from db_service import ChatbotDocumentsMapper, Documents
+        from bson import ObjectId
+        
+        # Convert string IDs to ObjectId
+        chatbot_object_id = ObjectId(chatbot_id)
+        user_object_id = ObjectId(user_id)
+        
+        # Get the mapping records for this chatbot and user
+        chatbot_documents_mapper_list = ChatbotDocumentsMapper.objects(
+            chatbot=chatbot_object_id, 
+            user=user_object_id
+        )
+        
+        if not chatbot_documents_mapper_list:
+            logger.warning(f"No document mappings found for chatbot {chatbot_id}")
+            return []
+        
+        # Extract document IDs from the mappings
+        document_ids = [mapping.document.id for mapping in chatbot_documents_mapper_list]
+        
+        # Get the documents
+        documents = Documents.objects(id__in=document_ids)
+        if not documents:
+            logger.warning(f"No documents found for document IDs: {document_ids}")
+            return []
+        
+        # Extract unique namespaces
+        unique_namespaces = list(set([doc.namespace for doc in documents]))
+        
+        logger.info(f"Found {len(unique_namespaces)} unique namespaces for chatbot {chatbot_id}: {unique_namespaces}")
+        return unique_namespaces
+        
+    except Exception as e:
+        logger.error(f"Error fetching initial document namespaces for chatbot {chatbot_id}: {e}")
+        raise ValueError(f"Error fetching initial document namespaces for chatbot {chatbot_id}: {e}")
 
 
 async def safe_websocket_send(websocket: WebSocket, data: dict) -> bool:

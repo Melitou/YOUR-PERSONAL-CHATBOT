@@ -80,6 +80,17 @@ class EmbeddingService:
             "multilingual-e5-large": "text-embedding-3-small", # very slow
         }
 
+        # Model dimension mapping
+        self.model_dimensions = {
+            "text-embedding-3-large": 3072,
+            "text-embedding-3-small": 1536,
+            "text-embedding-ada-002": 1536,
+            "text-embedding-005": 1536,
+            "text-multilingual-embedding-002": 1536,
+            "multilingual-e5-large": 1536,
+            "gemini-embedding-001": 3072
+        }
+
     def initialize_embedding_model(self,
                                    model_name: str = "text-embedding-3-large",
                                    max_fallbacks: int = 3) -> Optional[str]:
@@ -422,13 +433,13 @@ class EmbeddingService:
             logger.error(f"Failed to initialize Pinecone client: {e}")
             return False
 
-    def ensure_pinecone_index_exists(self, index_name: str, dimension: int = 1536) -> bool:
+    def ensure_pinecone_index_exists(self, index_name: str, embedding_model: str = "text-embedding-3-small") -> bool:
         """
         Ensure Pinecone index exists, create if it doesn't.
 
         Args:
             index_name: Name of the Pinecone index
-            dimension: Vector dimension (default: 1536 for text-embedding-3-small)
+            embedding_model: Embedding model to determine correct dimension
 
         Returns:
             True if index exists or was created successfully
@@ -437,6 +448,9 @@ class EmbeddingService:
             if not self.pinecone_client:
                 if not self.initialize_pinecone_client():
                     return False
+
+            # Get the correct dimension for the model
+            dimension = self.model_dimensions.get(embedding_model, 1536)  # Default to 1536 if model not found
 
             # Check if index exists
             existing_indexes = self.pinecone_client.list_indexes()
@@ -447,8 +461,7 @@ class EmbeddingService:
                 return True
 
             # Create index if it doesn't exist
-            logger.info(
-                f"Creating Pinecone index '{index_name}' with dimension {dimension}")
+            logger.info(f"Creating Pinecone index '{index_name}' with dimension {dimension} for model {embedding_model}")
             self.pinecone_client.create_index(
                 name=index_name,
                 dimension=dimension,
@@ -460,8 +473,7 @@ class EmbeddingService:
             return True
 
         except Exception as e:
-            logger.error(
-                f"Error ensuring Pinecone index '{index_name}' exists: {e}")
+            logger.error(f"Error ensuring Pinecone index '{index_name}' exists: {e}")
             return False
 
     def prepare_embedding_text(self, chunk: Chunks) -> str:
@@ -585,7 +597,7 @@ class EmbeddingService:
         logger.info(f"Prepared {len(vectors)} vectors for Pinecone upsert")
         return vectors
 
-    def upsert_to_pinecone_namespace(self, vectors: List[Dict], namespace: str, index_name: str = "chatbot-vectors") -> List[str]:
+    def upsert_to_pinecone_namespace(self, vectors: List[Dict], namespace: str, index_name: str = "chatbot-vectors", embedding_model: str = "text-embedding-3-small") -> List[str]:
         """
         Upload vectors to specific Pinecone namespace.
 
@@ -593,6 +605,7 @@ class EmbeddingService:
             vectors: List of vector dictionaries
             namespace: Pinecone namespace to upsert to
             index_name: Pinecone index name
+            embedding_model: Embedding model to determine correct dimension
 
         Returns:
             List of successfully uploaded vector IDs
@@ -606,8 +619,8 @@ class EmbeddingService:
                 if not self.initialize_pinecone_client():
                     return []
 
-            # Ensure index exists
-            if not self.ensure_pinecone_index_exists(index_name):
+            # Ensure index exists with correct dimensions
+            if not self.ensure_pinecone_index_exists(index_name, embedding_model):
                 return []
 
             # Get index
@@ -749,6 +762,13 @@ class EmbeddingService:
                 logger.error(error_msg)
                 return results
 
+            # Ensure index exists with correct dimensions for the embedding model
+            if not self.ensure_pinecone_index_exists(pinecone_index, embedding_model):
+                error_msg = f"Failed to ensure Pinecone index '{pinecone_index}' exists with correct dimensions for model '{embedding_model}'"
+                results["errors"].append(error_msg)
+                logger.error(error_msg)
+                return results
+
             # Step 1: Get all unembedded chunks for user
             logger.info("\n📋 Step 1: Getting unembedded chunks...")
             chunks = self.get_unembedded_chunks_by_user(user_id)
@@ -812,7 +832,7 @@ class EmbeddingService:
 
                         # Step 3c: Upsert to Pinecone
                         successful_vector_ids = self.upsert_to_pinecone_namespace(
-                            vectors, namespace, pinecone_index)
+                            vectors, namespace, pinecone_index, embedding_model)
                         namespace_result["chunks_embedded"] += len(
                             successful_vector_ids)
 

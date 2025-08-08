@@ -185,7 +185,7 @@ const ManageChatbotsModalComponent = ({
                                                         <p className="text-sm text-gray-500">
                                                             Namespace: {chatbot.namespace}
                                                         </p>
-                                                        <div className="flex items-center space-x-4 mt-1">
+                                                        {/* <div className="flex items-center space-x-4 mt-1">
                                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                                                 chatbot.isActive 
                                                                     ? 'bg-green-100 text-green-800' 
@@ -196,7 +196,7 @@ const ManageChatbotsModalComponent = ({
                                                             <span className="text-xs text-gray-500">
                                                                 {chatbot.files.length} files
                                                             </span>
-                                                        </div>
+                                                        </div> */}
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center space-x-2">
@@ -271,7 +271,7 @@ const ManageChatbotsModalComponent = ({
                                                             </div>
                                                             <div>
                                                                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                                                    Index
+                                                                    Namespace
                                                                 </span>
                                                                 <p className="text-sm text-gray-900 mt-1">
                                                                     {chatbot.index}

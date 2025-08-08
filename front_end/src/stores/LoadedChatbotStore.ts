@@ -80,7 +80,8 @@ const LoadedChatbotStore = create((set, get) => ({
     setConversationMessages: (conversationMessages: Conversation | null) => set({ conversationMessages }),
 
     // Handle the streaming chunk received
-    // This corresponds to ONE agent response message
+    // This corresponds to ONE assistant response message. We always append
+    // to the last assistant message if present to avoid accidental splits.
     handleStreamingChunk: (chunk: string) => {
         const state = get() as any;
         const conversation = state.conversationMessages;
@@ -94,10 +95,11 @@ const LoadedChatbotStore = create((set, get) => ({
         console.log('handleStreamingChunk - lastMessage:', lastMessage);
         console.log('handleStreamingChunk - chunk:', chunk);
         
-        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming === true) {
-            // Append to existing streaming message
-            console.log('Appending to existing streaming message');
-            lastMessage.message += chunk;
+        if (lastMessage && lastMessage.role === 'agent') {
+            // Append to existing assistant message (ensure it's marked as streaming)
+            console.log('Appending to last assistant message');
+            lastMessage.message = (lastMessage.message || '') + chunk;
+            lastMessage.isStreaming = true;
         } else {
             // Create a new agent message for streaming only if there isn't one already
             console.log('Creating new streaming message');
@@ -126,13 +128,16 @@ const LoadedChatbotStore = create((set, get) => ({
         console.log('completeStreamingResponse - lastMessage:', lastMessage);
         console.log('completeStreamingResponse - fullResponse length:', fullResponse?.length);
         
-        if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming === true) {
+        if (lastMessage && lastMessage.role === 'agent') {
             console.log('Completing streaming response');
-            // Just update the timestamp - the chunked content should already be complete
-            // Avoid replacing the content to prevent UI flicker/double boxes
+            // Ensure the message content is finalized and timestamped
+            // Prefer the incrementally built content; only fill from fullResponse if needed
+            if (!lastMessage.message && typeof fullResponse === 'string') {
+                lastMessage.message = fullResponse;
+            }
             lastMessage.created_at = timestamp;
-            // Don't remove streaming flag yet - let the UI component handle it
-            // The UI will remove isStreaming when animation completes
+            // Mark streaming as finished so UI stops showing the typing indicator
+            lastMessage.isStreaming = false;
         }
         
         set({ 

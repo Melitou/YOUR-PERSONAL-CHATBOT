@@ -69,6 +69,31 @@ const ChatComponent = () => {
     const { isThinking, loadedChatbot, conversationMessages, sendMessage, markStreamingComplete } = LoadedChatbotStore((state: any) => state);
     
     const [inputMessage, setInputMessage] = useState('');
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+    const adjustTextareaHeight = (element?: HTMLTextAreaElement) => {
+        const textarea = element ?? textareaRef.current;
+        if (!textarea) return;
+        const computed = window.getComputedStyle(textarea);
+        const lineHeight = parseFloat(computed.lineHeight || '20');
+        const paddingTop = parseFloat(computed.paddingTop || '0');
+        const paddingBottom = parseFloat(computed.paddingBottom || '0');
+        const maxRows = 3;
+        const maxHeight = lineHeight * maxRows + paddingTop + paddingBottom;
+        textarea.style.height = 'auto';
+        const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+        textarea.style.height = `${newHeight}px`;
+        textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+    };
+
+    useEffect(() => {
+        adjustTextareaHeight();
+    }, [inputMessage]);
+
+    useEffect(() => {
+        // Initialize height on mount
+        adjustTextareaHeight();
+    }, []);
 
     const handleSendMessage = () => {
         if (!inputMessage.trim()) return; // Don't send empty messages
@@ -195,13 +220,15 @@ const ChatComponent = () => {
                     <div className="flex items-center space-x-3">
                         <div className="flex-1 relative">
                             <textarea
+                                ref={textareaRef}
                                 value={inputMessage}
                                 onChange={(e) => setInputMessage(e.target.value)}
+                                onInput={(e) => adjustTextareaHeight(e.currentTarget)}
                                 onKeyPress={handleKeyPress}
                                 placeholder="Type your message here..."
                                 className="w-full px-4 py-2 text-black border border-gray-300 rounded-lg resize-none outline-none border-transparent focus:border-transparent"
                                 rows={1}
-                                style={{ minHeight: '40px', maxHeight: '120px' }}
+                                style={{ minHeight: '40px' }}
                                 disabled={isThinking}
                             />
                         </div>

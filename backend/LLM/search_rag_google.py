@@ -241,18 +241,19 @@ def format_results_without_reranking(matches, chunk_dict):
     return final_text
 
 
-def test_search():
-    """Test function to demonstrate usage"""
-    query = "summarise alice in wonderland?"
-    namespace = "ex_6889c26368f5b07f9550e806"
-    print("\nSearching for:", query)
-    print("\nResults:")
-    print("="*80)
-    results = search_rag(query, namespace)
-    print(results)
-    print("="*80)
+# def test_search():
+#     """Test function to demonstrate usage"""
+#     query = "summarise alice in wonderland?"
+#     namespace = "ex_6889c26368f5b07f9550e806"
+#     print("\nSearching for:", query)
+#     print("\nResults:")
+#     print("="*80)
+#     results = search_rag(query, namespace)
+#     print(results)
+#     print("="*80)
 
 
 if __name__ == "__main__":
     # Test the search function
-    test_search()
+    # test_search()
+    pass

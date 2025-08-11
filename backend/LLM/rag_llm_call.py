@@ -148,7 +148,7 @@ def rag_search_tool(query: str) -> str:
             user_id=RAG_CONFIG['user_id'],
             #namespace=RAG_CONFIG['namespace'],
             namespaces=RAG_CONFIG['namespaces'],
-            embedding_model=RAG_CONFIG['embedding_model'],
+            embedding_model_of_chatbot_caller=RAG_CONFIG['embedding_model'],
             top_k=5  # Default to top 5 results
         )
         debug_print(f"✅ RAG Search returned result length: {len(result)}")

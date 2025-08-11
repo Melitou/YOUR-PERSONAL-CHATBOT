@@ -36,14 +36,6 @@ const ManageChatbotsModalComponent = ({
         }
     }, [open, fetchChatbots, addError]);
 
-    const formatFileSize = (bytes: number): string => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
-
     const getFileIcon = (type: string) => {
         if (type.includes('pdf')) return { icon: 'picture_as_pdf', color: 'text-red-500' };
         if (type.includes('word') || type.includes('document')) return { icon: 'description', color: 'text-blue-500' };
@@ -93,35 +85,34 @@ const ManageChatbotsModalComponent = ({
                 backgroundColor: 'rgba(0, 0, 0, 0.5)'
             }}
         >
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[70%] h-[70%] bg-white rounded-lg shadow-lg p-8 flex flex-row gap-6">
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] sm:w-[70%] h-[90%] sm:h-[70%] bg-white rounded-lg shadow-lg p-2 sm:p-8 flex flex-row gap-6">
                 <div className="flex flex-col gap-6 flex-1 w-[70%]">
                     {/* Header */}
-                    <div className="border-b border-gray-200 px-6 py-4">
+                    <div className="border-b border-gray-200 px-2 sm:px-6 py-4">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <h2 className="text-xl font-semibold text-gray-900">
+                            <div className="flex flex-col items-start space-x-4">
+                                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
                                     My Chatbots ({chatbots.length})
                                 </h2>
-                                <span className="text-sm text-gray-500">
+                                <span className="text-xs sm:text-sm text-gray-500">
                                     Real-time Data
                                 </span>
                             </div>
                             <button
                                 onClick={onClose}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                className="text-gray-400 hover:text-gray-600 transition-colors text-xs sm:text-sm"
                             >
-                                <span className="material-symbols-outlined">close</span>
+                                <span className="material-symbols-outlined text-xs sm:text-sm">close</span>
                             </button>
                         </div>
                     </div>
 
                     {/* Content */}
-                    <div className="overflow-y-auto max-h-[calc(80vh-120px)]">
+                    <div className="overflow-y-auto overflow-x-hidden max-h-[calc(80vh-120px)]">
                         {/* Loading State */}
                         {isLoading ? (
                             <div className="flex flex-col items-center justify-center py-12 px-6">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                                <p className="text-gray-500 text-center">Loading chatbots...</p>
+                                <p className="text-gray-500 text-center text-xs sm:text-sm">Loading chatbots...</p>
                             </div>
                         ) : 
                         /* Error State */
@@ -130,10 +121,10 @@ const ManageChatbotsModalComponent = ({
                                 <span className="material-symbols-outlined text-6xl text-red-300 mb-4 text-center">
                                     error
                                 </span>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                <h3 className="text-lg font-medium text-gray-900 mb-2 text-xs sm:text-sm">
                                     Error loading chatbots
                                 </h3>
-                                <p className="text-gray-500 text-center mb-4">
+                                <p className="text-gray-500 text-center mb-4 text-xs sm:text-sm">
                                     {error}
                                 </p>
                             </div>
@@ -144,25 +135,25 @@ const ManageChatbotsModalComponent = ({
                                 <span className="material-symbols-outlined text-6xl text-gray-300 mb-4 text-center">
                                     smart_toy
                                 </span>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                <h3 className="text-lg font-medium text-gray-900 mb-2 text-xs sm:text-sm">
                                     No chatbots yet
                                 </h3>
-                                <p className="text-gray-500 text-center">
+                                <p className="text-gray-500 text-center text-xs sm:text-sm">
                                     Create your first chatbot to get started with AI assistance.
                                 </p>
                             </div>
                         ) : (
                             <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
                                 {chatbots.map((chatbot) => (
-                                    <div key={chatbot.id} className="p-6">
+                                    <div key={chatbot.id} className="p-2 sm:p-6">
                                         {/* Chatbot List Item */}
                                         <div 
-                                            className="cursor-pointer hover:bg-gray-50 p-4 rounded-lg transition-colors"
+                                            className="cursor-pointer hover:bg-gray-50 p-2 sm:p-4 rounded-lg transition-colors"
                                             onClick={() => toggleExpanded(chatbot.id)}
                                         >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-4">
-                                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
+                                                <div className="flex items-start sm:items-center gap-3 sm:gap-4 w-full min-w-0">
+                                                    <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full flex items-center justify-center ${
                                                         chatbot.isActive ? 'bg-green-100' : 'bg-gray-100'
                                                     }`}>
                                                                                                 <span className={`material-symbols-outlined ${
@@ -170,19 +161,19 @@ const ManageChatbotsModalComponent = ({
                                         }`}>
                                             smart_toy
                                         </span>
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="text-lg font-medium text-gray-900">
+                                    </div>
+                                                    <div className="min-w-0 w-full">
+                                                        <h3 className="text-lg font-medium text-gray-900 text-base sm:text-lg truncate max-w-full">
                                                             {chatbot.name}
                                                         </h3>
                                                         {chatbot.description && (
-                                                            <p className="text-sm text-gray-600 mb-1">
+                                                            <p className="text-sm text-gray-600 mb-1 break-all sm:break-words">
                                                                 {chatbot.description.length > 100 
                                                                     ? chatbot.description.slice(0, 100) + '...' 
                                                                     : chatbot.description}
                                                             </p>
                                                         )}
-                                                        <p className="text-sm text-gray-500">
+                                                        <p className="text-sm text-gray-500 break-all">
                                                             Namespace: {chatbot.namespace}
                                                         </p>
                                                         {/* <div className="flex items-center space-x-4 mt-1">
@@ -199,10 +190,10 @@ const ManageChatbotsModalComponent = ({
                                                         </div> */}
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center space-x-2">
+                                                <div className="flex items-center space-x-2 w-full sm:w-auto justify-start sm:justify-end">
                                                     <button
                                                         onClick={(e) => handleDeleteChatbot(e, chatbot.id, chatbot.name)}
-                                                        className="px-3 py-1 bg-red-100 text-red-800 text-xs rounded-md hover:bg-red-200 transition-colors"
+                                                        className="px-3 py-1 bg-red-100 text-red-800 text-xs sm:text-base rounded-md hover:bg-red-200 transition-colors"
                                                         title="Delete chatbot"
                                                     >
                                                         Delete
@@ -212,7 +203,7 @@ const ManageChatbotsModalComponent = ({
                                                             e.stopPropagation();
                                                             handleSelectChatbot(chatbot);
                                                         }}
-                                                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                                                        className="px-3 py-1 bg-black text-white text-xs sm:text-base rounded-md hover:bg-green-900 transition-colors"
                                                     >
                                                         Select
                                                     </button>
@@ -227,10 +218,10 @@ const ManageChatbotsModalComponent = ({
 
                                         {/* Expanded Details */}
                                         {expandedChatbot === chatbot.id && (
-                                            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="mt-4 p-4 bg-gray-50 rounded-lg min-w-0 overflow-hidden">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
                                                     {/* Left Column - Configuration */}
-                                                    <div>
+                                                    <div className="min-w-0">
                                                         <h4 className="text-sm font-semibold text-gray-900 mb-3">
                                                             Configuration
                                                         </h4>
@@ -240,7 +231,7 @@ const ManageChatbotsModalComponent = ({
                                                                     <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                                                                         Description
                                                                     </span>
-                                                                    <p className="text-sm text-gray-900 mt-1">
+                                                                    <p className="text-sm text-gray-900 mt-1 break-all sm:break-words whitespace-pre-wrap">
                                                                         {chatbot.description}
                                                                     </p>
                                                                 </div>
@@ -249,7 +240,7 @@ const ManageChatbotsModalComponent = ({
                                                                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                                                                     Embedding Model
                                                                 </span>
-                                                                <p className="text-sm text-gray-900 mt-1">
+                                                                <p className="text-sm text-gray-900 mt-1 break-all">
                                                                     {chatbot.embeddingType}
                                                                 </p>
                                                             </div>
@@ -257,7 +248,7 @@ const ManageChatbotsModalComponent = ({
                                                                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                                                                     Chunking Process
                                                                 </span>
-                                                                <p className="text-sm text-gray-900 mt-1 capitalize">
+                                                                <p className="text-sm text-gray-900 mt-1 capitalize break-all">
                                                                     {chatbot.chunkingProcess.replace('-', ' ')}
                                                                 </p>
                                                             </div>
@@ -273,7 +264,7 @@ const ManageChatbotsModalComponent = ({
                                                                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                                                                     Namespace
                                                                 </span>
-                                                                <p className="text-sm text-gray-900 mt-1">
+                                                                <p className="text-sm text-gray-900 mt-1 break-all">
                                                                     {chatbot.index}
                                                                 </p>
                                                             </div>
@@ -281,11 +272,11 @@ const ManageChatbotsModalComponent = ({
                                                     </div>
 
                                                     {/* Right Column - Files */}
-                                                    <div>
+                                                    <div className="min-w-0">
                                                         <h4 className="text-sm font-semibold text-gray-900 mb-3">
                                                             Loaded Files ({chatbot.files.length})
                                                         </h4>
-                                                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                        <div className="space-y-2 max-h-48 overflow-y-auto min-w-0">
                                                             {chatbot.files.length === 0 ? (
                                                                 <p className="text-sm text-gray-500 italic">
                                                                     No files loaded
@@ -296,13 +287,13 @@ const ManageChatbotsModalComponent = ({
                                                                     return (
                                                                         <div 
                                                                             key={file.id} 
-                                                                            className="flex items-center space-x-3 p-2 bg-white rounded border"
+                                                                            className="flex items-center space-x-3 p-2 bg-white rounded border min-w-0"
                                                                         >
                                                             <span className={`material-symbols-outlined ${fileIcon.color}`}>
                                                                 {fileIcon.icon}
                                                             </span>
                                                                             <div className="flex-1 min-w-0">
-                                                                                <p className="text-sm font-medium text-gray-900 truncate">
+                                                                                <p className="text-sm font-medium text-gray-900 break-all sm:truncate">
                                                                                     {file.name}
                                                                                 </p>
                                                                                 <p className="text-xs text-gray-500">

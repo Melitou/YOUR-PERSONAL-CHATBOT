@@ -298,7 +298,7 @@ const ManageChatbotsModalComponent = ({
                                                                             key={file.id} 
                                                                             className="flex items-center space-x-3 p-2 bg-white rounded border"
                                                                         >
-                                                                                                                                        <span className={`material-symbols-outlined ${fileIcon.color}`}>
+                                                            <span className={`material-symbols-outlined ${fileIcon.color}`}>
                                                                 {fileIcon.icon}
                                                             </span>
                                                                             <div className="flex-1 min-w-0">
@@ -306,7 +306,7 @@ const ManageChatbotsModalComponent = ({
                                                                                     {file.name}
                                                                                 </p>
                                                                                 <p className="text-xs text-gray-500">
-                                                                                    {formatFileSize(file.size)} • Uploaded {file.uploadedAt.toLocaleDateString()}
+                                                                                    Uploaded {file.uploadedAt.toLocaleDateString()}
                                                                                 </p>
                                                                             </div>
                                                                         </div>

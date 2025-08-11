@@ -15,9 +15,9 @@ const WelcomeScreenComponent = () => {
     }
     
     return (
-        <div className="flex flex-col w-full h-full text-white items-center justify-center">
+        <div className="flex flex-col w-screen sm:w-full h-full text-white items-center justify-center p-5">
             <div className="flex flex-col gap-10 w-full">
-                <h1 className="text-5xl font-extralight mt-5 text-center text-2xl sm:text-5xl text-black">
+                <h1 className="text-3xl sm:text-5xl font-extralight mt-5 text-center text-2xl sm:text-5xl text-black">
                         Create your personal AI Chatbot
                 </h1>
                 {/*Basic options choices*/}

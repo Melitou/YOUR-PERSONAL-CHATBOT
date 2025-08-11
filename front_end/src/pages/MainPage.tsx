@@ -10,17 +10,17 @@ const MainPage = () => {
     const chatbot = LoadedChatbotStore((state: any) => state.loadedChatbot);
 
     return (
-        <div className="h-screen flex flex-row overflow-hidden w-screen">
+        <div className="min-h-screen flex flex-row w-full overflow-x-hidden">
             {/* Sidebar */}
             {chatbot && (
-                <div className={`flex-none w-min ${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300`}>
+                <div className={`flex-none ${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300`}>
                     <SidebarComponent />
                 </div>
             )}
             {/* Main Content */}
-            <div className="flex-grow flex flex-col p-2">
+            <div className="flex-1 min-w-0 flex flex-col p-2">
                 <HeaderComponent />
-                <div className="flex flex-row flex-1 min-h-0 justify-center items-center">
+                <div className="flex flex-row flex-1 min-h-0 min-w-0 w-full justify-center items-center">
                     {chatbot ? (
                         <ChatComponent />
                     ) : (

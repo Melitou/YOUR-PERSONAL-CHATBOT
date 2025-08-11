@@ -190,41 +190,43 @@ const ChatComponent = () => {
             </div>
 
             {/* Message Input Bar */}
-            <div className="border rounded-xl border-gray-200 bg-white p-3">
-                <div className="flex items-center space-x-3">
-                    <div className="flex-1 relative">
-                        <textarea
-                            value={inputMessage}
-                            onChange={(e) => setInputMessage(e.target.value)}
-                            onKeyPress={handleKeyPress}
-                            placeholder="Type your message here..."
-                            className="w-full px-4 py-2 text-black border border-gray-300 rounded-lg resize-none outline-none border-transparent focus:border-transparent"
-                            rows={1}
-                            style={{ minHeight: '40px', maxHeight: '120px' }}
-                            disabled={isThinking}
-                        />
-                    </div>
-                    {isThinking ? (
-                        <div className="justify-center p-3 items-center text-black rounded-lg hover:bg-opacity-10 transition-colors">
-                            <div className="flex space-x-1">
-                                <div className="w-2 h-2 bg-black rounded-full animate-pulse"></div>
-                                <div className="w-2 h-2 bg-black rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                                <div className="w-2 h-2 bg-black rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                            </div>
+            {conversationMessages?.conversation_id && (
+                <div className="border rounded-xl border-gray-200 bg-white p-3">
+                    <div className="flex items-center space-x-3">
+                        <div className="flex-1 relative">
+                            <textarea
+                                value={inputMessage}
+                                onChange={(e) => setInputMessage(e.target.value)}
+                                onKeyPress={handleKeyPress}
+                                placeholder="Type your message here..."
+                                className="w-full px-4 py-2 text-black border border-gray-300 rounded-lg resize-none outline-none border-transparent focus:border-transparent"
+                                rows={1}
+                                style={{ minHeight: '40px', maxHeight: '120px' }}
+                                disabled={isThinking}
+                            />
                         </div>
-                    ) : (
-                        <button
-                            onClick={handleSendMessage}
-                            disabled={isThinking || !inputMessage.trim()}
-                            className="justify-center p-3 items-center justify-center text-black rounded-lg hover:bg-[#f4f4f4] hover:bg-opacity-10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <span className="material-symbols-outlined text-black text-5xl">
-                                send
-                            </span>
-                        </button>
-                    )}
+                        {isThinking ? (
+                            <div className="justify-center p-3 items-center text-black rounded-lg hover:bg-opacity-10 transition-colors">
+                                <div className="flex space-x-1">
+                                    <div className="w-2 h-2 bg-black rounded-full animate-pulse"></div>
+                                    <div className="w-2 h-2 bg-black rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                                    <div className="w-2 h-2 bg-black rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                                </div>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={handleSendMessage}
+                                disabled={isThinking || !inputMessage.trim()}
+                                className="justify-center p-3 items-center justify-center text-black rounded-lg hover:bg-[#f4f4f4] hover:bg-opacity-10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span className="material-symbols-outlined text-black text-5xl">
+                                    send
+                                </span>
+                            </button>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

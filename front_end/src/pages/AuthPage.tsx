@@ -28,11 +28,16 @@ const AuthPage: React.FC = () => {
             }
             
             // Update the auth store with user data and token
-            login({
+            const userData = {
                 name: `${response.user.first_name} ${response.user.last_name}` || response.user.user_name || username,
                 role: response.user.role || 'User',
                 email: response.user.email || username
-            }, response.access_token);
+            };
+            
+            console.log('AuthPage - calling login with userData:', userData);
+            console.log('AuthPage - response from server:', response);
+            
+            login(userData, response.access_token);
             
         } catch (err: any) {
             const errorMessage = err.message || 'Login failed. Please check your credentials.';

@@ -5,9 +5,12 @@ import UserAuthStore from '../stores/UserAuthStore';
 import { authApi } from '../utils/api';
 
 const HeaderComponent = () => {
-    const { user, logout } = UserAuthStore() as any;
+    const { user, logout } = UserAuthStore();
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const isMenuOpen = Boolean(menuAnchorEl);
+
+    // Debug logging
+    console.log('HeaderComponent render - user:', user);
 
     const handleLogout = async () => {
         try {
@@ -44,7 +47,7 @@ const HeaderComponent = () => {
                                 </Avatar>
                             </IconButton>
                             <div className="flex flex-col text-[11px] sm:text-sm leading-tight min-w-0 max-w-[40vw] sm:max-w-none">
-                                <div className="font-medium text-gray-800 truncate">{user.name}</div>
+                                <div className="font-medium text-gray-800 truncate">{user.first_name} {user.last_name}</div>
                                 <div className="text-[10px] sm:text-xs text-gray-500 truncate">{user.role}</div>
                             </div>
                         </div>

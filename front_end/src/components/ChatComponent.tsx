@@ -114,9 +114,9 @@ const ChatComponent = () => {
 
 
     return (
-        <div className="flex flex-col flex-1 h-full w-full max-w-5xl mx-auto">
+        <div className="flex flex-col h-full w-full max-w-5xl mx-auto">
             {/* Chatbot Header */}
-            <div className="bg-white border-b border-gray-200 px-4 py-4">
+            <div className="bg-white border-b border-gray-200 px-4 py-4 flex-shrink-0">
                 <div className="flex items-center space-x-3 min-w-0">
                     <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center">
                         <span className="material-symbols-outlined text-white text-xl">
@@ -124,18 +124,18 @@ const ChatComponent = () => {
                         </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h2 className="text-lg font-semibold text-gray-900 truncate">
+                        <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                             {loadedChatbot?.name || 'AI Assistant'}
                         </h2>
                         {loadedChatbot?.description && (
-                            <p className="text-sm text-gray-500 truncate">
+                            <p className="text-xs sm:text-sm text-gray-500 truncate">
                                 {loadedChatbot.description}
                             </p>
                         )}
                     </div>
                     <div className="flex items-center space-x-2 flex-shrink-0">
                         <div className={`w-3 h-3 rounded-full ${loadedChatbot?.isActive ? 'bg-green-400' : 'bg-gray-300'}`}></div>
-                        <span className="text-sm text-gray-500 whitespace-nowrap">
+                        <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
                             {loadedChatbot?.isActive ? 'Active' : 'Inactive'}
                         </span>
                     </div>
@@ -143,11 +143,11 @@ const ChatComponent = () => {
             </div>
 
             {/* Chat Messages Container */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
                 {conversationMessages?.conversation_id ? (
                     <>
                         {/*Small Header that displays the conversation ID*/}
-                        <div className="text-xs text-gray-500 text-center border-b border-gray-200 pb-2">
+                        <div className="text-xs sm:text-sm text-gray-500 text-center border-b border-gray-200 pb-2">
                             Loaded conversation ID: {conversationMessages.conversation_id}
                         </div>
                         {conversationMessages?.messages && conversationMessages.messages.length > 0 ? (
@@ -163,7 +163,7 @@ const ChatComponent = () => {
                                                 : 'bg-white text-gray-800 border border-gray-200 rounded-br-none'
                                         }`}
                                     >
-                                        <p className="text-sm">
+                                        <p className="text-xs sm:text-sm">
                                             <TypewriterText 
                                                 text={message.message} 
                                                 isStreaming={message.isStreaming || false}
@@ -181,10 +181,10 @@ const ChatComponent = () => {
                                                     <div className="w-2 h-2 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '1.5s' }}></div>
                                                     <div className="w-2 h-2 bg-black rounded-full animate-bounce" style={{ animationDelay: '0.6s', animationDuration: '1.5s' }}></div>
                                                 </div>
-                                                <span className="text-sm text-black ml-3 font-medium">Agent is thinking...</span>
+                                                <span className="text-xs sm:text-sm text-black ml-3 font-medium">Agent is thinking...</span>
                                             </div>
                                         )}
-                                        <p className={`text-xs mt-1 text-gray-500 ${
+                                        <p className={`text-xs sm:text-sm mt-1 text-gray-500 ${
                                             message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
                                         }`}>
                                             {new Date(message.created_at).toLocaleTimeString([], { 
@@ -198,7 +198,7 @@ const ChatComponent = () => {
                         ) : (
                             <>
                                 <div className="flex justify-center items-center h-min">
-                                    <p className="text-gray-500 text-sm">No messages yet</p>
+                                    <p className="text-gray-500 text-xs sm:text-sm">No messages yet</p>
                                 </div>
                             </>
                         )}
@@ -208,7 +208,7 @@ const ChatComponent = () => {
                         <div className="text-center text-gray-500">
                             <div className="text-6xl mb-4">💬</div>
                             <h3 className="text-lg font-medium mb-2">No conversation loaded</h3>
-                            <p className="text-sm">Start a new conversation or select an existing one from the sidebar</p>
+                            <p className="text-xs sm:text-sm">Start a new conversation or select an existing one from the sidebar</p>
                         </div>
                     </div>
                 )}
@@ -216,7 +216,7 @@ const ChatComponent = () => {
 
             {/* Message Input Bar */}
             {conversationMessages?.conversation_id && (
-                <div className="border rounded-xl border-gray-200 bg-white p-3">
+                <div className="border rounded-xl border-gray-200 bg-white p-1 sm:p-3 flex-shrink-0">
                     <div className="flex items-center space-x-3">
                         <div className="flex-1 relative">
                             <textarea
@@ -226,7 +226,7 @@ const ChatComponent = () => {
                                 onInput={(e) => adjustTextareaHeight(e.currentTarget)}
                                 onKeyPress={handleKeyPress}
                                 placeholder="Type your message here..."
-                                className="w-full px-4 py-2 text-black border border-gray-300 rounded-lg resize-none outline-none border-transparent focus:border-transparent"
+                                className="w-full px-2 sm:px-4 py-2 text-xs sm:text-sm text-black border border-gray-300 rounded-lg resize-none outline-none border-transparent focus:border-transparent"
                                 rows={1}
                                 style={{ minHeight: '40px' }}
                                 disabled={isThinking}
@@ -244,9 +244,9 @@ const ChatComponent = () => {
                             <button
                                 onClick={handleSendMessage}
                                 disabled={isThinking || !inputMessage.trim()}
-                                className="justify-center p-3 items-center justify-center text-black rounded-lg hover:bg-[#f4f4f4] hover:bg-opacity-10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="justify-center p-1 sm:p-3 items-center justify-center text-black rounded-lg hover:bg-[#f4f4f4] hover:bg-opacity-10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <span className="material-symbols-outlined text-black text-5xl">
+                                <span className="material-symbols-outlined text-black text-2xl sm:text-5xl">
                                     send
                                 </span>
                             </button>

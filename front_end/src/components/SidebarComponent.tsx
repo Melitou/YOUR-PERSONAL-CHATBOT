@@ -81,6 +81,7 @@ const SidebarComponent = () => {
                     ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
                     transition-transform duration-300
                     sm:translate-x-0 sm:static sm:h-screen
+                    shadow-lg
                     flex flex-col
                 `}
                 style={{ boxSizing: "border-box" }}

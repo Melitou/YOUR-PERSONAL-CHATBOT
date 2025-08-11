@@ -22,9 +22,9 @@ const HeaderComponent = () => {
     };
 
     return (
-        <header className="px-2 sm:px-4 py-2 flex items-center border-b border-gray-200 bg-white flex-shrink-0">
-            <div className="flex items-center gap-2 w-full justify-between">
-                <h1 className="text-lg sm:text-xl text-black font-light">YourPersonalChatBot</h1>
+        <header className="px-2 sm:px-4 py-4 flex items-center border-b border-gray-200 bg-white flex-shrink-0">
+            <div className="flex items-center gap-2 w-full justify-end sm:justify-between">
+                <h1 className="hidden sm:block text-lg sm:text-xl md:text-2xl text-black font-light">YourPersonalChatBot</h1>
                 
                 {user && (
                     <div className="flex items-center gap-3 min-w-0">

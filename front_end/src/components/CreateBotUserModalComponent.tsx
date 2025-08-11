@@ -113,40 +113,48 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                 backgroundColor: 'rgba(0, 0, 0, 0.5)'
             }}
         >
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[70%] h-[70%] bg-white rounded-lg shadow-lg p-8 flex flex-row gap-6">
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] sm:w-[70%] h-[90%] sm:h-[70%] bg-white rounded-lg shadow-lg p-2 sm:p-8 flex flex-col sm:flex-row gap-6 overflow-x-hidden relative">
+                {/* Close button */}
+                <button
+                    onClick={onClose}
+                    className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                    aria-label="Close modal"
+                >
+                    <span className="material-symbols-outlined text-xl sm:text-2xl">close</span>
+                </button>
                 {/* Left side - Form fields (70%) */}
-                <div className="flex flex-col gap-6 flex-1 w-[70%]">
-                    <h1 className="text-2xl font-semibold text-gray-800 text-center">Create New Chatbot</h1>
+                <div className="flex flex-col gap-6 flex-1 w-full sm:w-[70%] min-w-0 overflow-y-auto">
+                    <h1 className="text-base sm:text-2xl font-semibold text-gray-800 text-center">Create New Chatbot</h1>
                     
-                    <div className="flex flex-col gap-4 flex-1">
+                    <div className="flex flex-col gap-4 flex-1 min-w-0">
                         {/* Chatbot Name */}
                         <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium text-gray-700">Chatbot Name</label>
+                            <label className="text-xs sm:text-sm font-medium text-gray-700">Chatbot Name</label>
                             <input 
                                 type="text"
                                 placeholder="Enter chatbot name"
-                                className="w-full p-3 border text-black border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full p-2 sm:p-3 border text-xs sm:text-sm text-black border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                             />
                         </div>
                         
                         {/* Description */}
-                        <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium text-gray-700">Description</label>
+                        <div className="flex flex-col gap-2 min-w-0">
+                            <label className="text-xs sm:text-sm font-medium text-gray-700">Description</label>
                             <input 
                                 type="text"
                                 placeholder="Enter chatbot description"
-                                className="w-full p-3 border text-black border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full p-2 sm:p-3 border text-xs sm:text-sm text-black border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                             />
                         </div>
 
                         {/* AI Provider selection */}
-                        <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium text-gray-700">AI Provider</label>
-                            <div className="flex gap-4">
+                        <div className="flex flex-col gap-2 min-w-0">
+                            <label className="text-xs sm:text-sm font-medium text-gray-700">AI Provider</label>
+                            <div className="flex flex-wrap gap-4">
                                 <div className="flex items-center">
                                     <input 
                                         type="radio"
@@ -157,7 +165,7 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                         defaultChecked
                                         onChange={(e) => setAiProvider(e.target.value)}
                                     />
-                                    <label htmlFor="Gemini" className="text-sm text-gray-700 cursor-pointer">Gemini</label>
+                                    <label htmlFor="Gemini" className="text-xs sm:text-sm text-gray-700 cursor-pointer">Gemini</label>
                                 </div>
                                 <div className="flex items-center">
                                     <input 
@@ -168,14 +176,14 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                         className="mr-2"
                                         onChange={(e) => setAiProvider(e.target.value)}
                                     />
-                                    <label htmlFor="OpenAI" className="text-sm text-gray-700 cursor-pointer">OpenAI</label>
+                                    <label htmlFor="OpenAI" className="text-xs sm:text-sm text-gray-700 cursor-pointer">OpenAI</label>
                                 </div>
                             </div>
                         </div>
 
                         {/* Files upload (only PDFs, DOCS, CSVs and TXT) */}
-                        <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium text-gray-700">Files</label>
+                        <div className="flex flex-col gap-2 min-w-0">
+                            <label className="text-xs sm:text-sm font-medium text-gray-700">Files</label>
                             <div className="relative">
                                 <input 
                                     ref={fileInputRef}
@@ -185,9 +193,9 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                     accept=".pdf,.doc,.docx,.csv,.txt"
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
-                                <div className="w-full p-3 border text-black border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer flex items-center gap-2">
+                                <div className="w-full p-2 sm:p-3 border text-xs sm:text-sm text-black border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white cursor-pointer flex items-center gap-2">
                                     <span className="material-symbols-outlined text-gray-500">upload_file</span>
-                                    <span className="text-gray-700">Choose files (PDF, DOC, CSV, TXT)</span>
+                                    <span className="text-gray-700 text-xs sm:text-base truncate">Choose files (PDF, DOC, CSV, TXT)</span>
                                 </div>
                             </div>
                         </div>
@@ -195,14 +203,14 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                     
                     {/* Error message */}
                     {errorMessage && (
-                        <div className="text-red-500 text-sm text-center">
+                        <div className="text-red-500 text-xs sm:text-sm text-center">
                             {errorMessage}
                         </div>
                     )}
 
                     <div className="flex justify-center">
                         <button 
-                            className="px-8 py-3 bg-[#23272e] text-white rounded-md hover:bg-[#23272e]/80 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" 
+                            className="w-full sm:w-auto text-xs sm:text-sm px-8 py-3 bg-[#23272e] text-white rounded-md hover:bg-[#23272e]/80 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" 
                             onClick={() => handleSubmit(name, description, selectedFiles, aiProvider)}
                             disabled={isLoading}
                         >
@@ -215,9 +223,9 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                 </div>
 
                 {/* Right side - Files preview (30%) */}
-                <div className="w-[30%] flex flex-col gap-4">
-                    <h2 className="text-lg font-medium text-gray-800 text-center">Selected Files</h2>
-                    <div className="flex-1 border border-gray-200 rounded-md p-4 bg-gray-50 overflow-y-auto">
+                <div className="w-full sm:w-[30%] h-[40%] sm:h-full flex flex-col gap-2 sm:gap-4 min-w-0 rounded-lg shadow-lg p-2 sm:p-8">
+                    <h2 className="text-base sm:text-lg font-medium text-gray-800 text-center">Selected Files</h2>
+                    <div className="flex-1 border border-gray-200 rounded-md p-4 bg-gray-50 overflow-y-auto min-w-0">
                         <div className="flex flex-col gap-3">
                             {selectedFiles.length > 0 ? (
                                 selectedFiles.map((file, index) => {
@@ -225,12 +233,12 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                     const fileType = file.name.split('.').pop()?.toUpperCase() || 'FILE';
                                     
                                     return (
-                                        <div key={index} className="flex items-center gap-3 p-3 bg-white rounded-md border border-gray-200 shadow-sm">
+                                        <div key={index} className="flex items-center gap-3 p-1 sm:p-3 bg-white rounded-md border border-gray-200 shadow-sm min-w-0">
                                             <div className="flex-shrink-0">
                                                 <span className={`material-symbols-outlined ${color}`}>{icon}</span>
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-gray-900 truncate" title={file.name}>
+                                                <p className="text-xs sm:text-sm font-medium text-gray-900 break-all sm:truncate" title={file.name}>
                                                     {file.name}
                                                 </p>
                                                 <p className="text-xs text-gray-500">{fileType}</p>
@@ -239,7 +247,7 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                                 onClick={() => removeFile(index)}
                                                 className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"
                                             >
-                                                <span className="material-symbols-outlined text-sm">close</span>
+                                                <span className="material-symbols-outlined text-xs sm:text-sm">close</span>
                                             </button>
                                         </div>
                                     );
@@ -247,8 +255,8 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                             ) : (
                                 /* Empty state when no files */
                                 <div className="text-center py-8 text-gray-400">
-                                    <span className="material-symbols-outlined text-4xl mb-2 block">upload_file</span>
-                                    <p className="text-sm">No files selected</p>
+                                    <span className="material-symbols-outlined text-2xl sm:text-4xl mb-2 block">upload_file</span>
+                                    <p className="text-xs sm:text-sm">No files selected</p>
                                 </div>
                             )}
                         </div>

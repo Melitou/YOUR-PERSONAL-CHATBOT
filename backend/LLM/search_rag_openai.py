@@ -35,7 +35,7 @@ def get_embedding(text: str, model: str = "text-embedding-3-small") -> List[floa
     return response.data[0].embedding
 
 
-def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-openai",
+def search_rag(query: str, namespace: str, index_name: str = None,
                embedding_model: str = "text-embedding-3-small", top_k: int = 9, top_reranked: int = 4) -> str:
     """
     Search for relevant chunks in the Pinecone index based on the query.
@@ -232,18 +232,19 @@ def format_results_without_reranking(matches, chunk_dict):
     return final_text
 
 
-def test_search():
-    """Test function to demonstrate usage"""
-    query = "tell me something about ai by dna?"
-    namespace = "test_688b48416faad142f66ca95e"
-    print("\nSearching for:", query)
-    print("\nResults:")
-    print("="*80)
-    results = search_rag(query, namespace)
-    print(results)
-    print("="*80)
+# def test_search():
+#     """Test function to demonstrate usage"""
+#     query = "tell me something about ai by dna?"
+#     namespace = "test_688b48416faad142f66ca95e"
+#     print("\nSearching for:", query)
+#     print("\nResults:")
+#     print("="*80)
+#     results = search_rag(query, namespace)
+#     print(results)
+#     print("="*80)
 
 
 if __name__ == "__main__":
     # Test the search function
-    test_search()
+    #test_search()
+    pass

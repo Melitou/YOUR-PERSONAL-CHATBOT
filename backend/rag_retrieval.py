@@ -42,7 +42,7 @@ class RAGService:
             "gemini-embedding-001": "google",
 
             # Open-Source models
-            "multilingual-e5-large": "other",
+            #"multilingual-e5-large": "other",
         }
 
     def __init__(self):
@@ -100,7 +100,7 @@ class RAGService:
     def determine_pinecone_index(self, embedding_model: str) -> str:
         """
         Determine the correct Pinecone index based on embedding model
-        Follows the same logic as master_pipeline.py
+        Uses the same smart index selection as EmbeddingService
 
         Args:
             embedding_model: The embedding model being used
@@ -108,10 +108,7 @@ class RAGService:
         Returns:
             The appropriate Pinecone index name
         """
-        if "gemini" in embedding_model.lower():
-            return "chatbot-vectors-google"
-        else:
-            return "chatbot-vectors-openai"
+        return self.embedding_service.get_pinecone_index_for_model(embedding_model)
 
     def create_query_embedding(self, query: str, embedding_model: str) -> List[float]:
         """
@@ -484,87 +481,103 @@ class RAGService:
 #         logger.error("=" * 60)
 #         return f"Error retrieving relevant documents: {str(e)}"
 
-def rag_search(query: str, user_id: str, namespaces: list, embedding_model_of_chatbot_caller: str, top_k: int = 5) -> str:
-    """
-    Main RAG search function that retrieves relevant document chunks for a user query
-    Now supports multiple namespaces for searching across multiple document collections
-    """
-    logger.info("=" * 60)
-    logger.info("🔍 STARTING OPTIMIZED RAG SEARCH")
-    logger.info("=" * 60)
-    logger.info(f"📝 Query: {query}")
-    logger.info(f"👤 User ID: {user_id}")
-    logger.info(f"🏷️  Namespaces: {namespaces}")
-    logger.info(f"🤖 Embedding Model: {embedding_model_of_chatbot_caller}")
-    logger.info(f"📊 Top K: {top_k}")
+    def rag_search(self, query: str, user_id: str, namespaces: list, embedding_model_of_chatbot_caller: str, top_k: int = 5) -> str:
+        """
+        Main RAG search function that retrieves relevant document chunks for a user query
+        Now supports multiple namespaces for searching across multiple document collections
+        """
+        logger.info("=" * 60)
+        logger.info("🔍 STARTING OPTIMIZED RAG SEARCH")
+        logger.info("=" * 60)
+        logger.info(f"📝 Query: {query}")
+        logger.info(f"👤 User ID: {user_id}")
+        logger.info(f"🏷️  Namespaces: {namespaces}")
+        logger.info(f"🤖 Embedding Model: {embedding_model_of_chatbot_caller}")
+        logger.info(f"📊 Top K: {top_k}")
 
-    try:
-        if isinstance(namespaces, str):
-            namespaces = [namespaces]
+        try:
+            if isinstance(namespaces, str):
+                namespaces = [namespaces]
 
-        full_namespaces = namespaces
-        logger.info(f"🔗 Full namespaces: {full_namespaces}")
+            full_namespaces = namespaces
+            logger.info(f"🔗 Full namespaces: {full_namespaces}")
 
-        from db_service import Documents, Chunks
-        total_doc_count = 0
-        total_chunk_count = 0
-        for full_ns in full_namespaces:
-            doc_count = Documents.objects(namespace=full_ns).count()
-            chunk_count = Chunks.objects(namespace=full_ns).count()
-            total_doc_count += doc_count
-            total_chunk_count += chunk_count
-            logger.info(f"🔍 Found {doc_count} documents and {chunk_count} chunks for namespace: {full_ns}")
-        logger.info(f"📊 Total: {total_doc_count} documents and {total_chunk_count} chunks across all namespaces")
+            from db_service import Documents, Chunks, ChatBots
+            total_doc_count = 0
+            total_chunk_count = 0
+            for full_ns in full_namespaces:
+                doc_count = Documents.objects(namespace=full_ns).count()
+                chunk_count = Chunks.objects(namespace=full_ns).count()
+                total_doc_count += doc_count
+                total_chunk_count += chunk_count
+                logger.info(f"🔍 Found {doc_count} documents and {chunk_count} chunks for namespace: {full_ns}")
+            logger.info(f"📊 Total: {total_doc_count} documents and {total_chunk_count} chunks across all namespaces")
 
-        collected = []
+            # Initialize embedding service for determining indexes
+            from embedding_service import EmbeddingService
+            embedding_service = EmbeddingService()
+            
+            # Model provider mapping
+            model_providers = {
+                "text-embedding-3-large": "openai",
+                "text-embedding-3-small": "openai", 
+                "text-embedding-ada-002": "openai",
+                "gemini-embedding-001": "google",
+                "text-embedding-005": "google",
+                "text-multilingual-embedding-002": "google"
+            }
 
-        for full_namespace in full_namespaces:
-            chatbot = ChatBots.objects(namespace=full_namespace).first()
-            if not chatbot or not chatbot.embedding_model:
-                logger.warning(f"No chatbot or embedding model found for namespace: {full_namespace}")
-                continue
+            collected = []
 
-            embedding_model_of_namespace = chatbot.embedding_model
-            provider = RAGService.model_providers.get(embedding_model_of_namespace, "other")
+            for full_namespace in full_namespaces:
+                chatbot = ChatBots.objects(namespace=full_namespace).first()
+                if not chatbot or not chatbot.embedding_model:
+                    logger.warning(f"No chatbot or embedding model found for namespace: {full_namespace}")
+                    continue
 
-            if provider == "google":
-                pinecone_index = "chatbot-vectors-google"
-                logger.info(f"📊 Using Google/Gemini search pipeline with index: {pinecone_index}")
-                result = search_rag_google(
-                    query=query,
-                    namespace=full_namespace,
-                    index_name=pinecone_index,
-                    embedding_model=embedding_model_of_namespace,
-                    top_k=top_k * 2,
-                    top_reranked=top_k * 2
-                )
-            elif provider == "openai":
-                pinecone_index = "chatbot-vectors-openai"
-                logger.info(f"📊 Using OpenAI search pipeline with index: {pinecone_index}")
-                result = search_rag_openai(
-                    query=query,
-                    namespace=full_namespace,
-                    index_name=pinecone_index,
-                    embedding_model=embedding_model_of_namespace,
-                    top_k=top_k * 2,
-                    top_reranked=top_k * 2
-                )
-            else:
-                logger.warning(f"Unsupported embedding model: {embedding_model_of_namespace}")
-                continue
+                embedding_model_of_namespace = chatbot.embedding_model
+                provider = model_providers.get(embedding_model_of_namespace, "other")
 
-            if result and result != "No relevant documents found for the query.":
-                collected.append(result)
+                if provider == "google":
+                    pinecone_index = self.embedding_service.get_pinecone_index_for_model(embedding_model_of_namespace)
+                    logger.info(f"📊 Using Google/Gemini search pipeline with index: {pinecone_index} and namespace embedding model: {embedding_model_of_namespace}")
+                    from LLM.search_rag_google import search_rag as search_rag_google
+                    result = search_rag_google(
+                        query=query,
+                        namespace=full_namespace,
+                        index_name=pinecone_index,
+                        embedding_model=embedding_model_of_namespace,
+                        top_k=top_k * 2,
+                        top_reranked=top_k * 2
+                    )
+                elif provider == "openai":
+                    pinecone_index = self.embedding_service.get_pinecone_index_for_model(embedding_model_of_namespace)
+                    logger.info(f"📊 Using OpenAI search pipeline with index: {pinecone_index} and namespace embedding model: {embedding_model_of_namespace}")
+                    from LLM.search_rag_openai import search_rag as search_rag_openai
+                    result = search_rag_openai(
+                        query=query,
+                        namespace=full_namespace,
+                        index_name=pinecone_index,
+                        embedding_model=embedding_model_of_namespace,
+                        top_k=top_k * 2,
+                        top_reranked=top_k * 2
+                    )
+                else:
+                    logger.warning(f"Unsupported embedding model: {embedding_model_of_namespace}")
+                    continue
 
-        if collected:
-            return "\n\n".join(collected)
-        return "No relevant documents found for the query."
+                if result and result != "No relevant documents found for the query.":
+                    collected.append(result)
 
-    except Exception as e:
-        error_msg = f"RAG search failed: {str(e)}"
-        logger.error(error_msg)
-        logger.error("=" * 60)
-        return f"Error retrieving relevant documents: {str(e)}"
+            if collected:
+                return "\n\n".join(collected)
+            return "No relevant documents found for the query."
+
+        except Exception as e:
+            error_msg = f"RAG search failed: {str(e)}"
+            logger.error(error_msg)
+            logger.error("=" * 60)
+            return f"Error retrieving relevant documents: {str(e)}"
 
 
 if __name__ == "__main__":

@@ -91,6 +91,74 @@ class EmbeddingService:
             "gemini-embedding-001": 3072
         }
 
+    def get_pinecone_index_for_model(self, embedding_model: str) -> str:
+        """
+        Get the appropriate Pinecone index name based on embedding model.
+        Automatically determines provider and dimension to create the right index.
+        
+        Args:
+            embedding_model: Name of the embedding model
+            
+        Returns:
+            Pinecone index name with provider and dimension suffix
+        """
+        # Get model dimensions
+        dimension = self.model_dimensions.get(embedding_model, 1536)
+        
+        # Determine provider based on model name
+        if "gemini" in embedding_model.lower() or "google" in embedding_model.lower():
+            provider = "google"
+        else:
+            provider = "openai"
+        
+        # Return index name with dimension
+        index_name = f"chatbot-vectors-{provider}-{dimension}"
+        logger.info(f"Selected Pinecone index '{index_name}' for model '{embedding_model}' (dimension: {dimension})")
+        return index_name
+
+    # def list_all_pinecone_indexes(self) -> Dict[str, Dict]:
+    #     """
+    #     List all Pinecone indexes with their details for debugging and management.
+        
+    #     Returns:
+    #         Dictionary mapping index names to their details
+    #     """
+    #     try:
+    #         if not self.pinecone_client:
+    #             if not self.initialize_pinecone_client():
+    #                 return {}
+            
+    #         indexes = self.pinecone_client.list_indexes()
+    #         index_details = {}
+            
+    #         for idx in indexes:
+    #             try:
+    #                 # Get index stats to determine dimension
+    #                 index = self.pinecone_client.Index(idx.name)
+    #                 stats = index.describe_index_stats()
+    #                 dimension = stats.dimension if hasattr(stats, 'dimension') else 'unknown'
+                    
+    #                 index_details[idx.name] = {
+    #                     'name': idx.name,
+    #                     'dimension': dimension,
+    #                     'metric': stats.metric if hasattr(stats, 'metric') else 'unknown',
+    #                     'status': 'ready' if idx.status.state == 'Ready' else idx.status.state
+    #                 }
+    #             except Exception as e:
+    #                 logger.warning(f"Could not get details for index {idx.name}: {e}")
+    #                 index_details[idx.name] = {
+    #                     'name': idx.name,
+    #                     'dimension': 'unknown',
+    #                     'metric': 'unknown',
+    #                     'status': 'error'
+    #                 }
+            
+    #         return index_details
+            
+    #     except Exception as e:
+    #         logger.error(f"Failed to list Pinecone indexes: {e}")
+    #         return {}
+
     def initialize_embedding_model(self,
                                    model_name: str = "text-embedding-3-large",
                                    max_fallbacks: int = 3) -> Optional[str]:

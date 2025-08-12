@@ -3,7 +3,7 @@
 RAG Chatbot with GPT-4.1 function calling and multi-turn support, with streaming capabilities.
 Integrates the optimized RAG search pipeline for document-based question answering.
 """
-from rag_retrieval import rag_search
+from rag_retrieval import RAGService
 from openai import OpenAI, AsyncOpenAI
 from google import genai
 from typing import AsyncGenerator, Dict, Any, List, Optional
@@ -143,10 +143,10 @@ def rag_search_tool(query: str) -> str:
     debug_print(f"📊 RAG Config: {RAG_CONFIG}")
 
     try:
-        result = rag_search(
+        rag_service = RAGService()
+        result = rag_service.rag_search(
             query=query,
             user_id=RAG_CONFIG['user_id'],
-            #namespace=RAG_CONFIG['namespace'],
             namespaces=RAG_CONFIG['namespaces'],
             embedding_model_of_chatbot_caller=RAG_CONFIG['embedding_model'],
             top_k=5  # Default to top 5 results

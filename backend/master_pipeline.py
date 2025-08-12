@@ -279,12 +279,8 @@ class MasterPipeline:
         Returns:
             Dict with complete workflow statistics including embeddings
         """
-        # Auto-determine Pinecone index based on embedding model
-        if "gemini" in embedding_model.lower():
-            pinecone_index = "chatbot-vectors-google"
-        else:
-            # Default to OpenAI index for all OpenAI models
-            pinecone_index = "chatbot-vectors-openai"
+        # Use smart index selection based on model and dimensions
+        pinecone_index = self.embedding_service.get_pinecone_index_for_model(embedding_model)
 
         workflow_start_time = time.time()
 

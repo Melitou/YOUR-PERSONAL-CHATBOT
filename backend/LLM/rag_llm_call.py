@@ -16,6 +16,8 @@ import logging
 from dotenv import load_dotenv
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 # Import the RAG search function
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -184,6 +186,13 @@ SYSTEM_PROMPT = (
     "# Identity\n"
     "You are a Personal Document Assistant, an AI agent that helps users find and understand information from their uploaded documents.\n\n"
     "# Instructions\n"
+    "## THINKING PROCESS\n"
+    "Before answering, always think through your approach step by step:\n"
+    "1. ANALYZE the user's question to understand what information they need\n"
+    "2. PLAN your search strategy - what queries will you use and why\n"
+    "3. EXECUTE searches using the rag_search_tool\n"
+    "4. EVALUATE the search results and determine if you need more information\n"
+    "5. SYNTHESIZE the information into a comprehensive answer\n\n"
     "## PERSISTENCE\n"
     "You are an agent—keep working until the user's query is fully resolved. Only stop when you're sure the question is answered completely.\n"
     "## TOOL CALLING\n"
@@ -463,19 +472,10 @@ def ask_openai_assistant(history: list, query: str, model: str) -> str:
     return final_response
 
 
-async def ask_openai_assistant_stream(history: list, query: str, model: str) -> AsyncGenerator[str, None]:
+async def ask_openai_assistant_stream(history: list, query: str, model: str) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    Streaming version of ask_openai_assistant.
-    Returns an async generator that yields content deltas as they're received.
-    Tool calls are still processed synchronously before streaming the final response.
-
-    Args:
-        history: List of previous conversation turns
-        query: User's current query
-        model: OpenAI model to use (e.g., "gpt-4.1", "gpt-4o")
-
-    Yields:
-        Content deltas as they're received from the model
+    Enhanced streaming version that includes thinking process events.
+    Returns an async generator that yields content deltas and thinking events.
     """
     # Initialize message history
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -505,10 +505,19 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
     tool_calls = 0
     final_messages = messages.copy()
 
+    # Send thinking start event
+    yield {"type": "thinking_start", "message": "Analyzing your question and planning search strategy..."}
+
     debug_print(f"Processing tool calls for query: {query}")
 
     while tool_calls < MAX_TOOL_CALLS:
         debug_print(f"Checking for tool call {tool_calls+1}/{MAX_TOOL_CALLS}")
+
+        # Send thinking event for each tool call
+        if tool_calls == 0:
+            yield {"type": "thinking_step", "step": "search_planning", "message": "Planning search queries to find relevant information..."}
+        else:
+            yield {"type": "thinking_step", "step": "additional_search", "message": f"Searching for additional information (attempt {tool_calls + 1})..."}
 
         # Send to OpenAI with function schema
         resp = openai_client.responses.create(
@@ -527,8 +536,15 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
         # Execute the function
         debug_print(f"Executing function call: {func_call.name}")
         args = json.loads(func_call.arguments)
+        
+        # Send search execution event
+        yield {"type": "thinking_step", "step": "executing_search", "message": f"Searching documents for: '{args.get('query', '')}'"}
+        
         result = rag_search_tool(args.get("query"))
         debug_print(f"Function returned result length: {len(result)}")
+
+        # Send search results event
+        yield {"type": "thinking_step", "step": "search_results", "message": f"Found {len(result)} relevant results"}
 
         # Append the function call and its output
         function_call_msg = {
@@ -553,6 +569,9 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
             debug_print(f"Reached max tool calls: {MAX_TOOL_CALLS}")
             break
 
+    # Send thinking completion event
+    yield {"type": "thinking_complete", "message": "Analysis complete. Generating comprehensive answer..."}
+
     # Stream the final response
     try:
         # Use a streaming-compatible model for final response
@@ -570,14 +589,14 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
         async for event in stream:
             if event.type == "response.output_text.delta":
                 got_content = True
-                yield event.delta
+                yield {"type": "response_chunk", "chunk": event.delta}
             elif event.type == "text_delta":
                 got_content = True
-                yield event.delta
+                yield {"type": "response_chunk", "chunk": event.delta}
             elif event.type == "content_part_added":
                 if event.content_part.type == "text":
                     got_content = True
-                    yield event.content_part.text
+                    yield {"type": "response_chunk", "chunk": event.content_part.text}
             elif event.type == "text_done":
                 pass
             elif event.type == "content_part_done":
@@ -595,7 +614,7 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
                 input=final_messages,
                 tools=tools
             )
-            yield fallback_resp.output_text or "I'm sorry, I couldn't generate a response. Please try again."
+            yield {"type": "response_chunk", "chunk": fallback_resp.output_text or "I'm sorry, I couldn't generate a response. Please try again."}
     except Exception:
         # Fallback on stream error
         fallback_resp = openai_client.responses.create(
@@ -603,7 +622,7 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
             input=final_messages,
             tools=tools
         )
-        yield fallback_resp.output_text
+        yield {"type": "response_chunk", "chunk": fallback_resp.output_text}
 
 
 def ask_gemini_assistant(history: list, query: str, model: str) -> str:

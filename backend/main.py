@@ -498,14 +498,10 @@ async def websocket_conversation(websocket: WebSocket, session_id: str, token: s
                 
                 logger.info(f"Initializing RAG with user_id={str(user.id)}, namespace={chatbot.namespace}, embedding_model={chatbot.embedding_model}")
                 
-                # TODO: THIS MIGHT NEED TO BE CHANGED TO USE (ALSO) THE MAPPING TABLE!!!!
                 # We have in the chatbot.namespace the namespace of the chatbot, we have to:
                 # Retreive the documents (initial) namespaces that are mapped to this chatbot.
                 # This will a list of namespaces, and also it might include different namespaces (make the list a set to have unique namespaces).
                 # Then we will use the namespace to initialize the RAG config.
-                # --
-                # NOTE: if the chatbot.namespace is the initial namespace, this approach will also work because we also map the initial namespace to the chatbot.
-
                 unique_namespaces_list = _fetch_initial_documents_namespaces_for_current_chatbot(chatbot.id, user.id)
 
                 initialize_rag_config(
@@ -553,13 +549,46 @@ async def websocket_conversation(websocket: WebSocket, session_id: str, token: s
                 })
                 
                 try:
-                    async for chunk in ask_rag_assistant_stream(history, user_message):
-                        if chunk.strip():
-                            assistant_response += chunk
-                            await safe_websocket_send(websocket, {
-                                "type": "response_chunk",
-                                "chunk": chunk
-                            })
+                    async for event in ask_rag_assistant_stream(history, user_message):
+                        if isinstance(event, dict):
+                            event_type = event.get("type")
+                            
+                            if event_type == "thinking_start":
+                                await safe_websocket_send(websocket, {
+                                    "type": "thinking_start",
+                                    "message": event.get("message", "")
+                                })
+                            
+                            elif event_type == "thinking_step":
+                                await safe_websocket_send(websocket, {
+                                    "type": "thinking_step",
+                                    "step": event.get("step", ""),
+                                    "message": event.get("message", "")
+                                })
+                            
+                            elif event_type == "thinking_complete":
+                                await safe_websocket_send(websocket, {
+                                    "type": "thinking_complete",
+                                    "message": event.get("message", "")
+                                })
+                            
+                            elif event_type == "response_chunk":
+                                chunk = event.get("chunk", "")
+                                if chunk.strip():
+                                    assistant_response += chunk
+                                    await safe_websocket_send(websocket, {
+                                        "type": "response_chunk",
+                                        "chunk": chunk
+                                    })
+                        else:
+                            # Handle legacy string chunks for backward compatibility
+                            if event.strip():
+                                assistant_response += event
+                                await safe_websocket_send(websocket, {
+                                    "type": "response_chunk",
+                                    "chunk": event
+                                })
+                                
                 except Exception as e:
                     logger.error(f"Error in RAG streaming: {e}")
                     await safe_websocket_send(websocket, {

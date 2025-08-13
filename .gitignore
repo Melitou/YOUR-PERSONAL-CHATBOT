@@ -11,3 +11,7 @@ backend/copy_melina_branch/rag_retrieval.py
 backend/copy_melina_branch/README_MELINA_DIFFERENCES.md
 backend/copy_melina_branch/search_rag_openai.py
 backend/copy_melina_branch/split_and_upload_md.py
+.env
+.env.local
+venv/
+Text/

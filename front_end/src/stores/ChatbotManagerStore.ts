@@ -130,7 +130,7 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
             set({ chatbots: transformedChatbots, isLoading: false });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to fetch chatbots';
-            console.error('Failed to fetch chatbots:', errorMessage);
+            
             ViewStore.getState().addError(errorMessage);
             set({ 
                 error: errorMessage,
@@ -160,7 +160,7 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
                 apiData.chunking_method, 
                 apiData.embedding_model
             );
-            console.log('Response:', response);
+            
             set({ isLoading: false });
             return true;
         } catch (error) {
@@ -179,7 +179,7 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
         try {
             set({ isLoading: true, error: null });
 
-            console.log('Creating chatbot with data:', data);
+            
 
             const apiData = {
                 user_namespace: data.name,
@@ -196,7 +196,7 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
                 apiData.files,
                 apiData.agent_provider
             );
-            console.log('Response:', response);
+            
             set({ isLoading: false });
             return true;
         } catch (error) {
@@ -214,13 +214,12 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
     removeChatbot: async (id) => {
         try {
             set({ isLoading: true, error: null });
-            
-            // Remove from local state on successful deletion
+            await chatbotApi.deleteChatbot(id);
             get().deleteChatbot(id);
             set({ isLoading: false });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to delete chatbot';
-            console.error('Failed to delete chatbot:', errorMessage);
+            
             ViewStore.getState().addError(errorMessage);
             set({ 
                 error: errorMessage,

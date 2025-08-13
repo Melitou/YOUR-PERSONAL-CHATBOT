@@ -513,9 +513,7 @@ class RAGService:
                 logger.info(f"🔍 Found {doc_count} documents and {chunk_count} chunks for namespace: {full_ns}")
             logger.info(f"📊 Total: {total_doc_count} documents and {total_chunk_count} chunks across all namespaces")
 
-            # Initialize embedding service for determining indexes
-            from embedding_service import EmbeddingService
-            embedding_service = EmbeddingService()
+            # Use the existing embedding service instance for index/model utilities
             
             # Model provider mapping
             model_providers = {

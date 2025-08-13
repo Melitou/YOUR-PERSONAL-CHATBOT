@@ -174,7 +174,9 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
             chunk_text += f"**Chunk Index**: {chunk.chunk_index + 1}\n"
             chunk_text += f"**Relevance Score**: {score:.4f}\n\n"
 
-            logger.info(f"\n\nRAG search results:\n Source file: {source_file}\n Chunk index: {chunk.chunk_index + 1}\n Relevance score: {score:.4f}\n Full content: {full_content}\n Full summary: {full_summary}")
+            # Trim noisy terminal logs: keep a concise trace line only
+            logger.debug(
+                f"RAG result: file={source_file}, idx={chunk.chunk_index + 1}, score={score:.4f}")
 
             if full_summary.strip():
                 chunk_text += f"**Summary**: {full_summary}\n\n"

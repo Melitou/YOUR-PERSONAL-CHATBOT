@@ -33,7 +33,7 @@ client = openai_client
 async_client = openai_async_client
 
 # For debugging - set to True to print debug info (tool-call events only)
-DEBUG = True
+DEBUG = False
 
 # Configure logging for token management
 logging.basicConfig(level=logging.INFO)
@@ -121,11 +121,8 @@ def initialize_rag_config(user_id: str, namespaces: list, embedding_model: str, 
     RAG_CONFIG['chatbot_model'] = chatbot_model
 
     provider = get_model_provider(chatbot_model)
-    print(f"✅ RAG Configuration initialized:")
-    print(f"   👤 User ID: {user_id}")
-    print(f"   🏷️  Namespaces: {namespaces}")
-    print(f"   🔍 Embedding Model: {embedding_model}")
-    print(f"   🤖 Chatbot Model: {chatbot_model} ({provider.upper()})")
+    # Suppress verbose init prints in server mode
+    pass
 
 
 def rag_search_tool(query: str) -> str:
@@ -141,8 +138,8 @@ def rag_search_tool(query: str) -> str:
     if not all(RAG_CONFIG.values()):
         return "Error: RAG system not properly initialized. Please contact support."
 
-    debug_print(f"🔍 RAG Search Tool called with query: {query}")
-    debug_print(f"📊 RAG Config: {RAG_CONFIG}")
+    # Keep debug logs suppressed in server mode
+    pass
 
     try:
         rag_service = RAGService()

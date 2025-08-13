@@ -27,16 +27,13 @@ const SidebarComponent = () => {
     }
 
     const handleConversationClick = async (conversation: ConversationSummary) => {
-        console.log('Selected conversation:', conversation);
         try {
             // Start conversation session
             const session_id = await startConversationSession(conversation.conversation_id, loadedChatbot.id);
-            console.log('Conversation session started successfully:', session_id);
             // Connect to WebSocket
             const ws = await connectToWebSocket(session_id);
-            console.log('WebSocket connected successfully:', ws);
         } catch (error) {
-            console.error('Failed to start conversation session:', error);
+            // Surface minimal error to the global error store if desired
         }
     }
 
@@ -44,12 +41,10 @@ const SidebarComponent = () => {
         try {
             // Create a new conversation
             const session_id = await createNewConversationWithSession(loadedChatbot.id);
-            console.log('New conversation created successfully:', session_id);
             // Connect to WebSocket
             const ws = await connectToWebSocket(session_id);
-            console.log('WebSocket connected successfully:', ws);
         } catch (error) {
-            console.error('Failed to start new conversation:', error);
+            // Surface minimal error to the global error store if desired
         }
     }
 

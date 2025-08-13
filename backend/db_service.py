@@ -6,7 +6,7 @@ from gridfs import GridFS
 import hashlib
 
 
-def initialize_db(db_url: str = "mongodb://localhost:50000/"):
+def initialize_db(db_url: str = "mongodb://localhost:27017/"):
     """Initialize MongoDB connection and create necessary indexes"""
     try:
         database_name = "your_personal_chatbot_db"
@@ -155,12 +155,13 @@ class Documents(Document):
         'collection': 'documents',
         'indexes': [
             {'fields': ['user']},
-            {'fields': ['gridfs_file_id'], 'unique': True},
+            {'fields': ['gridfs_file_id'], 'unique': True},  # Restored unique constraint
             {'fields': ['full_hash']},
             {'fields': ['status']},
             {'fields': ['chunking_method']},
             {'fields': ['namespace']},
-            {'fields': [('user', 1), ('full_hash', 1)], 'unique': True}
+            {'fields': [('user', 1), ('full_hash', 1)], 'unique': True},  # Restored unique constraint
+            {'fields': [('user', 1), ('full_hash', 1), ('namespace', 1)]}  # For faster duplicate detection
         ]
     }
 
@@ -201,8 +202,8 @@ class Chunks(Document):
             {'fields': ['user']},
             {'fields': ['vector_id']},
             {'fields': ['chunking_method']},
-            # query by both document and chunk_index
-            {'fields': [('document', 1), ('chunk_index', 1)]}
+            # enforce one chunk per (document, chunk_index)
+            {'fields': [('document', 1), ('chunk_index', 1)], 'unique': True}
         ]
     }
 

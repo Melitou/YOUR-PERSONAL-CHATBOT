@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import List
+from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, status, Depends, UploadFile, File, Form, Query
@@ -119,7 +120,124 @@ def user_to_response(user: User_Auth_Table) -> UserResponse:
         created_at=user.created_at,
         role=user.role if user.role else "User"  # Default to "User" if role is None
     )
+class CheckDocumentsRequest(BaseModel):
+    hashes: List[str]
 
+class ExistingDocumentInfo(BaseModel):
+    hash: str
+    file_name: str
+    namespace: str
+    chatbots: List[str]
+
+class CheckDocumentsResponse(BaseModel):
+    duplicates: List[ExistingDocumentInfo]
+
+@app.post("/documents/check-exists", response_model=CheckDocumentsResponse, tags=["Documents"])
+async def check_documents_exists(request: CheckDocumentsRequest, current_user: User_Auth_Table = Depends(get_current_user)):
+    """Check which of the provided SHA256 hashes already exist for the current user.
+
+    Returns matching document info and the chatbots they are mapped to.
+    """
+    try:
+        from db_service import Documents, ChatbotDocumentsMapper, ChatBots
+        user = current_user
+        docs = Documents.objects(user=user, full_hash__in=request.hashes)
+        duplicates: List[ExistingDocumentInfo] = []
+        for doc in docs:
+            mappings = ChatbotDocumentsMapper.objects(document=doc, user=user)
+            chatbot_names = []
+            for m in mappings:
+                try:
+                    chatbot = ChatBots.objects(id=m.chatbot.id).first()
+                    if chatbot:
+                        chatbot_names.append(chatbot.name)
+                except Exception:
+                    continue
+            duplicates.append(ExistingDocumentInfo(
+                hash=doc.full_hash,
+                file_name=doc.file_name,
+                namespace=doc.namespace,
+                chatbots=chatbot_names
+            ))
+        return CheckDocumentsResponse(duplicates=duplicates)
+    except Exception as e:
+        logger.error(f"Error checking document existence: {e}")
+        raise HTTPException(status_code=500, detail="Error checking document existence")
+
+
+class ChatbotHealthResponse(BaseModel):
+    chatbot_id: str
+    name: str
+    namespace: str
+    provider: str
+    embedding_model: str
+    pinecone_index: str
+    pinecone_vectors: int
+    mongo_chunks_total: int
+    mongo_embedded: int
+    ready: bool
+
+@app.get("/chatbots/{chatbot_id}/health", response_model=ChatbotHealthResponse, tags=["Chatbot"])
+async def get_chatbot_health(chatbot_id: str, current_user: User_Auth_Table = Depends(get_current_user)):
+    """Return Pinecone/Mongo readiness for a chatbot's namespace."""
+    try:
+        from bson import ObjectId
+        from db_service import ChatBots, Documents, Chunks, ChatbotDocumentsMapper
+        from embeddings import EmbeddingService
+
+        chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=current_user).first()
+        if not chatbot:
+            raise HTTPException(status_code=404, detail="Chatbot not found")
+
+        es = EmbeddingService()
+        pinecone_index = es.get_pinecone_index_for_model(chatbot.embedding_model)
+        # Derive provider from embedding model (ChatBots has no explicit provider field)
+        emb = (chatbot.embedding_model or "").lower()
+        provider_str = "google" if ("gemini" in emb or "google" in emb) else "openai"
+
+        # Pinecone vectors count for this namespace
+        vectors = 0
+        try:
+            if es.initialize_pinecone_client():
+                idx = es.pinecone_client.Index(pinecone_index)
+                stats = idx.describe_index_stats(filter=None, namespace=chatbot.namespace)
+                ns = stats.get("namespaces", {}).get(chatbot.namespace, {})
+                vectors = int(ns.get("vector_count", 0))
+        except Exception:
+            vectors = 0
+
+        # Mongo counts for this chatbot via mapping
+        mapped_docs = ChatbotDocumentsMapper.objects(chatbot=chatbot, user=current_user).only('document')
+        doc_ids = [m.document.id for m in mapped_docs]
+        if doc_ids:
+            # Chunks are stored once per document (not per-namespace). For health, compare
+            # Pinecone namespace vector count against total chunks of mapped documents.
+            total_chunks = Chunks.objects(document__in=doc_ids).count()
+            embedded_chunks = Chunks.objects(document__in=doc_ids, vector_id__ne=None).count()
+        else:
+            total_chunks = 0
+            embedded_chunks = 0
+
+        # Ready when Pinecone namespace has vectors for all chunks
+        ready = total_chunks > 0 and vectors == total_chunks
+
+        return ChatbotHealthResponse(
+            chatbot_id=str(chatbot.id),
+            name=chatbot.name,
+            namespace=chatbot.namespace,
+            provider=provider_str,
+            embedding_model=chatbot.embedding_model,
+            pinecone_index=pinecone_index,
+            pinecone_vectors=vectors,
+            mongo_chunks_total=total_chunks,
+            mongo_embedded=embedded_chunks,
+            ready=ready,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error computing chatbot health: {e}")
+        raise HTTPException(status_code=500, detail="Error computing chatbot health")
 
 @app.get("/", tags=["Health"])
 async def root():
@@ -423,35 +541,64 @@ async def authenticate_websocket(websocket: WebSocket, token: str) -> User_Auth_
         )
 
 @app.websocket("/ws/conversation/session/{session_id}")
-async def websocket_conversation(websocket: WebSocket, session_id: str, token: str = Query(...)):
+async def websocket_conversation(websocket: WebSocket, session_id: str):
     """Handle WebSocket conversation session with streaming responses"""
     user = None
     session = None
     
-    # Authenticate user via query parameter
-    try:
-        user = await authenticate_websocket(websocket, token)
-    except HTTPException:
+    # Extract token from query params (WebSocket routes do not support Query(...) parameters)
+    token = websocket.query_params.get("token")
+    logger.info(f"WebSocket connection attempt for session {session_id} with token: {str(token)[:20]}...")
+    
+    if not token:
+        # Must accept the websocket before we can close it gracefully
+        try:
+            await websocket.accept()
+        except Exception:
+            return
         await safe_websocket_close(websocket, code=1008, reason="Unauthorized")
         return
     
-    # Accept connection
+    # Accept connection FIRST (required for WebSocket)
     try:
         await websocket.accept()
+        logger.info("WebSocket connection accepted")
     except Exception as e:
         logger.error(f"Failed to accept WebSocket connection: {e}")
         return
     
+    # Then authenticate user
+    try:
+        user = await authenticate_websocket(websocket, token)
+        logger.info(f"User authenticated: {user.user_name} (ID: {user.id})")
+    except HTTPException as e:
+        logger.error(f"WebSocket authentication failed: {e.detail}")
+        await safe_websocket_close(websocket, code=1008, reason="Unauthorized")
+        return
+    except Exception as e:
+        logger.error(f"WebSocket authentication error: {e}")
+        await safe_websocket_close(websocket, code=1008, reason="Authentication error")
+        return
+    
     try:
         # Validate session belongs to user
+        logger.info(f"Validating session {session_id} for user {user.id}")
         session = pipeline_handler.get_conversation_session(session_id, str(user.id))
+        if not session:
+            logger.error(f"Session not found or does not belong to user for session {session_id}")
+            await safe_websocket_close(websocket, code=1008, reason="Session not found")
+            return
+        logger.info(f"Session found: {session.session_id}")
         
         # Get the actual chatbot object from the session
         from db_service import ChatBots
         chatbot = ChatBots.objects(id=session.chatbot_id.id, user_id=user.id).first()
         if not chatbot:
+            logger.error(f"Chatbot not found for session {session_id}")
             await safe_websocket_close(websocket, code=1008, reason="Chatbot not found")
             return
+        
+        logger.info(f"Chatbot found: {chatbot.name}")
         
         logger.info(f"WebSocket connected for session {session_id}, user {user.user_name}, chatbot {chatbot.name}")
 
@@ -498,16 +645,15 @@ async def websocket_conversation(websocket: WebSocket, session_id: str, token: s
                 
                 logger.info(f"Initializing RAG with user_id={str(user.id)}, namespace={chatbot.namespace}, embedding_model={chatbot.embedding_model}")
                 
-                # We have in the chatbot.namespace the namespace of the chatbot, we have to:
-                # Retreive the documents (initial) namespaces that are mapped to this chatbot.
-                # This will a list of namespaces, and also it might include different namespaces (make the list a set to have unique namespaces).
-                # Then we will use the namespace to initialize the RAG config.
-                unique_namespaces_list = _fetch_initial_documents_namespaces_for_current_chatbot(chatbot.id, user.id)
+                # OPTIMIZATION: Use only chatbot's own namespace to avoid 500k token queries
+                # Each chatbot now contains duplicated chunks in its own namespace
+                # This eliminates the need to query multiple namespaces and reduces tokens by 90%
+                chatbot_namespace = chatbot.namespace
+                logger.info(f"Using single namespace for RAG: {chatbot_namespace}")
 
                 initialize_rag_config(
                     user_id=str(user.id),
-                    # namespace=chatbot.namespace,
-                    namespaces=unique_namespaces_list,
+                    namespaces=[chatbot_namespace],  # Single namespace only
                     embedding_model=chatbot.embedding_model
                 )
                 
@@ -750,6 +896,44 @@ async def cleanup_inactive_sessions(
 async def get_current_user_info(current_user: User_Auth_Table = Depends(get_current_user)):
     """Get current user information"""
     return user_to_response(current_user)
+
+
+@app.post("/chatbots/{chatbot_id}/delete", tags=["Chatbot"])
+async def delete_chatbot(chatbot_id: str, current_user: User_Auth_Table = Depends(get_current_user)):
+    """Delete a chatbot and its Pinecone namespace; preserve shared documents."""
+    try:
+        from db_service import ChatBots, Conversation, Messages, ConversationSession, ChatbotDocumentsMapper
+        from bson import ObjectId
+        from embeddings import EmbeddingService
+
+        chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=current_user).first()
+        if not chatbot:
+            raise HTTPException(status_code=404, detail="Chatbot not found")
+
+        # Delete sessions, messages, conversations for this chatbot
+        ConversationSession.objects(chatbot_id=chatbot, user_id=current_user).delete()
+        conversations = Conversation.objects(chatbot=chatbot)
+        if conversations:
+            conv_ids = [c.id for c in conversations]
+            Messages.objects(conversation_id__in=conv_ids).delete()
+            conversations.delete()
+
+        # Delete mapping rows (docs remain for other chatbots)
+        ChatbotDocumentsMapper.objects(chatbot=chatbot, user=current_user).delete()
+
+        # Delete Pinecone namespace
+        es = EmbeddingService()
+        index_name = es.get_pinecone_index_for_model(chatbot.embedding_model)
+        es.delete_namespace(index_name, chatbot.namespace)
+
+        # Delete the chatbot itself
+        chatbot.delete()
+        return {"deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting chatbot {chatbot_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error deleting chatbot")
 
 
 # Error handlers

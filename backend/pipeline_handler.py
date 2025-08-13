@@ -159,7 +159,7 @@ class PipelineHandler:
             raise ValueError("Namespace prefix too long (max 50 characters)")
 
         # Create unique namespace
-        unique_namespace = f"{clean_namespace}_{user.id}"
+        unique_namespace = f"{clean_namespace}|{user.id}"
         return unique_namespace
     
     def generate_chatbot_name(self, agent_description: str) -> str:

@@ -745,7 +745,7 @@ class EmbeddingService:
             if not successful_vector_ids:
                 logger.warning("No vector IDs to update")
                 return 0
-
+            
             updated_count = 0
 
             for chunk_id in successful_vector_ids:
@@ -772,6 +772,238 @@ class EmbeddingService:
         except Exception as e:
             logger.error(f"Error updating chunks with vector IDs: {e}")
             return 0
+
+    def delete_namespace(self, index_name: str, namespace: str) -> bool:
+        """
+        Delete all vectors in a Pinecone namespace for the given index.
+        Safe to call even if namespace is empty or missing.
+        """
+        try:
+            if not self.pinecone_client:
+                if not self.initialize_pinecone_client():
+                    return False
+            index = self.pinecone_client.Index(index_name)
+            index.delete(deleteAll=True, namespace=namespace)
+            logger.info(f"Deleted Pinecone namespace '{namespace}' in index '{index_name}'")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete Pinecone namespace '{namespace}' in index '{index_name}': {e}")
+            return False
+
+    def re_embed_document_for_chatbots(self, document_id: str, embedding_model: str = "text-embedding-3-small", batch_size: int = 50) -> Dict:
+        """
+        Re-embed existing document chunks for all chatbots that use this document
+        This handles the case where a document is shared between multiple chatbots
+        Each chatbot gets its own Pinecone namespace with the same document content
+        
+        Args:
+            document_id: MongoDB ObjectId string of the document
+            embedding_model: Model to use for embeddings  
+            batch_size: Number of chunks to process per batch
+            
+        Returns:
+            Processing statistics and results
+        """
+        start_time = time.time()
+        
+        results = {
+            "success": False,
+            "document_id": document_id,
+            "embedding_model": embedding_model,
+            "chatbots_processed": 0,
+            "total_chunks_embedded": 0,
+            "chatbot_results": {},
+            "processing_time": 0,
+            "errors": []
+        }
+        
+        try:
+            from db_service import Documents, ChatbotDocumentsMapper, Chunks
+            
+            # Get the document
+            document = Documents.objects(id=document_id).first()
+            if not document:
+                error_msg = f"Document not found: {document_id}"
+                results["errors"].append(error_msg)
+                return results
+                
+            logger.info(f"🔄 Re-embedding document '{document.file_name}' for multiple chatbots")
+            
+            # Get all chatbots that use this document
+            mappings = ChatbotDocumentsMapper.objects(document=document)
+            if not mappings:
+                error_msg = f"No chatbot mappings found for document {document_id}"
+                results["errors"].append(error_msg)
+                return results
+                
+            logger.info(f"📋 Found {len(mappings)} chatbots using this document")
+            
+            # Initialize embedding model and Pinecone
+            if not self.initialize_embedding_model(embedding_model):
+                error_msg = f"Failed to initialize embedding model: {embedding_model}"
+                results["errors"].append(error_msg)
+                return results
+                
+            pinecone_index = self.get_pinecone_index_for_model(embedding_model)
+            if not self.initialize_pinecone_client():
+                error_msg = "Failed to initialize Pinecone client"
+                results["errors"].append(error_msg)
+                return results
+                
+            if not self.ensure_pinecone_index_exists(pinecone_index, embedding_model):
+                error_msg = f"Failed to ensure Pinecone index exists: {pinecone_index}"
+                results["errors"].append(error_msg)
+                return results
+            
+            # Get all chunks for this document
+            chunks = list(Chunks.objects(document=document))
+            if not chunks:
+                error_msg = f"No chunks found for document {document_id}"
+                results["errors"].append(error_msg)
+                return results
+                
+            logger.info(f"📦 Found {len(chunks)} chunks to re-embed")
+            
+            # Process each chatbot's namespace
+            for mapping in mappings:
+                chatbot = mapping.chatbot
+                namespace = chatbot.namespace
+                
+                logger.info(f"\n🤖 Processing chatbot '{chatbot.name}' (namespace: {namespace})")
+                
+                chatbot_result = {
+                    "chunks_embedded": 0,
+                    "success": False,
+                    "errors": []
+                }
+                
+                try:
+                    # Process chunks in batches
+                    for i in range(0, len(chunks), batch_size):
+                        batch = chunks[i:i + batch_size]
+                        batch_num = i // batch_size + 1
+                        
+                        logger.info(f"  Processing batch {batch_num}: {len(batch)} chunks")
+                        
+                        # Create embeddings
+                        chunk_embeddings = self.create_embeddings_for_chunks(batch, embedding_model)
+                        if not chunk_embeddings:
+                            error_msg = f"Failed to create embeddings for batch {batch_num}"
+                            chatbot_result["errors"].append(error_msg)
+                            logger.error(error_msg)
+                            continue
+                            
+                        # Upload to Pinecone with chatbot's namespace
+                        vector_ids = self.upload_embeddings_to_pinecone(
+                            chunk_embeddings, batch, pinecone_index, namespace
+                        )
+                        
+                        if vector_ids:
+                            # Update chunks with new vector IDs (each chatbot might have different vector IDs)
+                            self.update_chunks_with_vector_ids(batch, vector_ids)
+                            chatbot_result["chunks_embedded"] += len(vector_ids)
+                            results["total_chunks_embedded"] += len(vector_ids)
+                            logger.info(f"  ✅ Embedded {len(vector_ids)} chunks in namespace '{namespace}'")
+                        else:
+                            error_msg = f"Failed to upload embeddings to Pinecone for batch {batch_num}"
+                            chatbot_result["errors"].append(error_msg)
+                            logger.error(error_msg)
+                    
+                    if chatbot_result["chunks_embedded"] > 0:
+                        chatbot_result["success"] = True
+                        logger.info(f"✅ Successfully re-embedded {chatbot_result['chunks_embedded']} chunks for chatbot '{chatbot.name}'")
+                    
+                except Exception as e:
+                    error_msg = f"Error processing chatbot '{chatbot.name}': {str(e)}"
+                    chatbot_result["errors"].append(error_msg)
+                    logger.error(error_msg)
+                
+                results["chatbot_results"][chatbot.name] = chatbot_result
+                if chatbot_result["success"]:
+                    results["chatbots_processed"] += 1
+            
+            # Mark document as processed
+            document.status = "processed"
+            document.save()
+            
+            if results["chatbots_processed"] > 0:
+                results["success"] = True
+                logger.info(f"🎉 Successfully re-embedded document for {results['chatbots_processed']} chatbots")
+            
+        except Exception as e:
+            error_msg = f"Re-embedding failed: {str(e)}"
+            results["errors"].append(error_msg)
+            logger.error(error_msg)
+        
+        results["processing_time"] = time.time() - start_time
+        return results
+
+    def embed_document_for_chatbot(self, document_id: str, chatbot, embedding_model: str, batch_size: int = 50) -> Dict:
+        """
+        Re-embed a single document's chunks specifically for one chatbot and upsert to that chatbot's namespace.
+        This is idempotent (upsert) and provider-aware.
+        """
+        results = {
+            "success": False,
+            "document_id": document_id,
+            "chatbot_id": str(getattr(chatbot, 'id', chatbot)),
+            "chatbot_namespace": getattr(chatbot, 'namespace', ''),
+            "embedding_model": embedding_model,
+            "chunks_embedded": 0,
+            "processing_time": 0,
+            "errors": []
+        }
+        import time
+        start_time = time.time()
+        try:
+            from db_service import Documents, Chunks
+            # Find document
+            document = Documents.objects(id=document_id).first()
+            if not document:
+                results["errors"].append("Document not found")
+                return results
+            namespace = getattr(chatbot, 'namespace', None)
+            if not namespace:
+                results["errors"].append("Chatbot namespace missing")
+                return results
+            # Initialize model and pinecone
+            if not self.initialize_embedding_model(embedding_model):
+                results["errors"].append(f"Failed to initialize embedding model {embedding_model}")
+                return results
+            pinecone_index = self.get_pinecone_index_for_model(embedding_model)
+            if not self.initialize_pinecone_client():
+                results["errors"].append("Failed to initialize Pinecone client")
+                return results
+            if not self.ensure_pinecone_index_exists(pinecone_index, embedding_model):
+                results["errors"].append(f"Failed to ensure Pinecone index {pinecone_index}")
+                return results
+            # Load chunks for document
+            chunks = list(Chunks.objects(document=document))
+            if not chunks:
+                results["errors"].append("No chunks found for document")
+                return results
+            # Create embeddings in batches
+            total_embedded = 0
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i:i + batch_size]
+                chunk_embeddings = self.create_embeddings_for_chunks(batch, embedding_model)
+                if not chunk_embeddings:
+                    results["errors"].append(f"Failed to create embeddings for batch {i//batch_size+1}")
+                    continue
+                vectors = self.prepare_pinecone_vectors(batch, chunk_embeddings)
+                successful_vector_ids = self.upsert_to_pinecone_namespace(vectors, namespace, pinecone_index, embedding_model)
+                total_embedded += len(successful_vector_ids)
+                # Keep chunk vector_id updated (idempotent)
+                if successful_vector_ids:
+                    self.update_chunks_with_vector_ids(successful_vector_ids)
+            results["chunks_embedded"] = total_embedded
+            results["success"] = total_embedded > 0
+        except Exception as e:
+            logger.error(f"Error in embed_document_for_chatbot: {e}")
+            results["errors"].append(str(e))
+        finally:
+            results["processing_time"] = time.time() - start_time
+        return results
 
     def process_user_embeddings_by_namespace(self,
                                              user_id: str,

@@ -93,17 +93,16 @@ const LoadedChatbotStore = create((set, get) => ({
         // Check if the last message is an agent message that's still being built
         const lastMessage = currentMessages[currentMessages.length - 1];
         
-        console.log('handleStreamingChunk - lastMessage:', lastMessage);
-        console.log('handleStreamingChunk - chunk:', chunk);
+        
         
         if (lastMessage && lastMessage.role === 'agent') {
             // Append to existing assistant message (ensure it's marked as streaming)
-            console.log('Appending to last assistant message');
+            
             lastMessage.message = (lastMessage.message || '') + chunk;
             lastMessage.isStreaming = true;
         } else {
             // Create a new agent message for streaming only if there isn't one already
-            console.log('Creating new streaming message');
+            
             const newMessage: Message = {
                 message: chunk,
                 created_at: new Date().toISOString(),
@@ -126,11 +125,10 @@ const LoadedChatbotStore = create((set, get) => ({
         
         // Find and update the last agent message that was streaming
         const lastMessage = currentMessages[currentMessages.length - 1];
-        console.log('completeStreamingResponse - lastMessage:', lastMessage);
-        console.log('completeStreamingResponse - fullResponse length:', fullResponse?.length);
+        
         
         if (lastMessage && lastMessage.role === 'agent') {
-            console.log('Completing streaming response');
+            
             // Ensure the message content is finalized and timestamped
             // Prefer the incrementally built content; only fill from fullResponse if needed
             if (!lastMessage.message && typeof fullResponse === 'string') {
@@ -173,7 +171,7 @@ const LoadedChatbotStore = create((set, get) => ({
     // Start a conversation session and connect via WebSocket
     startConversationSession: async (conversationId: string, chatbotId: string): Promise<string> => {
         try {
-            console.log('Starting conversation session for conversationId:', conversationId);
+            
             
             // 1. Disconnect existing WebSocket first
             const state = get() as any;
@@ -217,7 +215,11 @@ const LoadedChatbotStore = create((set, get) => ({
                 throw new Error('No authentication token found');
             }
     
-            const wsUrl = `ws://localhost:8000/ws/conversation/session/${sessionId}?token=${userToken}`;
+            // Build WS URL based on current origin and fallback to 127.0.0.1 to avoid localhost resolution quirks
+            const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const hostname = window.location.hostname || '127.0.0.1';
+            const baseHost = hostname === 'localhost' ? '127.0.0.1' : hostname;
+            const wsUrl = `${protocol}://${baseHost}:8000/ws/conversation/session/${sessionId}?token=${userToken}`;
             const ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {

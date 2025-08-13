@@ -237,6 +237,10 @@ export const chatbotApi = {
     createNewConversationWithSession: (chatbotId: string) => {
         return apiClient.post(`/chatbot/${chatbotId}/conversation/new`, {});
     },
+
+    // Health check for a chatbot
+    getChatbotHealth: (chatbotId: string) =>
+        apiClient.get(`/chatbots/${chatbotId}/health`),
 };
 
 // ['token', 'semantic', 'line', 'recursive']

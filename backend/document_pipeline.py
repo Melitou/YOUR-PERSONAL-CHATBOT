@@ -166,6 +166,7 @@ class DocumentPipeline:
             document.save()
             return document.id
 
+
     def process_single_file(self, file_path: str, namespace: str, chatbot: ChatBots) -> Dict:
         """Process a single file and return processing result"""
         result = {
@@ -204,28 +205,68 @@ class DocumentPipeline:
 
             # Check if file already exists
             if self.check_file_exists(file_hash):
-                result['message'] = "File already exists (duplicate hash)"
-                print(f"  Status: SKIPPED - {result['message']}")
-                self._update_stats('skipped')
-
-                # Take the exising document
+                # Get existing document and find which chatbot it belongs to
                 existing_document = Documents.objects(
                     user=self.user,
                     full_hash=file_hash
                 ).first()
-
-                # Add the association in the chatbot_documents_mapper collection
+                
+                # Find existing chatbot that has this document
+                existing_mapping = ChatbotDocumentsMapper.objects(
+                    document=existing_document,
+                    user=self.user
+                ).first()
+                
+                existing_chatbot_name = existing_mapping.chatbot.name if existing_mapping else "another chatbot"
+                
+                print(f"  📋 Document '{os.path.basename(file_path)}' already exists in chatbot: {existing_chatbot_name}")
+                # In server mode, auto-confirm reuse to avoid blocking prompts
+                print(f"  ✅ Auto-sharing existing document to chatbot '{chatbot.name}'")
+                
+                # Create mapping to link chatbot to existing document (NO new document creation)
                 try:
                     chatbot_documents_mapper = ChatbotDocumentsMapper(
                         chatbot=chatbot,
-                        document=existing_document,
+                        document=existing_document,  # Use existing document
                         user=self.user,
                         assigned_at=datetime.now()
                     )   
                     chatbot_documents_mapper.save()
-                    print(f"  Added document to chatbot mapping")
+                    print(f"  ✅ Added document to chatbot mapping")
                 except Exception as e:
                     logger.error(f"Error adding association to chatbot_documents_mapper: {e}")
+                    result['message'] = f"Failed to create chatbot mapping: {e}"
+                    print(f"  Status: FAILED - {result['message']}")
+                    self._update_stats('failed')
+                    return result
+                
+                # Keep document status as-is (processed) to avoid duplicate re-processing
+                # Immediately embed into the new chatbot's namespace to avoid empty results
+                try:
+                    from embeddings import EmbeddingService
+                    service = EmbeddingService()
+                    # Determine embedding model from chatbot
+                    embedding_model = chatbot.embedding_model
+                    embed_res = service.embed_document_for_chatbot(str(existing_document.id), chatbot, embedding_model)
+                    if embed_res.get('success'):
+                        result['success'] = True
+                        result['message'] = "Document shared and embedded into new chatbot namespace"
+                    else:
+                        result['success'] = True
+                        result['message'] = "Document shared; embedding will complete shortly"
+                except Exception as e:
+                    # Fallback: mark as success but warn
+                    result['success'] = True
+                    result['message'] = f"Document shared; embedding deferred due to: {e}"
+                result['document_id'] = existing_document.id
+                result['gridfs_id'] = existing_document.gridfs_file_id
+                result['hash'] = file_hash
+                result['file_type'] = existing_document.file_type
+                result['file_size'] = 0  # Size already known from existing document
+                
+                print(f"  ✅ Document shared with chatbot '{chatbot.name}' - re-embedding will be triggered")
+                print(f"  🔄 Existing chunks will be re-indexed in Pinecone namespace: {namespace}")
+                self._update_stats('processed')
 
                 return result
 

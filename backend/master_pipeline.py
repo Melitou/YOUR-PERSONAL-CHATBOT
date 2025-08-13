@@ -339,7 +339,29 @@ class MasterPipeline:
 
             logger.info(f"👤 Processing embeddings for user: {user_id}")
 
-            # Run embedding processing
+            # First check for documents that need re-embedding for multiple chatbots
+            from db_service import Documents
+            pending_shared_docs = Documents.objects(status="pending")
+            
+            re_embedding_results = []
+            if pending_shared_docs:
+                logger.info(f"🔄 Found {len(pending_shared_docs)} documents needing re-embedding for shared chatbots")
+                
+                for doc in pending_shared_docs:
+                    logger.info(f"📄 Re-embedding document: {doc.file_name}")
+                    re_embed_result = self.embedding_service.re_embed_document_for_chatbots(
+                        document_id=str(doc.id),
+                        embedding_model=embedding_model,
+                        batch_size=50
+                    )
+                    re_embedding_results.append(re_embed_result)
+                    
+                    if re_embed_result['success']:
+                        logger.info(f"✅ Successfully re-embedded {doc.file_name} for {re_embed_result['chatbots_processed']} chatbots")
+                    else:
+                        logger.error(f"❌ Failed to re-embed {doc.file_name}: {re_embed_result.get('errors', [])}")
+
+            # Run standard embedding processing for new chunks
             embedding_results = self.embedding_service.process_user_embeddings_by_namespace(
                 user_id=user_id,
                 embedding_model=embedding_model,

@@ -4,7 +4,7 @@ import time
 from typing import List, Optional
 from dotenv import load_dotenv
 from openai import OpenAI
-import google.generativeai as genai
+from google import genai
 
 # Load environment variables
 load_dotenv()
@@ -23,6 +23,7 @@ class EmbeddingService:
     def __init__(self):
         self.openai_client = None
         self.google_initialized = False
+        self.google_client = None
         
         # Fallback model hierarchy
         self.fallback_models = {
@@ -79,20 +80,18 @@ class EmbeddingService:
                     return current_model
                 
                 elif current_model.startswith("gemini"):
-                    # Initialize Google client
+                    # Initialize Google client (new SDK)
                     if not self.google_initialized:
                         api_key = os.getenv("GOOGLE_API_KEY")
-                        
                         if not api_key:
                             raise ValueError("GOOGLE_API_KEY environment variable not set")
-                        
-                        genai.configure(api_key=api_key, transport="rest")
+                        self.google_client = genai.Client(api_key=api_key)
                         self.google_initialized = True
-                    
                     # Test the connection
-                    model = genai.GenerativeModel(current_model)
-                    test_result = model.embed_content(contents=["test"])
-                    
+                    _ = self.google_client.models.embed_content(
+                        model=current_model,
+                        contents=["test"],
+                    )
                     logger.info(f"Successfully initialized Google model: {current_model}")
                     return current_model
                 
@@ -151,10 +150,13 @@ class EmbeddingService:
                     return embeddings
                 
                 elif model_name.startswith("gemini"):
-                    model = genai.GenerativeModel(model_name)
-                    result = model.embed_content(contents=chunks)
-                    
-                    embeddings = result['embedding']
+                    if not self.google_client:
+                        raise RuntimeError("Google client not initialized")
+                    result = self.google_client.models.embed_content(
+                        model=model_name,
+                        contents=chunks,
+                    )
+                    embeddings = [e.values for e in result.embeddings]
                     return embeddings
                 
                 else:

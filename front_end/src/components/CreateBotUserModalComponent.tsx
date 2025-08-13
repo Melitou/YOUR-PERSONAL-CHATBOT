@@ -1,5 +1,6 @@
 import { Modal } from "@mui/material";
 import { useState, useRef } from "react";
+import { apiClient } from "../utils/api";
 import ChatbotManagerStore from "../stores/ChatbotManagerStore";
 import ViewStore from "../stores/ViewStore";
 
@@ -86,6 +87,50 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
             description: description,
             files: files,
             aiProvider: aiProvider
+        }
+
+        // 1) Compute hashes in browser for small number of files (fallback: send names only)
+        const computeHash = async (file: File): Promise<string> => {
+            const buf = await file.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest('SHA-256', buf);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        };
+
+        try {
+            const hashes = await Promise.all(files.map(f => computeHash(f)));
+            // 2) Ask backend which already exist
+            const checkResp = await apiClient.post('/documents/check-exists', { hashes });
+            const duplicates = (checkResp?.duplicates || []) as Array<{hash:string,file_name:string,namespace:string,chatbots:string[]}>;
+
+            let proceed = true;
+            if (duplicates.length > 0) {
+                const names = duplicates.map(d => `${d.file_name} (in ${d.chatbots.join(', ') || d.namespace})`).join('\n');
+                proceed = window.confirm(`The following files already exist in your account and can be reused:\n\n${names}\n\nDo you want to reuse them for this chatbot (recommended)?`);
+            }
+
+            if (!proceed) {
+                // User cancelled creation
+                return;
+            }
+
+            const result = await ChatbotManagerStore.getState().createChatbotNormalUser(data);
+            if (result) {
+                onClose();
+                setName("");
+                setDescription("");
+                setAiProvider("Gemini");
+                setSelectedFiles([]);
+                setErrorMessage("");
+            } else {
+                const errorMsg = "Failed to create normal user chatbot";
+                setErrorMessage(errorMsg);
+                addError(errorMsg);
+            }
+            return;
+        } catch (e) {
+            // If hashing or check fails, fallback to normal flow
         }
 
         const result = await ChatbotManagerStore.getState().createChatbotNormalUser(data);

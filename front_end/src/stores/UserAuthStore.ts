@@ -45,7 +45,6 @@ const UserAuthStore = create<UserAuthState>((set, get) => ({
     loadPersistedState: () => {
         const persistedState = loadFromStorage();
         if (persistedState) {
-            console.log('Loading persisted auth state:', persistedState);
             set({
                 user: persistedState.user,
                 isLoggedIn: persistedState.isLoggedIn
@@ -54,7 +53,7 @@ const UserAuthStore = create<UserAuthState>((set, get) => ({
     },
 
     login: (userData: User, token: string) => {
-        console.log('UserAuthStore login called with:', userData);
+        
         
         // Clear all stores when user logs in
         try {
@@ -75,11 +74,10 @@ const UserAuthStore = create<UserAuthState>((set, get) => ({
         set(newState);
         saveToStorage(newState);
         
-        console.log('UserAuthStore state after login:', get());
     },
 
     logout: () => {
-        console.log('UserAuthStore logout called');
+        
         localStorage.removeItem('authToken');
         
         const newState = {
@@ -90,7 +88,6 @@ const UserAuthStore = create<UserAuthState>((set, get) => ({
         set(newState);
         saveToStorage(newState);
         
-        console.log('UserAuthStore state after logout:', get());
     }
 }));
 

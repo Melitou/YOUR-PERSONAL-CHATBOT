@@ -13,8 +13,7 @@ const HeaderComponent = () => {
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const isMenuOpen = Boolean(menuAnchorEl);
 
-    // Debug logging
-    console.log('HeaderComponent render - user:', user);
+    
 
     const handleLogout = async () => {
         try {

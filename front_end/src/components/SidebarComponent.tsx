@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react";
-import { FaBars, FaTimes } from "react-icons/fa";
 //import UserComponent from "./UserComponent";    
 import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
 import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent";
 import UserAuthStore from "../stores/UserAuthStore";
+
 import ManageChatbotsModalComponent from "./ManageChatbotsModalComponent";
 import LoadedChatbotStore, { type ConversationSummary } from "../stores/LoadedChatbotStore";
 import { chatbotApi } from "../utils/api";
 
 const SidebarComponent = () => {
     const user = UserAuthStore((state: any) => state.user);
-    const { loadedChatbot, loadedChatbotHistory, startConversationSession, setLoadedChatbotHistory, connectToWebSocket, createNewConversationWithSession, webSocket } = LoadedChatbotStore((state: any) => state);
-
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const { loadedChatbot, loadedChatbotHistory, startConversationSession, setLoadedChatbotHistory, connectToWebSocket, createNewConversationWithSession, webSocket, isThinking } = LoadedChatbotStore((state: any) => state);
+    // Note: sidebarOpen state is now controlled by MainPage layout, but we keep the destructuring for potential future use
     const [createBotModalOpen, setCreateBotModalOpen] = useState(false);
     const [existingChatbotsModalOpen, setExistingChatbotsModalOpen] = useState(false);
+    const [previousThinking, setPreviousThinking] = useState(false);
 
     const handleNewChatbotClick = () => {
         // Open the create bot modal
@@ -53,9 +53,9 @@ const SidebarComponent = () => {
         }
     }
 
+    // Load conversations when chatbot changes or when a conversation exchange completes
     useEffect(() => {
         if (loadedChatbot) {
-            // Load the conversations of the chatbot selected
             const loadConversations = async () => {
                 const conversations = await chatbotApi.getChatbotConversations(loadedChatbot.id);
                 setLoadedChatbotHistory(conversations);
@@ -64,39 +64,28 @@ const SidebarComponent = () => {
         }
     }, [loadedChatbot, webSocket]);
 
+    // Refresh conversations when thinking completes (indicating a conversation exchange finished)
+    useEffect(() => {
+        if (loadedChatbot && previousThinking && !isThinking) {
+            // Just finished thinking (conversation exchange completed)
+            const loadConversations = async () => {
+                const conversations = await chatbotApi.getChatbotConversations(loadedChatbot.id);
+                setLoadedChatbotHistory(conversations);
+            }
+            loadConversations();
+        }
+        setPreviousThinking(isThinking);
+    }, [isThinking, previousThinking, loadedChatbot]);
+
     return (
         <>
-            {/* Hamburger button for mobile */}
-            <button
-                className="fixed top-4 left-4 z-50 sm:hidden bg-gray-800 text-white p-2 rounded-md shadow-lg"
-                onClick={() => setSidebarOpen(true)}
-                aria-label="Open sidebar"
-            >
-                <FaBars size={24} />
-            </button>
-
             <aside
-                className={`
-                    fixed top-0 left-0 h-screen w-64 bg-[#f9f9f9] z-40 transform
-                    ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-                    transition-transform duration-300
-                    sm:translate-x-0 sm:static sm:h-screen
-                    shadow-lg
-                    flex flex-col
-                `}
+                className="h-full w-full bg-[#f9f9f9] shadow-lg flex flex-col"
                 style={{ boxSizing: "border-box" }}
             >
-                {/* Close button for mobile */}
-                <button
-                    className="absolute top-4 right-4 sm:hidden text-black z-50"
-                    onClick={() => setSidebarOpen(false)}
-                    aria-label="Close sidebar"
-                >
-                    <FaTimes size={24} />
-                </button>
 
                 {/* Chatbots action buttons */}
-                <div className="flex-shrink-0 p-3 pt-16 sm:pt-3 border-b border-gray-200 flex flex-col gap-2">
+                <div className="flex-shrink-0 p-3 border-b border-gray-200 flex flex-col gap-2">
                     <button className="p-3 w-full rounded-md hover:bg-[#efefef] transition-colors flex items-center justify-start gap-2 text-black text-xs sm:text-sm" onClick={handleNewChatbotClick}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
@@ -166,13 +155,7 @@ const SidebarComponent = () => {
                 {/* <UserComponent /> */}
             </aside>
 
-            {/* Overlay for mobile when sidebar is open */}
-            {sidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black bg-opacity-40 z-30 sm:hidden"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
+
 
             {/* Show appropriate modal based on permissions (frontend convenience only) */}
             {/* Backend will still verify permissions on API calls */}

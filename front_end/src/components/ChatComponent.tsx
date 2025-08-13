@@ -67,7 +67,6 @@ const TypewriterText = ({ text, isStreaming, speed = 25, onComplete }: { text: s
 const ChatComponent = () => {
     
     const { isThinking, loadedChatbot, conversationMessages, sendMessage, markStreamingComplete } = LoadedChatbotStore((state: any) => state);
-    
     const [inputMessage, setInputMessage] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -254,7 +253,7 @@ const ChatComponent = () => {
                     </div>
                 </div>
             )}
-        </div>
+    </div>
     );
 };
 

@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { Avatar, Menu, MenuItem, IconButton } from '@mui/material';
-import { FaUser } from 'react-icons/fa';
+import { FaUser, FaBars } from 'react-icons/fa';
 import UserAuthStore from '../stores/UserAuthStore';
+import ViewStore from '../stores/ViewStore';
+import LoadedChatbotStore from '../stores/LoadedChatbotStore';
 import { authApi } from '../utils/api';
 
 const HeaderComponent = () => {
     const { user, logout } = UserAuthStore();
+    const { sidebarOpen, setSidebarOpen } = ViewStore();
+    const { loadedChatbot } = LoadedChatbotStore((state: any) => state);
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const isMenuOpen = Boolean(menuAnchorEl);
 
@@ -26,8 +30,20 @@ const HeaderComponent = () => {
 
     return (
         <header className="px-2 sm:px-4 py-4 flex items-center border-b border-gray-200 bg-white flex-shrink-0">
-            <div className="flex items-center gap-2 w-full justify-end sm:justify-between">
-                <h1 className="hidden sm:block text-lg sm:text-xl md:text-2xl text-black font-light">YourPersonalChatBot</h1>
+            <div className="flex items-center gap-2 w-full justify-between">
+                <div className="flex items-center gap-3">
+                    {/* Sidebar toggle button - only shown when chatbot is loaded */}
+                    {loadedChatbot && (
+                        <button
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-md transition-colors"
+                            aria-label="Toggle sidebar"
+                        >
+                            <FaBars size={18} />
+                        </button>
+                    )}
+                    <h1 className="text-lg sm:text-xl md:text-2xl text-black font-light">YourPersonalChatBot</h1>
+                </div>
                 
                 {user && (
                     <div className="flex items-center gap-3 min-w-0">
@@ -47,8 +63,8 @@ const HeaderComponent = () => {
                                 </Avatar>
                             </IconButton>
                             <div className="flex flex-col text-[11px] sm:text-sm leading-tight min-w-0 max-w-[40vw] sm:max-w-none">
-                                <div className="font-medium text-gray-800 truncate">{user.first_name} {user.last_name}</div>
-                                <div className="text-[10px] sm:text-xs text-gray-500 truncate">{user.role}</div>
+                                <div className="font-medium text-gray-800 truncate">{(user as any)?.first_name} {(user as any)?.last_name}</div>
+                                <div className="text-[10px] sm:text-xs text-gray-500 truncate">{(user as any)?.role}</div>
                             </div>
                         </div>
                         <Menu

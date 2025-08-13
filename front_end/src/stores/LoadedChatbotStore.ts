@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { chatbotApi } from "../utils/api";
+import ViewStore from "./ViewStore";
 
 // Manage the chatbot state that is loaded
 
@@ -227,7 +228,29 @@ const LoadedChatbotStore = create((set, get) => ({
                 try {
                     const messageData = JSON.parse(event.data);
                     
-                    if (messageData.type === 'response_chunk') { // Streaming response chunks
+                    if (messageData.type === 'thinking_start') {
+                        // Open the thought visualizer and start thinking process
+                        ViewStore.getState().setThoughtVisualizerOpen(true);
+                        ViewStore.getState().addThinkingStart(messageData.message || 'Starting to think...');
+                        
+                    } else if (messageData.type === 'thinking_step') {
+                        // Add a thinking step
+                        ViewStore.getState().addThinkingStep(
+                            messageData.step || 'Processing', 
+                            messageData.message || 'Working on the problem...'
+                        );
+                        
+                    } else if (messageData.type === 'thinking_complete') {
+                        // Complete the thinking process
+                        ViewStore.getState().completeThinking(messageData.message || 'Thinking complete');
+                        
+                        // Auto-close the visualizer after a short delay to let user see completion
+                        setTimeout(() => {
+                            ViewStore.getState().setThoughtVisualizerOpen(false);
+                            ViewStore.getState().resetThinking();
+                        }, 2000);
+                        
+                    } else if (messageData.type === 'response_chunk') { // Streaming response chunks
                         const state = get() as any;
                         state.handleStreamingChunk(messageData.chunk);
                     } else if (messageData.type === 'response_complete') { // The response is complete

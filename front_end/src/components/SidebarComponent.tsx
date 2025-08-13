@@ -69,7 +69,7 @@ const SidebarComponent = () => {
         if (loadedChatbot && previousThinking && !isThinking) {
             // Just finished thinking (conversation exchange completed)
             const loadConversations = async () => {
-                const conversations = await chatbotApi.getChatbotConversations(loadedChatbot.id);
+                const conversations = await chatbotApi.getChatbotConversations(loadedChatbot.id);   
                 setLoadedChatbotHistory(conversations);
             }
             loadConversations();

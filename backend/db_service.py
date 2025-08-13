@@ -187,6 +187,7 @@ class Chunks(Document):
     chunk_index = IntField(required=True)
     content = StringField(required=True)
     summary = StringField(required=True)
+    keywords = ListField(StringField(required=False))
     # Chunking method used to generate this chunk
     chunking_method = StringField(required=False, choices=[
         'token', 'semantic', 'line', 'recursive'], default='token')
@@ -201,13 +202,14 @@ class Chunks(Document):
             {'fields': ['user']},
             {'fields': ['vector_id']},
             {'fields': ['chunking_method']},
+            {'fields': ['keywords']},
             # query by both document and chunk_index
             {'fields': [('document', 1), ('chunk_index', 1)]}
         ]
     }
 
     def __str__(self) -> str:
-        return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, file_name={self.file_name}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, vector_id={self.vector_id}, created_at={self.created_at})"
+        return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, file_name={self.file_name}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, vector_id={self.vector_id}, created_at={self.created_at}, keywords={self.keywords})"
 
 class ChatbotDocumentsMapper(Document):
     """Mapping table between ChatBots and Documents"""

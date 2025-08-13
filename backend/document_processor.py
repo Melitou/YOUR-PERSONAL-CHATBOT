@@ -23,6 +23,7 @@ from pdf_parsing import pdf_to_md
 from docx_parsing import docx_to_md
 from csv_parsing import csv_to_md
 from txt_parsing import txt_to_md
+from keyword_extractor import KeywordExtractor
 
 # OpenAI and rate limiting
 from dotenv import load_dotenv
@@ -129,6 +130,9 @@ class DocumentProcessor:
             "csv": csv_to_md,
             "txt": txt_to_md
         }
+
+        # Keyword extractor
+        self.keyword_extractor = KeywordExtractor()
 
         # Prompts (from split_and_upload_md.py)
         self.document_context_prompt = """
@@ -373,13 +377,23 @@ Answer only with the succinct context and nothing else.
             # Process chunks in batches to avoid overwhelming the API
             chunk_batch_size = 5  # From split_and_upload_md.py
 
+            # Extract keywords for each chunk
+            all_keywords = None
+            try:
+                all_keywords = self.keyword_extractor.extract_keywords_batch(chunks, max_keywords=10)
+                logger.info(f"Extracted {len(all_keywords)} keywords for document {document.file_name}")
+            except Exception as e:
+                logger.error(f"Error extracting keywords for document {document.file_name}: {e}")
+                all_keywords = None
+
             for batch_start in range(0, len(chunks), chunk_batch_size):
                 batch = chunks[batch_start:batch_start + chunk_batch_size]
 
                 # Generate summaries for this batch
                 summary_tasks = [
                     self.generate_contextual_summary_async(
-                        markdown_content, chunk_text)
+                        markdown_content, chunk_text
+                    )
                     for chunk_text in batch
                 ]
 
@@ -391,14 +405,29 @@ Answer only with the succinct context and nothing else.
                         chunk_index = batch_start + idx
 
                         if isinstance(summary, Exception):
-                            logger.error(
-                                f"Summary generation failed for chunk {chunk_index}: {summary}")
+                            logger.error(f"Summary generation failed for chunk {chunk_index}: {summary}")
                             summary = f"Summary generation failed: {str(summary)[:100]}..."
+                        
+                        if all_keywords and chunk_index < len(all_keywords):
+                            keywords = all_keywords[chunk_index]
+                        else:
+                            try:
+                                keywords = self.keyword_extractor.extract_keywords(
+                                    text=chunk_text,
+                                    max_keywords=12,
+                                    document_context=markdown_content,
+                                    chunk_summary=summary if not isinstance(summary, Exception) else None
+                                )
+                                logger.info(f"Extracted {len(keywords)} keywords for chunk {chunk_index} resulting in {keywords}")
+                            except Exception as kw_error:
+                                logger.warning(f"Individual keyword extraction failed for chunk {chunk_index}: {kw_error}")
+                                keywords = []
 
                         chunk_data.append({
                             'chunk_index': chunk_index,
                             'content': chunk_text,
                             'summary': summary,
+                            'keywords': keywords,
                             'token_count': self.num_tokens_from_string(chunk_text)
                         })
 
@@ -415,6 +444,7 @@ Answer only with the succinct context and nothing else.
                             'chunk_index': chunk_index,
                             'content': chunk_text,
                             'summary': f"Summary generation failed: {str(e)[:100]}...",
+                            'keywords': [],
                             'token_count': self.num_tokens_from_string(chunk_text)
                         })
 
@@ -445,10 +475,11 @@ Answer only with the succinct context and nothing else.
                         document=document,
                         user=document.user,
                         namespace=document.namespace,
-                        file_name=document.file_name,  # Denormalized for performance
+                        file_name=document.file_name,
                         chunk_index=chunk_info['chunk_index'],
                         content=chunk_info['content'],
                         summary=chunk_info['summary'],
+                        keywords=chunk_info.get('keywords', []),  # Include keywords
                         chunking_method=self.chunking_method,
                         vector_id=None,  # Initially null, populated later by embedding pipeline
                         created_at=datetime.now()
@@ -458,12 +489,12 @@ Answer only with the succinct context and nothing else.
                     saved_count += 1
 
                     logger.debug(
-                        f"Saved chunk {chunk_info['chunk_index']} for document {document.file_name} (ID: {chunk_id})")
+                        f"Saved chunk {chunk_info['chunk_index']} for document {document.file_name} "
+                        f"(ID: {chunk_id}, Keywords: {len(chunk_info.get('keywords', []))})")
 
                 except Exception as e:
                     logger.error(
                         f"Failed to save chunk {chunk_info['chunk_index']} for document {document.id}: {e}")
-                    # Continue with other chunks rather than failing completely
                     continue
 
             logger.info(
@@ -471,8 +502,7 @@ Answer only with the succinct context and nothing else.
             return saved_count
 
         except Exception as e:
-            logger.error(
-                f"Error saving chunks for document {document.id}: {e}")
+            logger.error(f"Error saving chunks for document {document.id}: {e}")
             raise
 
     def _safe_document_status_update(self, document: Documents, status: str, error_message: str = None):

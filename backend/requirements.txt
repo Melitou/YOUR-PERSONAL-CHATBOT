@@ -29,3 +29,7 @@ aiofiles>=23.2.0
 transformers>=4.30.0
 torch>=2.0.0
 sentence-transformers>=2.2.2
+spacy>=3.5.0
+scikit-learn>=1.7.1
+
+# NOTE: Run 'python -m spacy download en_core_web_sm' after installing spacy

@@ -651,7 +651,12 @@ class EmbeddingService:
                 "content_preview": chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content,
                 "summary_preview": chunk.summary[:200] + "..." if len(chunk.summary) > 200 else chunk.summary,
                 "chunking_method": chunk.chunking_method or "token",
-                "created_at": chunk.created_at.isoformat() if chunk.created_at else ""
+                "created_at": chunk.created_at.isoformat() if chunk.created_at else "",
+                
+                # NEW: Add keywords metadata
+                "keywords": chunk.keywords[:10] if chunk.keywords else [],  # Limit to 10 keywords for Pinecone
+                "keyword_count": len(chunk.keywords) if chunk.keywords else 0,
+                "top_keywords": ", ".join(chunk.keywords[:5]) if chunk.keywords else "",  # String format for text search
             }
 
             vector_data = {

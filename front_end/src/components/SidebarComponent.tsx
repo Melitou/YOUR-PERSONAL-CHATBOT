@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
 import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent";
 import UserAuthStore from "../stores/UserAuthStore";
+import ViewStore from "../stores/ViewStore";
 
 import ManageChatbotsModalComponent from "./ManageChatbotsModalComponent";
 import LoadedChatbotStore, { type ConversationSummary } from "../stores/LoadedChatbotStore";
@@ -11,6 +12,7 @@ import { chatbotApi } from "../utils/api";
 const SidebarComponent = () => {
     const user = UserAuthStore((state: any) => state.user);
     const { loadedChatbot, loadedChatbotHistory, startConversationSession, setLoadedChatbotHistory, connectToWebSocket, createNewConversationWithSession, webSocket, isThinking } = LoadedChatbotStore((state: any) => state);
+    const { setCurrentView } = ViewStore();
     // Note: sidebarOpen state is now controlled by MainPage layout, but we keep the destructuring for potential future use
     const [createBotModalOpen, setCreateBotModalOpen] = useState(false);
     const [existingChatbotsModalOpen, setExistingChatbotsModalOpen] = useState(false);
@@ -26,12 +28,17 @@ const SidebarComponent = () => {
         setExistingChatbotsModalOpen(true);
     }
 
+    const handleManageClientsClick = () => {
+        // Navigate to organizations page
+        setCurrentView('organizations');
+    }
+
     const handleConversationClick = async (conversation: ConversationSummary) => {
         try {
             // Start conversation session
             const session_id = await startConversationSession(conversation.conversation_id, loadedChatbot.id);
             // Connect to WebSocket
-            const ws = await connectToWebSocket(session_id);
+            await connectToWebSocket(session_id);
         } catch (error) {
             // Surface minimal error to the global error store if desired
         }
@@ -42,7 +49,7 @@ const SidebarComponent = () => {
             // Create a new conversation
             const session_id = await createNewConversationWithSession(loadedChatbot.id);
             // Connect to WebSocket
-            const ws = await connectToWebSocket(session_id);
+            await connectToWebSocket(session_id);
         } catch (error) {
             // Surface minimal error to the global error store if desired
         }
@@ -64,7 +71,7 @@ const SidebarComponent = () => {
         if (loadedChatbot && previousThinking && !isThinking) {
             // Just finished thinking (conversation exchange completed)
             const loadConversations = async () => {
-                const conversations = await chatbotApi.getChatbotConversations(loadedChatbot.id);   
+                const conversations = await chatbotApi.getChatbotConversations(loadedChatbot.id);
                 setLoadedChatbotHistory(conversations);
             }
             loadConversations();
@@ -93,6 +100,15 @@ const SidebarComponent = () => {
                         </svg>
                         Manage Chatbots
                     </button>
+                    {/* Super User only button for managing clients */}
+                    {user?.role === 'Super User' && (
+                        <button className="p-3 w-full rounded-md hover:bg-[#efefef] transition-colors flex items-center justify-start gap-2 text-black text-xs sm:text-sm" onClick={handleManageClientsClick}>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                            </svg>
+                            Manage Clients
+                        </button>
+                    )}
                 </div>
 
                 {/* Scrollable chatbot conversation history list */}
@@ -103,7 +119,7 @@ const SidebarComponent = () => {
                                 <h3 className="text-sm font-medium text-gray-700 mb-1">Conversations</h3>
                                 <p className="text-xs text-gray-500">{loadedChatbot.name}</p>
                             </div>
-                            <button 
+                            <button
                                 className="w-full p-2 mb-3 rounded-md bg-black hover:bg-gray-800 text-white text-sm transition-colors flex items-center justify-center gap-2"
                                 onClick={handleNewConversationClick}
                             >
@@ -124,10 +140,10 @@ const SidebarComponent = () => {
                         {loadedChatbotHistory && loadedChatbotHistory.map((conversation: ConversationSummary) => {
                             // Use the conversation_title from the session response
                             const conversationTitle = conversation.conversation_title || `Conversation ${conversation.conversation_id.slice(-6)}`;
-                            
+
                             return (
-                                <div 
-                                    key={conversation.conversation_id} 
+                                <div
+                                    key={conversation.conversation_id}
                                     className="p-3 rounded-md hover:bg-[#efefef] cursor-pointer transition-colors group"
                                     onClick={() => handleConversationClick(conversation)}
                                 >
@@ -155,14 +171,14 @@ const SidebarComponent = () => {
             {/* Show appropriate modal based on permissions (frontend convenience only) */}
             {/* Backend will still verify permissions on API calls */}
             {user?.role === 'Super User' ? (
-                <CreateBotSuperUserModalComponent 
-                    open={createBotModalOpen} 
-                    onClose={() => setCreateBotModalOpen(false)} 
+                <CreateBotSuperUserModalComponent
+                    open={createBotModalOpen}
+                    onClose={() => setCreateBotModalOpen(false)}
                 />
             ) : (
-                <CreateBotUserModalComponent 
-                    open={createBotModalOpen} 
-                    onClose={() => setCreateBotModalOpen(false)} 
+                <CreateBotUserModalComponent
+                    open={createBotModalOpen}
+                    onClose={() => setCreateBotModalOpen(false)}
                 />
             )}
 
@@ -170,9 +186,9 @@ const SidebarComponent = () => {
             <ManageChatbotsModalComponent
                 open={existingChatbotsModalOpen}
                 onClose={() => setExistingChatbotsModalOpen(false)}
-                onSelectChatbot={() => {}}
+                onSelectChatbot={() => { }}
             />
-        </> 
+        </>
     );
 }
 

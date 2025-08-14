@@ -3,6 +3,7 @@ import './App.css'
 import MainPage from './pages/MainPage'
 import AuthPage from './pages/AuthPage'
 import UserAuthStore from './stores/UserAuthStore'
+import ThemeStore from './stores/ThemeStore'
 import { authApi } from './utils/api'
 import ErrorComponent from './components/ErrorComponent'
 import ViewStore from './stores/ViewStore'
@@ -10,12 +11,18 @@ import ViewStore from './stores/ViewStore'
 function App() {
   const { isLoggedIn, login, logout } = UserAuthStore();
   const { addError } = ViewStore();
+  const { theme } = ThemeStore();
+
+  // Apply theme class to document body
+  useEffect(() => {
+    document.body.className = `${theme}-theme`;
+  }, [theme]);
 
   useEffect(() => {
     // Load persisted state first
     const { loadPersistedState } = UserAuthStore.getState();
     loadPersistedState();
-    
+
     // Check if user is already authenticated on app load
     const checkAuth = async () => {
       const token = localStorage.getItem('authToken');

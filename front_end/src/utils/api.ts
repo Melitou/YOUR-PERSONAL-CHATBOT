@@ -241,6 +241,10 @@ export const chatbotApi = {
         return apiClient.post(`/chatbot/${chatbotId}/session`, formData);
     },
 
+    // Health check for a chatbot
+    getChatbotHealth: (chatbotId: string) =>
+        apiClient.get(`/chatbots/${chatbotId}/health`),
+
     // Create a conversation session
     createConversationSession: (chatbotId: string, conversationId: string) => {
         const formData = new FormData();

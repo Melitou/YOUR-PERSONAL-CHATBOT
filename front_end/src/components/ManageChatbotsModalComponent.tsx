@@ -1,7 +1,7 @@
 import { Modal } from "@mui/material";
 import { useState, useEffect } from "react";
 import React from "react";
-
+import { chatbotApi } from "../utils/api";
 import ChatbotManagerStore, { type CreatedChatbot } from "../stores/ChatbotManagerStore";
 import LoadedChatbotStore from "../stores/LoadedChatbotStore";
 import ViewStore from "../stores/ViewStore";
@@ -24,6 +24,7 @@ const ManageChatbotsModalComponent = ({
     } = ChatbotManagerStore();
     const [expandedChatbot, setExpandedChatbot] = useState<string | null>(null);
     const { setLoadedChatbot } = LoadedChatbotStore((state: any) => state);
+    const [health, setHealth] = useState<Record<string, { ready: boolean; vectors: number }>>({});
     const { addError } = ViewStore();
 
     // Fetch real chatbots when modal opens
@@ -31,13 +32,55 @@ const ManageChatbotsModalComponent = ({
         if (open) {
             fetchChatbots().catch((error) => {
                 const errorMsg = 'Failed to load chatbots';
-                console.error('Error fetching chatbots on mount:', error);
+                console.error('Failed to load chatbots:', error);
                 addError(errorMsg);
             });
         }
     }, [open, fetchChatbots, addError]);
 
+    // Fetch health for expanded chatbot
+    useEffect(() => {
+        const id = expandedChatbot;
+        if (!id) return;
+        let cancelled = false;
+        const fetchHealth = async () => {
+            try {
+                const res = await chatbotApi.getChatbotHealth(id);
+                if (!cancelled) {
+                    setHealth((h) => ({ ...h, [id]: { ready: Boolean(res.ready), vectors: Number(res.pinecone_vectors || 0) } }));
+                }
+            } catch {
+                // ignore; badge will stay unknown
+            }
+        };
+        fetchHealth();
+        const t = setInterval(fetchHealth, 3000);
+        return () => { cancelled = true; clearInterval(t); };
+    }, [expandedChatbot]);
 
+    // Also fetch health for all chatbots when list loads, so pills don't stay in "Preparing…"
+    useEffect(() => {
+        if (!open || !chatbots || chatbots.length === 0) return;
+        let cancelled = false;
+        const loadAll = async () => {
+            try {
+                const entries = await Promise.all(chatbots.map(async (c) => {
+                    try {
+                        const res = await chatbotApi.getChatbotHealth(c.id);
+                        return [c.id, { ready: Boolean(res.ready), vectors: Number(res.pinecone_vectors || 0) }] as const;
+                    } catch {
+                        return [c.id, { ready: false, vectors: 0 }] as const;
+                    }
+                }));
+                if (!cancelled) {
+                    setHealth(Object.fromEntries(entries));
+                }
+            } catch {/* ignore */ }
+        };
+        loadAll();
+        const t = setInterval(loadAll, 10000);
+        return () => { cancelled = true; clearInterval(t); };
+    }, [open, chatbots]);
 
     const getFileIcon = (type: string) => {
         if (type.includes('pdf')) return { icon: 'picture_as_pdf', color: 'text-red-500' };
@@ -79,7 +122,6 @@ const ManageChatbotsModalComponent = ({
         if (window.confirm(`Are you sure you want to delete "${chatbotName}"? This action cannot be undone.`)) {
             try {
                 await removeChatbot(chatbotId);
-                console.log(`Successfully deleted chatbot: ${chatbotName}`);
             } catch (error) {
                 const errorMsg = `Failed to delete chatbot "${chatbotName}"`;
                 console.error('Delete chatbot error:', error);
@@ -176,6 +218,9 @@ const ManageChatbotsModalComponent = ({
                                                             <div>
                                                                 <h3 className="text-lg font-medium glass-text">
                                                                     {chatbot.name}
+                                                                    <span className={`px-2 py-0.5 rounded-full text-xs ${health[chatbot.id]?.ready ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                                                                        {health[chatbot.id]?.ready ? 'Ready' : 'Preparing…'}
+                                                                    </span>
                                                                 </h3>
                                                                 {chatbot.description && (
                                                                     <p className="text-sm glass-text opacity-80 mb-1">

@@ -506,7 +506,6 @@ async def websocket_conversation(websocket: WebSocket, session_id: str, token: s
 
                 initialize_rag_config(
                     user_id=str(user.id),
-                    # namespace=chatbot.namespace,
                     namespaces=unique_namespaces_list,
                     embedding_model=chatbot.embedding_model
                 )

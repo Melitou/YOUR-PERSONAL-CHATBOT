@@ -377,13 +377,18 @@ Answer only with the succinct context and nothing else.
             # Process chunks in batches to avoid overwhelming the API
             chunk_batch_size = 5  # From split_and_upload_md.py
 
-            # Extract keywords for each chunk
+            # Extract keywords for all chunks using optimized batch processing
             all_keywords = None
             try:
-                all_keywords = self.keyword_extractor.extract_keywords_batch(chunks, max_keywords=10)
-                logger.info(f"Extracted {len(all_keywords)} keywords for document {document.file_name}")
+                all_keywords = self.keyword_extractor.extract_keywords_batch(
+                    chunks, 
+                    max_keywords=12, 
+                    document_context=markdown_content
+                )
+                logger.info(f"Batch extracted keywords for {len(all_keywords)} chunks in document {document.file_name}")
             except Exception as e:
-                logger.error(f"Error extracting keywords for document {document.file_name}: {e}")
+                logger.error(f"Batch keyword extraction failed for document {document.file_name}: {e}")
+                logger.info("Falling back to individual keyword extraction without context for speed")
                 all_keywords = None
 
             for batch_start in range(0, len(chunks), chunk_batch_size):
@@ -408,17 +413,20 @@ Answer only with the succinct context and nothing else.
                             logger.error(f"Summary generation failed for chunk {chunk_index}: {summary}")
                             summary = f"Summary generation failed: {str(summary)[:100]}..."
                         
+                        # Use batch-extracted keywords or fallback to fast individual extraction
                         if all_keywords and chunk_index < len(all_keywords):
                             keywords = all_keywords[chunk_index]
                         else:
                             try:
+                                # Fast fallback: extract keywords without document context for speed
+                                # The batch processing above should have handled context-aware extraction
                                 keywords = self.keyword_extractor.extract_keywords(
                                     text=chunk_text,
                                     max_keywords=12,
-                                    document_context=markdown_content,
+                                    document_context=None,  # Skip context for performance
                                     chunk_summary=summary if not isinstance(summary, Exception) else None
                                 )
-                                logger.info(f"Extracted {len(keywords)} keywords for chunk {chunk_index} resulting in {keywords}")
+                                logger.info(f"Individual extracted {len(keywords)} keywords for chunk {chunk_index}")
                             except Exception as kw_error:
                                 logger.warning(f"Individual keyword extraction failed for chunk {chunk_index}: {kw_error}")
                                 keywords = []

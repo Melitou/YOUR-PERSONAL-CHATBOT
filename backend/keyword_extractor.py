@@ -78,7 +78,7 @@ class KeywordExtractor:
         try:
             if self.spacy_available and self.nlp:
                 logger.info(f"Extracting keywords with spaCy + TF-IDF for text with length: {len(text)}")
-                return self._extract_with_spacy_tfidf(text, max_keywords, document_context, chunk_summary)
+                return self._extract_with_spacy_tfidf(text, max_keywords, document_context , chunk_summary)
             else:
                 logger.info(f"Extracting keywords with fallback for text with length: {len(text)}")
                 return self._extract_fallback(text, max_keywords)
@@ -154,7 +154,7 @@ class KeywordExtractor:
                 
                 return top_keywords
         
-        # Fallback to single document TF-IDF (your original approach)
+        # Fallback to single document TF-IDF
         if combined_terms:
             vectorizer = TfidfVectorizer(ngram_range=(1, 2))
             try:
@@ -220,23 +220,127 @@ class KeywordExtractor:
         
         return [word for word, _ in word_counts.most_common(return_number)]
 
-    def extract_keywords_batch(self, chunks: List[str], max_keywords: int = 15) -> List[List[str]]:
-        """Extract keywords for multiple chunks with shared context"""
+    def extract_keywords_batch(self, chunks: List[str], max_keywords: int = 15, 
+                             document_context: Optional[str] = None) -> List[List[str]]:
+        """
+        Extract keywords for multiple chunks with optimized shared context processing.
+        
+        This method processes the document context once and reuses TF-IDF calculations
+        for all chunks, significantly improving performance.
+        
+        Args:
+            chunks: List of chunk texts to extract keywords from
+            max_keywords: Maximum number of keywords per chunk
+            document_context: Full document text for TF-IDF context (optional)
+            
+        Returns:
+            List of keyword lists, one for each chunk
+        """
         if not chunks:
             return []
         
-        # Use all chunks as context for better TF-IDF
-        full_context = "\n".join(chunks)
+        # If no document context provided, use all chunks as context
+        if document_context is None:
+            document_context = "\n".join(chunks)
         
+        try:
+            if self.spacy_available and self.nlp:
+                logger.info(f"Batch extracting keywords with spaCy + TF-IDF for {len(chunks)} chunks")
+                return self._extract_batch_with_spacy_tfidf(chunks, max_keywords, document_context)
+            else:
+                logger.info(f"Batch extracting keywords with fallback for {len(chunks)} chunks")
+                return self._extract_batch_fallback(chunks, max_keywords)
+                
+        except Exception as e:
+            logger.error(f"Batch keyword extraction failed: {e}")
+            logger.info(f"Falling back to individual extraction for {len(chunks)} chunks")
+            # Fallback to individual extraction without context for speed
+            return [self._extract_fallback(chunk, max_keywords) for chunk in chunks]
+
+    def _extract_batch_with_spacy_tfidf(self, chunks: List[str], max_keywords: int, 
+                                      document_context: str) -> List[List[str]]:
+        """
+        Optimized batch processing with spaCy + TF-IDF.
+        Processes document context once and reuses TF-IDF model for all chunks.
+        """
+        # Step 1: Process document context once to build vocabulary
+        logger.info(f"Creating context nouns from document context, to feed to TF-IDF model")
+        doc_context = self.nlp(document_context)
+        context_nouns = [token.lemma_.lower() for token in doc_context
+                        if (token.pos_ in ["NOUN", "PROPN"] and 
+                            not token.is_stop and 
+                            len(token.text) > 2 and
+                            token.text.lower() not in self.stop_words)]
+        
+        # Step 2: Process all chunks to build documents for TF-IDF
+        chunk_documents = []
+        chunk_technical_terms = []
+        
+        for chunk in chunks:
+            logger.info(f"Creating context nouns from chunk with length {len(chunk)}, to feed to TF-IDF model")
+            doc = self.nlp(chunk)
+            chunk_nouns = [token.lemma_.lower() for token in doc
+                          if (token.pos_ in ["NOUN", "PROPN"] and 
+                              not token.is_stop and 
+                              len(token.text) > 2 and
+                              token.text.lower() not in self.stop_words)]
+            
+            # Add technical terms
+            technical_terms = self._extract_technical_terms(chunk)
+            chunk_technical_terms.append(technical_terms)
+            
+            # Combine nouns and technical terms for this chunk
+            all_terms = chunk_nouns + technical_terms
+            chunk_documents.append(" ".join(all_terms) if all_terms else "")
+        
+        # Step 3: Build TF-IDF model once for all documents
+        if not any(chunk_documents):
+            return [self._extract_fallback(chunk, max_keywords) for chunk in chunks]
+        
+        try:
+            # Create document collection: context + all chunks
+            all_documents = [" ".join(context_nouns)] + chunk_documents
+            logger.info(f"All documents length: {len(all_documents)}")
+            
+            # Build TF-IDF vectorizer once
+            vectorizer = TfidfVectorizer(max_features=1000, ngram_range=(1, 2))
+            tfidf_matrix = vectorizer.fit_transform(all_documents)
+            logger.info(f"TF-IDF matrix shape: {tfidf_matrix.shape}")
+            vocab = vectorizer.get_feature_names_out()
+            
+            # Step 4: Extract keywords for each chunk using shared TF-IDF model
+            results = []
+            for i, chunk in enumerate(chunks):
+                # Get TF-IDF scores for this chunk (index i+1, since context is at index 0)
+                chunk_idx = i + 1
+                if chunk_idx < tfidf_matrix.shape[0]:
+                    scores = tfidf_matrix[chunk_idx].toarray()[0]
+                    
+                    # Get top keywords for this chunk
+                    return_number = self._compute_num_of_items_to_return(chunk, max_keywords)
+                    top_indices = scores.argsort()[::-1][:return_number]
+                    top_keywords = [vocab[idx] for idx in top_indices if scores[idx] > 0]
+                    
+                    # Add technical terms that might not be in TF-IDF vocab
+                    technical_kw = chunk_technical_terms[i][:max_keywords//3]
+                    combined_keywords = list(dict.fromkeys(top_keywords + technical_kw))[:return_number]
+                    
+                    results.append(combined_keywords)
+                else:
+                    # Fallback for this chunk
+                    results.append(self._extract_fallback(chunk, max_keywords))
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in batch TF-IDF processing: {e}")
+            return [self._extract_fallback(chunk, max_keywords) for chunk in chunks]
+
+    def _extract_batch_fallback(self, chunks: List[str], max_keywords: int) -> List[List[str]]:
+        """Fallback batch processing when spaCy is not available"""
         results = []
         for chunk in chunks:
-            keywords = self.extract_keywords(
-                text=chunk,
-                max_keywords=max_keywords,
-                document_context=full_context
-            )
-            results.append(keywords)
-        
+            results.append(self._extract_fallback(chunk, max_keywords))
         return results
 
     def get_extraction_stats(self, text: str, keywords: List[str]) -> Dict:

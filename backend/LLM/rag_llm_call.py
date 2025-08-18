@@ -128,7 +128,7 @@ def initialize_rag_config(user_id: str, namespaces: list, embedding_model: str, 
     print(f"   🤖 Chatbot Model: {chatbot_model} ({provider.upper()})")
 
 
-def rag_search_tool(query: str) -> str:
+def rag_search_tool(query: str, keyword_enhancement: bool = False, keyword_boost_factor: float = 0.3) -> str:
     """
     Wrapper function for rag_search that uses the global configuration
 
@@ -151,9 +151,13 @@ def rag_search_tool(query: str) -> str:
             user_id=RAG_CONFIG['user_id'],
             namespaces=RAG_CONFIG['namespaces'],
             embedding_model_of_chatbot_caller=RAG_CONFIG['embedding_model'],
-            top_k=5  # Default to top 5 results
+            top_k=5,  # Default to top 5 results
+            keyword_enhancement=keyword_enhancement,
+            keyword_boost_factor=keyword_boost_factor
         )
         debug_print(f"✅ RAG Search returned result length: {len(result)}")
+        # Print the first contents of the result
+        debug_print(f"🔍 First contents of the result: {result[:100]}\n\n")
         return result
     except Exception as e:
         debug_print(f"❌ RAG Search error: {str(e)}")
@@ -374,7 +378,7 @@ def trim_conversation_history(messages: List[Dict[str, Any]], target_tokens: int
         return messages
 
 
-def ask_openai_assistant(history: list, query: str, model: str) -> str:
+def ask_openai_assistant(history: list, query: str, model: str, keyword_enhancement: bool = False, keyword_boost_factor: float = 0.3) -> str:
     """
     Ask OpenAI models to search documents and provide answers using the RAG tool.
     Supports multi-turn context by including the last 8 turns of user/assistant.
@@ -384,10 +388,15 @@ def ask_openai_assistant(history: list, query: str, model: str) -> str:
         history: List of previous conversation turns
         query: User's current query
         model: OpenAI model to use (e.g., "gpt-4.1", "gpt-4o")
-
+        keyword_enhancement: Whether to use keyword enhancement
+        keyword_boost_factor: Boost factor for keyword enhancement
     Returns:
         Assistant's response string
     """
+    logger.info(f"🔍 Asking OpenAI assistant with model: {model}")
+    logger.info(f"🔍 Keyword enhancement: {keyword_enhancement}")
+    logger.info(f"🔍 Keyword boost factor: {keyword_boost_factor}")
+
     # Initialize message history
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
@@ -435,7 +444,7 @@ def ask_openai_assistant(history: list, query: str, model: str) -> str:
         # Execute the function
         debug_print(f"Executing function call: {func_call.name}")
         args = json.loads(func_call.arguments)
-        result = rag_search_tool(args.get("query"))
+        result = rag_search_tool(args.get("query"), keyword_enhancement=keyword_enhancement, keyword_boost_factor=keyword_boost_factor)
         debug_print(f"Function returned result length: {len(result)}")
 
         # Append the function call and its output

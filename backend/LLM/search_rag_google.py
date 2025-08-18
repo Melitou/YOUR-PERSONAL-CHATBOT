@@ -123,6 +123,7 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
         if not documents:
             return "No relevant documents found for the query."
 
+
         # Apply Cohere reranking
         try:
             reranked_results = pc.inference.rerank(

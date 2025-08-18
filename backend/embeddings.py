@@ -654,9 +654,8 @@ class EmbeddingService:
                 "created_at": chunk.created_at.isoformat() if chunk.created_at else "",
                 
                 # NEW: Add keywords metadata
-                "keywords": chunk.keywords[:10] if chunk.keywords else [],  # Limit to 10 keywords for Pinecone
+                "keywords": chunk.keywords[:12] if chunk.keywords else [],
                 "keyword_count": len(chunk.keywords) if chunk.keywords else 0,
-                "top_keywords": ", ".join(chunk.keywords[:5]) if chunk.keywords else "",  # String format for text search
             }
 
             vector_data = {

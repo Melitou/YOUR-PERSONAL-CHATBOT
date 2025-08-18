@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from pinecone import Pinecone
 from bson import ObjectId
-from db_service import ChatBots, Chunks
+from db_service import ChatBots, Chunks, Documents  
 from embeddings import EmbeddingService
 from LLM.search_rag_openai import search_rag as search_rag_openai
 from LLM.search_rag_google import search_rag as search_rag_google
@@ -481,7 +481,7 @@ class RAGService:
 #         logger.error("=" * 60)
 #         return f"Error retrieving relevant documents: {str(e)}"
 
-    def rag_search(self, query: str, user_id: str, namespaces: list, embedding_model_of_chatbot_caller: str, top_k: int = 5) -> str:
+    def rag_search(self, query: str, user_id: str, namespaces: list, embedding_model_of_chatbot_caller: str, top_k: int = 5, keyword_enhancement: bool = False, keyword_boost_factor: float = 0.3) -> str:
         """
         Main RAG search function that retrieves relevant document chunks for a user query
         Now supports multiple namespaces for searching across multiple document collections
@@ -502,7 +502,6 @@ class RAGService:
             full_namespaces = namespaces
             logger.info(f"🔗 Full namespaces: {full_namespaces}")
 
-            from db_service import Documents, Chunks, ChatBots
             total_doc_count = 0
             total_chunk_count = 0
             for full_ns in full_namespaces:
@@ -514,7 +513,6 @@ class RAGService:
             logger.info(f"📊 Total: {total_doc_count} documents and {total_chunk_count} chunks across all namespaces")
 
             # Initialize embedding service for determining indexes
-            from embedding_service import EmbeddingService
             embedding_service = EmbeddingService()
             
             # Model provider mapping
@@ -541,7 +539,6 @@ class RAGService:
                 if provider == "google":
                     pinecone_index = self.embedding_service.get_pinecone_index_for_model(embedding_model_of_namespace)
                     logger.info(f"📊 Using Google/Gemini search pipeline with index: {pinecone_index} and namespace embedding model: {embedding_model_of_namespace}")
-                    from LLM.search_rag_google import search_rag as search_rag_google
                     result = search_rag_google(
                         query=query,
                         namespace=full_namespace,
@@ -553,14 +550,15 @@ class RAGService:
                 elif provider == "openai":
                     pinecone_index = self.embedding_service.get_pinecone_index_for_model(embedding_model_of_namespace)
                     logger.info(f"📊 Using OpenAI search pipeline with index: {pinecone_index} and namespace embedding model: {embedding_model_of_namespace}")
-                    from LLM.search_rag_openai import search_rag as search_rag_openai
                     result = search_rag_openai(
                         query=query,
                         namespace=full_namespace,
                         index_name=pinecone_index,
                         embedding_model=embedding_model_of_namespace,
                         top_k=top_k * 2,
-                        top_reranked=top_k * 2
+                        top_reranked=top_k * 2,
+                        use_keyword_enhancement=keyword_enhancement,
+                        keyword_boost_factor=keyword_boost_factor
                     )
                 else:
                     logger.warning(f"Unsupported embedding model: {embedding_model_of_namespace}")

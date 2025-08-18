@@ -343,6 +343,65 @@ class KeywordExtractor:
             results.append(self._extract_fallback(chunk, max_keywords))
         return results
 
+    def extract_query_keywords(self, query: str, max_keywords: int = 5) -> List[str]:
+        """
+        Extract keywords from a user query for RAG search enhancement.
+        
+        Optimized for short queries - focuses on important terms without document context.
+        
+        Args:
+            query: User query string
+            max_keywords: Maximum number of keywords to extract
+            
+        Returns:
+            List of important query keywords
+        """
+        try:
+            if self.spacy_available and self.nlp:
+                # Use spaCy for query analysis
+                doc = self.nlp(query)
+                
+                # Extract important terms: nouns, proper nouns, and significant verbs
+                important_terms = []
+                for token in doc:
+                    if (token.pos_ in ["NOUN", "PROPN", "VERB"] and 
+                        not token.is_stop and 
+                        len(token.text) > 2 and
+                        token.text.lower() not in self.stop_words and
+                        token.lemma_.lower() not in self.stop_words):
+                        important_terms.append(token.lemma_.lower())
+                
+                # Add technical terms that spaCy might miss
+                technical_terms = self._extract_technical_terms(query)
+                important_terms.extend([term.lower() for term in technical_terms])
+                
+                # Remove duplicates while preserving order
+                keywords = list(dict.fromkeys(important_terms))
+                
+                # Limit to max_keywords
+                return keywords[:max_keywords]
+            else:
+                # Fallback: simple extraction
+                return self._extract_query_keywords_fallback(query, max_keywords)
+                
+        except Exception as e:
+            logger.error(f"Query keyword extraction failed: {e}")
+            return self._extract_query_keywords_fallback(query, max_keywords)
+    
+    def _extract_query_keywords_fallback(self, query: str, max_keywords: int) -> List[str]:
+        """Fallback query keyword extraction when spaCy is not available"""
+        # Simple approach: extract meaningful words, filter stop words
+        words = re.findall(r'\b[a-zA-Z]{3,}\b', query.lower())
+        filtered_words = [w for w in words if w not in self.stop_words]
+        
+        # Add technical terms
+        technical_terms = self._extract_technical_terms(query)
+        filtered_words.extend([term.lower() for term in technical_terms])
+        
+        # Remove duplicates and limit
+        keywords = list(dict.fromkeys(filtered_words))
+        return keywords[:max_keywords]
+
     def get_extraction_stats(self, text: str, keywords: List[str]) -> Dict:
         """Get statistics about the extraction process"""
         return {

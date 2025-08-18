@@ -52,6 +52,15 @@ const HeaderComponent = () => {
                         >
                             {theme === 'light' ? '🌙' : '☀️'}
                         </button>
+
+                        {/* Logout Button - More Visible */}
+                        <button
+                            onClick={handleLogout}
+                            className="px-3 py-1 rounded-md hover:glass-light transition-colors glass-text text-sm border border-white/20"
+                            title="Logout"
+                        >
+                            Logout
+                        </button>
                         <div className="flex items-center gap-2 min-w-0">
                             <IconButton
                                 onClick={(e) => setMenuAnchorEl(e.currentTarget)}

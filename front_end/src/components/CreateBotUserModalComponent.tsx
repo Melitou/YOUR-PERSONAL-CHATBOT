@@ -62,7 +62,7 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
             case 'csv':
                 return { icon: 'table_chart', color: 'text-green-500' };
             case 'txt':
-                return { icon: 'description', color: 'text-gray-500' };
+                return { icon: 'description', color: 'text-white-500' };
             default:
                 return { icon: 'insert_drive_file', color: 'text-gray-400' };
         }
@@ -222,12 +222,16 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                     multiple
                                     onChange={handleFileChange}
                                     accept=".pdf,.doc,.docx,.csv,.txt"
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    className="sr-only"
+                                    id="file-upload"
                                 />
-                                <div className="w-full p-2 sm:p-3 glass-input text-xs sm:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer flex items-center gap-2">
+                                <label
+                                    htmlFor="file-upload"
+                                    className="w-full p-2 sm:p-3 glass-input text-xs sm:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer flex items-center gap-2 hover:glass-light transition-colors"
+                                >
                                     <span className="material-symbols-outlined glass-text opacity-70">upload_file</span>
                                     <span className="glass-text text-xs sm:text-base truncate">Choose files (PDF, DOC, CSV, TXT)</span>
-                                </div>
+                                </label>
                             </div>
                         </div>
                     </div>

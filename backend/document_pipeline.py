@@ -52,11 +52,13 @@ class DocumentPipeline:
         # Set user for processing
         if user:
             self.user = user
-            print(f"Using provided user: {self.user.user_name} (ID: {self.user.id})")
+            print(
+                f"Using provided user: {self.user.user_name} (ID: {self.user.id})")
         else:
             # Get or create test user for backward compatibility
             try:
-                self.user = User_Auth_Table.objects(user_name="test_user").first()
+                self.user = User_Auth_Table.objects(
+                    user_name="test_user").first()
                 if not self.user:
                     # Create test user if it doesn't exist
                     from datetime import datetime
@@ -70,13 +72,16 @@ class DocumentPipeline:
                         role="User"
                     )
                     self.user.save()
-                    print(f"Created test user: {self.user.user_name} (ID: {self.user.id})")
+                    print(
+                        f"Created test user: {self.user.user_name} (ID: {self.user.id})")
                 else:
-                    print(f"Using existing test user: {self.user.user_name} (ID: {self.user.id})")
+                    print(
+                        f"Using existing test user: {self.user.user_name} (ID: {self.user.id})")
             except Exception as e:
                 raise Exception(f"Error getting/creating user: {e}")
-        
-        print(f"Parallel processing: {self.max_workers} workers, {self.rate_limit_delay}s rate limit")
+
+        print(
+            f"Parallel processing: {self.max_workers} workers, {self.rate_limit_delay}s rate limit")
 
     def generate_file_hash(self, file_bytes: bytes) -> str:
         """Generate SHA256 hash for the file content"""
@@ -166,7 +171,6 @@ class DocumentPipeline:
             document.save()
             return document.id
 
-
     def process_single_file(self, file_path: str, namespace: str, chatbot: ChatBots) -> Dict:
         """Process a single file and return processing result"""
         result = {
@@ -210,36 +214,42 @@ class DocumentPipeline:
                     user=self.user,
                     full_hash=file_hash
                 ).first()
-                
+
                 # Find existing chatbot that has this document
                 existing_mapping = ChatbotDocumentsMapper.objects(
                     document=existing_document,
                     user=self.user
                 ).first()
-                
+
                 existing_chatbot_name = existing_mapping.chatbot.name if existing_mapping else "another chatbot"
-                
-                print(f"  📋 Document '{os.path.basename(file_path)}' already exists in chatbot: {existing_chatbot_name}")
+
+                print(
+                    f"  📋 Document '{os.path.basename(file_path)}' already exists in chatbot: {existing_chatbot_name}")
                 # In server mode, auto-confirm reuse to avoid blocking prompts
-                print(f"  ✅ Auto-sharing existing document to chatbot '{chatbot.name}'")
-                
+                print(
+                    f"  ✅ Auto-sharing existing document to chatbot '{chatbot.name}'")
+
                 # Create mapping to link chatbot to existing document (NO new document creation)
                 try:
+                    # Ensure chatbot is properly committed to database before referencing
+                    chatbot.reload()  # Refresh from database to ensure it exists
+
                     chatbot_documents_mapper = ChatbotDocumentsMapper(
                         chatbot=chatbot,
                         document=existing_document,  # Use existing document
                         user=self.user,
                         assigned_at=datetime.now()
-                    )   
+                    )
                     chatbot_documents_mapper.save()
                     print(f"  ✅ Added document to chatbot mapping")
                 except Exception as e:
-                    logger.error(f"Error adding association to chatbot_documents_mapper: {e}")
+                    logger.error(
+                        f"Error adding association to chatbot_documents_mapper: {e}")
                     result['message'] = f"Failed to create chatbot mapping: {e}"
                     print(f"  Status: FAILED - {result['message']}")
                     self._update_stats('failed')
                     return result
-                
+
                 # Keep document status as-is (processed) to avoid duplicate re-processing
                 # Immediately embed into the new chatbot's namespace to avoid empty results
                 try:
@@ -247,7 +257,8 @@ class DocumentPipeline:
                     service = EmbeddingService()
                     # Determine embedding model from chatbot
                     embedding_model = chatbot.embedding_model
-                    embed_res = service.embed_document_for_chatbot(str(existing_document.id), chatbot, embedding_model)
+                    embed_res = service.embed_document_for_chatbot(
+                        str(existing_document.id), chatbot, embedding_model)
                     if embed_res.get('success'):
                         result['success'] = True
                         result['message'] = "Document shared and embedded into new chatbot namespace"
@@ -262,10 +273,13 @@ class DocumentPipeline:
                 result['gridfs_id'] = existing_document.gridfs_file_id
                 result['hash'] = file_hash
                 result['file_type'] = existing_document.file_type
-                result['file_size'] = 0  # Size already known from existing document
-                
-                print(f"  ✅ Document shared with chatbot '{chatbot.name}' - re-embedding will be triggered")
-                print(f"  🔄 Existing chunks will be re-indexed in Pinecone namespace: {namespace}")
+                # Size already known from existing document
+                result['file_size'] = 0
+
+                print(
+                    f"  ✅ Document shared with chatbot '{chatbot.name}' - re-embedding will be triggered")
+                print(
+                    f"  🔄 Existing chunks will be re-indexed in Pinecone namespace: {namespace}")
                 self._update_stats('processed')
 
                 return result
@@ -323,17 +337,21 @@ class DocumentPipeline:
 
             # Add the association in the chatbot_documents_mapper collection
             try:
+                # Ensure chatbot is properly committed to database before referencing
+                chatbot.reload()  # Refresh from database to ensure it exists
+
                 chatbot_documents_mapper = ChatbotDocumentsMapper(
                     chatbot=chatbot,
                     document=document,
                     user=self.user,
                     assigned_at=datetime.now()
-                )   
+                )
                 chatbot_documents_mapper.save()
-                print(f"  Added document to chatbot mapping")   
+                print(f"  Added document to chatbot mapping")
             except Exception as e:
-                logger.error(f"Error adding association to chatbot_documents_mapper: {e}")
-            
+                logger.error(
+                    f"Error adding association to chatbot_documents_mapper: {e}")
+
             # Chatbot associations will be created centrally after the chatbot is saved
             print(f"  Document ID: {result['document_id']}")
             print(f"  Status: SUCCESS - Uploaded to GridFS and created document record")
@@ -484,7 +502,6 @@ class DocumentPipeline:
         """Close database connection"""
         if self.client:
             self.client.close()
-
 
     def get_directory_file_hashes(self, directory_path: str) -> Dict[str, str]:
         """Calculate hashes for all supported files in directory

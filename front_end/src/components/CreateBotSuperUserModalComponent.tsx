@@ -102,7 +102,7 @@ const CreateBotSuperUserModalComponent = ({
             case 'csv':
                 return { icon: 'table_chart', color: 'text-green-500' };
             case 'txt':
-                return { icon: 'description', color: 'text-gray-500' };
+                return { icon: 'description', color: 'text-white-500' };
             default:
                 return { icon: 'insert_drive_file', color: 'text-gray-400' };
         }

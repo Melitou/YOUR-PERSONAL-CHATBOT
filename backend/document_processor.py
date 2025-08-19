@@ -359,6 +359,9 @@ Answer only with the succinct context and nothing else.
     async def chunk_and_summarize(self, markdown_content: str, document: Documents) -> List[Dict]:
         """Chunk the markdown content and generate summaries for each chunk"""
         try:
+            logger.info(f"Starting the summarization process for {document.file_name} with {len(markdown_content)} characters")
+            start_time = time.time()
+
             # Generate chunks using the configured method
             chunks = self.chunk_text(markdown_content)
             logger.info(
@@ -420,8 +423,8 @@ Answer only with the succinct context and nothing else.
 
             logger.info(
                 f"Completed chunking and summarization for {document.file_name}: {len(chunk_data)} chunks")
+            logger.info(f"Time taken: {time.time() - start_time:.2f} seconds")
             return chunk_data
-
         except Exception as e:
             logger.error(
                 f"Error in chunk_and_summarize for document {document.id}: {e}")

@@ -1,5 +1,3 @@
-import ViewStore from '../stores/ViewStore';
-
 // Simple API client for authentication
 class ApiClient {
     private baseURL: string;
@@ -21,14 +19,12 @@ class ApiClient {
             // Token expired or invalid
             localStorage.removeItem('authToken');
             const errorMessage = 'Authentication required - please log in again';
-            ViewStore.getState().addError(errorMessage);
             throw new Error(errorMessage);
         }
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({ message: 'Unknown error' }));
             const errorMessage = error.message || `Request failed with status ${response.status}`;
-            ViewStore.getState().addError(errorMessage);
             throw new Error(errorMessage);
         }
 
@@ -46,7 +42,6 @@ class ApiClient {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Network error occurred';
             console.error('POST request failed:', errorMessage);
-            ViewStore.getState().addError(errorMessage);
             throw error;
         }
     }
@@ -61,7 +56,6 @@ class ApiClient {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Network error occurred';
             console.error('GET request failed:', errorMessage);
-            ViewStore.getState().addError(errorMessage);
             throw error;
         }
     }
@@ -76,7 +70,6 @@ class ApiClient {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Network error occurred';
             console.error('DELETE request failed:', errorMessage);
-            ViewStore.getState().addError(errorMessage);
             throw error;
         }
     }
@@ -183,7 +176,6 @@ export const chatbotApi = {
             if (response.status === 401) {
                 localStorage.removeItem('authToken');
                 const errorMessage = 'Authentication required - please log in again';
-                ViewStore.getState().addError(errorMessage);
                 throw new Error(errorMessage);
             }
 
@@ -201,11 +193,9 @@ export const chatbotApi = {
                     }
                 } catch (parseError) {
                     console.error('Failed to parse error response:', parseError);
-                    ViewStore.getState().addError('Failed to parse server error response');
                 }
 
                 const fullErrorMessage = `Failed to create normal user chatbot: ${errorMessage}`;
-                ViewStore.getState().addError(fullErrorMessage);
                 throw new Error(fullErrorMessage);
             }
 
@@ -213,7 +203,6 @@ export const chatbotApi = {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Network error occurred while creating chatbot';
             console.error('Create normal user chatbot failed:', errorMessage);
-            ViewStore.getState().addError(errorMessage);
             throw error;
         }
     },

@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { chatbotApi } from "../utils/api";
-import ViewStore from "./ViewStore";
 
 export interface ChatbotFile {
     id: string;
@@ -131,7 +130,6 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to fetch chatbots';
             console.error('Failed to fetch chatbots:', errorMessage);
-            ViewStore.getState().addError(errorMessage);
             set({
                 error: errorMessage,
                 isLoading: false
@@ -166,7 +164,6 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to create super user chatbot';
             console.error('Failed to create super user chatbot:', errorMessage);
-            ViewStore.getState().addError(errorMessage);
             set({
                 error: errorMessage,
                 isLoading: false
@@ -202,7 +199,6 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to create normal user chatbot';
             console.error('Failed to create normal user chatbot:', errorMessage);
-            ViewStore.getState().addError(errorMessage);
             set({
                 error: errorMessage,
                 isLoading: false
@@ -222,7 +218,6 @@ const ChatbotManagerStore = create<ChatbotManagerState>((set, get) => ({
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to delete chatbot';
             console.error('Failed to delete chatbot:', errorMessage);
-            ViewStore.getState().addError(errorMessage);
             set({
                 error: errorMessage,
                 isLoading: false

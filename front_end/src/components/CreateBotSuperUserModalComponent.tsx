@@ -1,7 +1,6 @@
 import { Modal } from "@mui/material";
 import { useState, useRef, useEffect } from "react";
 import ChatbotManagerStore from "../stores/ChatbotManagerStore";
-import ViewStore from "../stores/ViewStore";
 
 const CreateBotSuperUserModalComponent = ({
     open,
@@ -13,13 +12,14 @@ const CreateBotSuperUserModalComponent = ({
 }) => {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const nameInputRef = useRef<HTMLInputElement>(null);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [chunkingMethod, setChunkingMethod] = useState("Fixed Token");
     const [embeddingModel, setEmbeddingModel] = useState("text-embedding-3-small");
     const [errorMessage, setErrorMessage] = useState("");
-    const { addError } = ViewStore();
-
+    const [duplicateNameError, setDuplicateNameError] = useState(false);
+    const [showRetryButton, setShowRetryButton] = useState(false);
     const { isLoading } = ChatbotManagerStore((state: any) => state);
 
     useEffect(() => {
@@ -30,6 +30,8 @@ const CreateBotSuperUserModalComponent = ({
             setChunkingMethod("Fixed Token");
             setEmbeddingModel("text-embedding-3-small");
             setErrorMessage("");
+            setDuplicateNameError(false);
+            setShowRetryButton(false);
 
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
@@ -71,7 +73,7 @@ const CreateBotSuperUserModalComponent = ({
 
             if (invalidFiles.length > 0) {
                 const errorMsg = `Invalid file types: ${invalidFiles.map(f => f.name).join(', ')}. Only PDF, DOC, DOCX, CSV, and TXT files are allowed.`;
-                addError(errorMsg);
+                setErrorMessage(errorMsg);
                 console.error('Invalid file types uploaded:', invalidFiles.map(f => f.name));
             }
 
@@ -79,7 +81,7 @@ const CreateBotSuperUserModalComponent = ({
         } catch (error) {
             const errorMsg = 'Error processing uploaded files';
             console.error('File upload error:', error);
-            addError(errorMsg);
+            setErrorMessage(errorMsg);
         }
     };
 
@@ -88,6 +90,19 @@ const CreateBotSuperUserModalComponent = ({
         // Clear the file input to reflect the change
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
+        }
+    };
+
+    const handleRetry = () => {
+        // Reset error states
+        setDuplicateNameError(false);
+        setShowRetryButton(false);
+        setErrorMessage("");
+
+        // Focus on name input for user convenience
+        if (nameInputRef.current) {
+            nameInputRef.current.focus();
+            nameInputRef.current.select();
         }
     };
 
@@ -121,7 +136,6 @@ const CreateBotSuperUserModalComponent = ({
             if (!name || !description || !files.length || !chunkingMethod || !embeddingModel) {
                 const errorMsg = "Please fill in all fields and select at least one file";
                 setErrorMessage(errorMsg);
-                addError(errorMsg);
                 return;
             }
 
@@ -143,16 +157,59 @@ const CreateBotSuperUserModalComponent = ({
                 setChunkingMethod("Fixed Token");
                 setEmbeddingModel("text-embedding-3-small");
                 setErrorMessage("");
+                setDuplicateNameError(false);
+                setShowRetryButton(false);
             } else {
-                const errorMsg = "Failed to create super user chatbot";
-                setErrorMessage(errorMsg);
-                addError(errorMsg);
+                // Get the error from the store
+                const storeError = ChatbotManagerStore.getState().error || "Failed to create super user chatbot";
+                console.log('Store error:', storeError);
+
+                // Check if this is a duplicate name error
+                const isDuplicateError = storeError.includes("Namespace already exists") ||
+                    storeError.includes("already exists") ||
+                    storeError.includes("400: Namespace already exists") ||
+                    storeError.includes("Error processing files: 400: Namespace already exists") ||
+                    (storeError.includes("400") && storeError.toLowerCase().includes("namespace"));
+
+                console.log('Is duplicate error from store:', isDuplicateError);
+
+                if (isDuplicateError) {
+                    console.log('Setting duplicate error state from store error');
+                    setDuplicateNameError(true);
+                    setShowRetryButton(true);
+                    setErrorMessage("A chatbot with this name already exists. Please try again with a different name or load the existing one.");
+                } else {
+                    setErrorMessage(storeError);
+                    setDuplicateNameError(false);
+                    setShowRetryButton(false);
+                }
             }
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : 'Failed to create super user chatbot. Please try again.';
             console.error('Failed to create super user chatbot:', errorMsg);
-            setErrorMessage(errorMsg);
-            addError(errorMsg);
+            console.log('Error message for duplicate check:', errorMsg);
+
+            // Check if this is a duplicate name error
+            const isDuplicateError = errorMsg.includes("Namespace already exists") ||
+                errorMsg.includes("already exists") ||
+                errorMsg.includes("400: Namespace already exists") ||
+                errorMsg.includes("Error processing files: 400: Namespace already exists") ||
+                (errorMsg.includes("400") && errorMsg.toLowerCase().includes("namespace"));
+
+            console.log('Is duplicate error:', isDuplicateError);
+
+            if (isDuplicateError) {
+                console.log('Setting duplicate error state');
+                setDuplicateNameError(true);
+                setShowRetryButton(true);
+                setErrorMessage("A chatbot with this name already exists. Please try again with a different name or load the existing one.");
+            } else {
+                // Handle other errors normally
+                console.log('Setting normal error state');
+                setDuplicateNameError(false);
+                setShowRetryButton(false);
+                setErrorMessage(errorMsg);
+            }
         }
     }
 
@@ -177,11 +234,21 @@ const CreateBotSuperUserModalComponent = ({
                                 Agent Name
                             </label>
                             <input
+                                ref={nameInputRef}
                                 type="text"
                                 placeholder="Enter agent name"
-                                className="w-full p-3 glass-input glass-text rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-300"
+                                className={`w-full p-3 glass-input glass-text rounded-md focus:outline-none focus:ring-2 focus:border-transparent placeholder-gray-300 ${duplicateNameError ? 'focus:ring-red-500 border-red-500' : 'focus:ring-blue-500'
+                                    }`}
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(e) => {
+                                    setName(e.target.value);
+                                    // Clear duplicate name error when user starts typing new name
+                                    if (duplicateNameError && e.target.value !== name) {
+                                        setDuplicateNameError(false);
+                                        setShowRetryButton(false);
+                                        setErrorMessage("");
+                                    }
+                                }}
                             />
                         </div>
 
@@ -250,7 +317,10 @@ const CreateBotSuperUserModalComponent = ({
 
                     {/* Error message */}
                     {errorMessage && (
-                        <div className="text-red-300 text-sm text-center p-3 glass rounded-md border border-red-300">
+                        <div className={`text-sm text-center p-3 glass rounded-md border ${duplicateNameError
+                            ? 'text-yellow-300 border-yellow-300 bg-yellow-900/20'
+                            : 'text-red-300 border-red-300'
+                            }`}>
                             {errorMessage}
                         </div>
                     )}
@@ -258,13 +328,13 @@ const CreateBotSuperUserModalComponent = ({
                     <div className="flex justify-center">
                         <button
                             className="px-8 py-3 glass-button glass-text rounded-md hover:glass-light transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            onClick={() => handleSubmit(name, description, selectedFiles, chunkingMethod, embeddingModel)}
+                            onClick={showRetryButton ? handleRetry : () => handleSubmit(name, description, selectedFiles, chunkingMethod, embeddingModel)}
                             disabled={isLoading}
                         >
                             {isLoading && (
                                 <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
                             )}
-                            {isLoading ? "Creating..." : "Create Agent"}
+                            {isLoading ? "Creating..." : showRetryButton ? "Try Again" : "Create Agent"}
                         </button>
                     </div>
                 </div>

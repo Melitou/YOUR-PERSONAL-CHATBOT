@@ -174,7 +174,7 @@ const CreateBotSuperUserModalComponent = ({
                         {/* Agent Name (Namespace) */}
                         <div className="flex flex-col gap-2">
                             <label className="text-sm font-medium glass-text">
-                                Agent Name <span className="text-xs glass-text opacity-70">(This is the Namespace)</span>
+                                Agent Name
                             </label>
                             <input
                                 type="text"
@@ -228,7 +228,7 @@ const CreateBotSuperUserModalComponent = ({
                                 onChange={(e) => setChunkingMethod(e.target.value)}
                             >
                                 {chunkingOptions.map((option) => (
-                                    <option key={option} value={option}>{option}</option>
+                                    <option key={option} value={option} className="bg-zinc-600 text-white">{option}</option>
                                 ))}
                             </select>
                         </div>
@@ -242,7 +242,7 @@ const CreateBotSuperUserModalComponent = ({
                                 onChange={(e) => setEmbeddingModel(e.target.value)}
                             >
                                 {embeddingOptions.map((option) => (
-                                    <option key={option} value={option}>{option}</option>
+                                    <option key={option} value={option} className="bg-zinc-600 text-white">{option}</option>
                                 ))}
                             </select>
                         </div>

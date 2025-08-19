@@ -102,9 +102,6 @@ const ManageClientOrganizationsModalComponent = ({
                                 <h2 className="text-xl font-semibold glass-text">
                                     Client & Organization Management ({clients.length})
                                 </h2>
-                                <span className="text-sm glass-text opacity-70">
-                                    Real-time Data
-                                </span>
                             </div>
                             <button
                                 onClick={onClose}

@@ -148,9 +148,6 @@ const ManageChatbotsModalComponent = ({
                                 <h2 className="text-xl font-semibold glass-text">
                                     My Chatbots ({chatbots.length})
                                 </h2>
-                                <span className="text-sm glass-text opacity-70">
-                                    Real-time Data
-                                </span>
                             </div>
                             <button
                                 onClick={onClose}

@@ -75,5 +75,6 @@ summary_preview: "This chunk contains the beginning of \"Alice's Ad
 - Back to the home page
 - Add final agent in super (hold)
 - Description should be added into the agent prompt
+- Output formated, markdown, equations
 - Summarization to backend
 - Way too long summaries

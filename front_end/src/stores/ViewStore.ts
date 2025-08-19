@@ -8,6 +8,7 @@ interface ViewState {
     currentView: 'chat' | 'organizations';
     setSidebarOpen: (sidebarOpen: boolean) => void;
     setCurrentView: (view: 'chat' | 'organizations') => void;
+    navigateToHome: () => void;
     addError: (error: string) => void;
     dismissError: (index: number) => void;
     clearAllErrors: () => void;
@@ -32,6 +33,25 @@ const ViewStore = create<ViewState>((set, get) => ({
             window.history.pushState({ view: 'chat' }, '', '#chat');
             document.title = 'Your Personal Chatbot';
         }
+    },
+
+    navigateToHome: () => {
+        // Import LoadedChatbotStore dynamically to avoid circular imports
+        import('../stores/LoadedChatbotStore').then((module) => {
+            const LoadedChatbotStore = module.default;
+            // Clear the loaded chatbot to return to welcome screen
+            (LoadedChatbotStore.getState() as any).resetStore();
+        });
+
+        // Set view to chat (which will show welcome screen when no chatbot is loaded)
+        set({ currentView: 'chat' });
+
+        // Close sidebar
+        set({ sidebarOpen: false });
+
+        // Update browser history to home
+        window.history.pushState({ view: 'home' }, '', '/');
+        document.title = 'Your Personal Chatbot';
     },
 
     addError: (error: string) => {
@@ -69,7 +89,11 @@ if (typeof window !== 'undefined') {
     window.addEventListener('popstate', (event) => {
         const state = event.state;
         if (state && state.view) {
-            ViewStore.getState().setCurrentView(state.view);
+            if (state.view === 'home') {
+                ViewStore.getState().navigateToHome();
+            } else {
+                ViewStore.getState().setCurrentView(state.view);
+            }
         } else {
             // Default to chat view when no state
             ViewStore.setState({ currentView: 'chat' });

@@ -8,7 +8,7 @@ import { authApi } from '../utils/api';
 
 const HeaderComponent = () => {
     const { user, logout } = UserAuthStore();
-    const { sidebarOpen, setSidebarOpen } = ViewStore();
+    const { sidebarOpen, setSidebarOpen, navigateToHome } = ViewStore();
     const { theme, toggleTheme } = ThemeStore();
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const isMenuOpen = Boolean(menuAnchorEl);
@@ -38,7 +38,22 @@ const HeaderComponent = () => {
                     >
                         <FaBars size={20} />
                     </button>
-                    <h1 className="text-lg sm:text-xl md:text-2xl glass-text font-light">Your Personal Chatbot</h1>
+                    <h1
+                        className="text-lg sm:text-xl md:text-2xl glass-text font-light cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={navigateToHome}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                navigateToHome();
+                            }
+                        }}
+                        aria-label="Navigate to home page"
+                        title="Go to home page"
+                    >
+                        Your Personal Chatbot
+                    </h1>
                 </div>
 
                 {user && (

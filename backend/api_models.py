@@ -2,10 +2,23 @@
 Pydantic models for FastAPI request/response validation
 """
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel, EmailStr, Field
 from enum import Enum
 
+class CheckDocumentsRequest(BaseModel):
+    hashes: List[str]
+
+
+class ExistingDocumentInfo(BaseModel):
+    hash: str
+    file_name: str
+    namespace: str
+    chatbots: List[str]
+
+
+class CheckDocumentsResponse(BaseModel):
+    duplicates: List[ExistingDocumentInfo]
 
 class ChunkingMethod(str, Enum):
     """Enumeration for chunking methods"""
@@ -51,6 +64,17 @@ class CreateAgentRequest(BaseModel):
     email: EmailStr = Field(..., description="Email address")
     agent_description: str = Field(..., min_length=10, max_length=500, description="Agent description")
 
+class ChatbotHealthResponse(BaseModel):
+    chatbot_id: str
+    name: str
+    namespace: str
+    provider: str
+    embedding_model: str
+    pinecone_index: str
+    pinecone_vectors: int
+    mongo_chunks_total: int
+    mongo_embedded: int
+    ready: bool
 
 class LoginRequest(BaseModel):
     """Request model for user login"""
@@ -111,13 +135,17 @@ class CreateAgentResponse(BaseModel):
     processing_results: Optional[ProcessingResult] = Field(None, description="File processing results")
     embedding_results: Optional[dict] = Field(None, description="Embedding processing results")
     total_time: float = Field(..., description="Total processing time")
+    # New fields for enhancement
+    can_enhance: bool = True
+    basic_summaries: bool = True
+    enhancement_available: bool = True
 
-
-class ChatbotResponse(BaseModel):
-    """Response model for chatbot"""
-    id: str = Field(..., description="Chatbot ID")
-    name: str = Field(..., description="Chatbot name")
-    description: str = Field(..., description="Chatbot description")
+# Not used
+# class ChatbotResponse(BaseModel):
+#     """Response model for chatbot"""
+#     id: str = Field(..., description="Chatbot ID")
+#     name: str = Field(..., description="Chatbot name")
+#     description: str = Field(..., description="Chatbot description")
 
 
 class LoadedFileInfo(BaseModel):
@@ -156,23 +184,15 @@ class ConversationSummary(BaseModel):
     belonging_user_uid: str = Field(..., description="User ID of the user who owns the conversation")
     belonging_chatbot_id: str = Field(..., description="Chatbot ID of the chatbot that the conversation belongs to")
 
-# class ConversationsResponse(BaseModel):
-#     """Response model for conversations"""
-#     conversation_id: str = Field(..., description="Conversation ID")
-#     conversation_title: str = Field(..., description="Title of the conversation")
-#     messages: List[Message] = Field(..., description="List of messages in the conversation")
-#     created_at: datetime = Field(..., description="When the conversation was created")
-#     belonging_user_uid: str = Field(..., description="User ID of the user who owns the conversation")
-#     belonging_chatbot_id: str = Field(..., description="Chatbot ID of the chatbot that the conversation belongs to")
-
 class ConversationMessagesResponse(BaseModel):
     """Response model for conversation messages"""
     conversation_id: str = Field(..., description="Conversation ID")
     messages: List[Message] = Field(..., description="List of messages in the conversation")
 
-class CreateSessionRequest(BaseModel):
-    """Request model for creating a chat session"""
-    pass  # No additional data needed, chatbot_id comes from URL and user from JWT
+# Not used
+# class CreateSessionRequest(BaseModel):
+#     """Request model for creating a chat session"""
+#     pass  # No additional data needed, chatbot_id comes from URL and user from JWT
 
 class CreateSessionResponse(BaseModel):
     """Response model for chat session creation"""
@@ -182,25 +202,27 @@ class CreateSessionResponse(BaseModel):
     chatbot_name: str = Field(..., description="Chatbot name")
     messages: List[Message] = Field(default=[], description="List of messages in the conversation")
 
-class ChatMessageRequest(BaseModel):
-    """Request model for chat messages via WebSocket"""
-    message: str = Field(..., min_length=1, max_length=2000, description="User message content")
-    message_type: str = Field(default="text", description="Type of message (text, system, etc.)")
+# Not used
+# class ChatMessageRequest(BaseModel):
+#     """Request model for chat messages via WebSocket"""
+#     message: str = Field(..., min_length=1, max_length=2000, description="User message content")
+#     message_type: str = Field(default="text", description="Type of message (text, system, etc.)")
 
-class ChatMessageResponse(BaseModel):
-    """Response model for chat messages"""
-    message: str = Field(..., description="Assistant response")
-    message_id: str = Field(..., description="Unique message ID")
-    timestamp: datetime = Field(..., description="Message timestamp")
-    is_complete: bool = Field(default=True, description="Whether this is the complete message or a chunk")
-    session_id: str = Field(..., description="Session ID")   
+# Not used
+# class ChatMessageResponse(BaseModel):
+#     """Response model for chat messages"""
+#     message: str = Field(..., description="Assistant response")
+#     message_id: str = Field(..., description="Unique message ID")
+#     timestamp: datetime = Field(..., description="Message timestamp")
+#     is_complete: bool = Field(default=True, description="Whether this is the complete message or a chunk")
+#     session_id: str = Field(..., description="Session ID")   
 
-class ErrorResponse(BaseModel):
-    """Standard error response model"""
-    detail: str = Field(..., description="Error description")
-    error_code: Optional[str] = Field(None, description="Error code")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Error timestamp")
-
+# Not used
+# class ErrorResponse(BaseModel):
+#     """Standard error response model"""
+#     detail: str = Field(..., description="Error description")
+#     error_code: Optional[str] = Field(None, description="Error code")
+#     timestamp: datetime = Field(default_factory=datetime.now, description="Error timestamp")
 
 # Internal Models
 class FileMetadata(BaseModel):
@@ -209,3 +231,22 @@ class FileMetadata(BaseModel):
     content_type: str
     size: int
     file_hash: str
+
+class BatchJobStatus(str, Enum):
+    SUBMITTED = "submitted"
+    VALIDATING = "validating"
+    IN_PROGRESS = "in_progress"
+    FINALIZING = "finalizing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+class EnhancementStatus(BaseModel):
+    """Response model for enhancement status"""
+    batch_id: str
+    status: BatchJobStatus
+    total_requests: int
+    request_counts: Dict[str, int]
+    created_at: datetime
+    completed_at: Optional[datetime] = None

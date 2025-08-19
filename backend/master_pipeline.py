@@ -35,8 +35,13 @@ logger = logging.getLogger(__name__)
 class MasterPipeline:
     """Master pipeline that combines document upload and processing"""
 
-    def __init__(self, max_workers: int = 4, rate_limit_delay: float = 0.2,
-                 chunking_method: str = "token", chunking_params: dict = None, user: User_Auth_Table = None):
+    def __init__(self, 
+                max_workers: int = 4, 
+                rate_limit_delay: float = 0.2,
+                chunking_method: str = "token", 
+                chunking_params: dict = None, 
+                user: User_Auth_Table = None,
+                use_basic_summaries: bool = True):
         """Initialize both upload and processing pipelines
 
         Args:
@@ -45,13 +50,14 @@ class MasterPipeline:
             chunking_method: Chunking method to use ('token', 'semantic', 'line', 'recursive') (default: 'token')
             chunking_params: Parameters for the chunking method (default: None, uses method defaults)
             user: User object for document processing (required for proper user association)
+            use_basic_summaries: Whether to use basic summaries instead of AI-enhanced summaries (default: True)
         """
         self.max_workers = max_workers
         self.rate_limit_delay = rate_limit_delay
         self.chunking_method = chunking_method
         self.chunking_params = chunking_params or {}
         self.user = user
-
+        self.use_basic_summaries = use_basic_summaries
         # Initialize all pipelines
         logger.info("Initializing master pipeline...")
         logger.info(f"Chunking method: {chunking_method} with params: {self.chunking_params}")
@@ -70,7 +76,8 @@ class MasterPipeline:
                 max_workers=max_workers,
                 rate_limit_delay=rate_limit_delay,
                 chunking_method=chunking_method,
-                chunking_params=chunking_params
+                chunking_params=chunking_params,
+                use_basic_summaries=use_basic_summaries
             )
             logger.info("✓ Document processing pipeline initialized")
 

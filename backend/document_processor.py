@@ -57,25 +57,35 @@ except ImportError as e:
 class DocumentProcessor:
     """Document processing pipeline that converts GridFS documents to chunked content with summaries"""
 
-    def __init__(self, max_workers: int = 4, rate_limit_delay: float = 0.2,
-                 chunking_method: str = "token", chunking_params: dict = None):
+    def __init__(self, 
+                user: User_Auth_Table = None,
+                max_workers: int = 4, 
+                rate_limit_delay: float = 0.2,
+                chunking_method: str = "token", 
+                chunking_params: dict = None,
+                use_basic_summaries: bool = False):
         """Initialize the document processor
 
         Args:
+            user: User_Auth_Table object for user-specific processing
             max_workers: Maximum number of parallel workers (default: 4)
             rate_limit_delay: Delay between database operations in seconds (default: 0.2)
             chunking_method: Chunking method to use ('token', 'semantic', 'line', 'recursive') (default: 'token')
             chunking_params: Parameters for the chunking method (default: None, uses method defaults)
+            use_basic_summaries: Whether to use basic summaries instead of AI-enhanced summaries (default: False)
         """
         # Initialize database connections
         self.client, self.db, self.fs = initialize_db()
         if not self.client:
             raise Exception("Failed to connect to database")
+        # Persist user reference
+        self.user = user
 
         # Parallel processing settings
         self.max_workers = min(max_workers, 5)  # Cap at 5 for MongoDB safety
         self.rate_limit_delay = rate_limit_delay
         self._db_lock = Lock()  # Thread-safe database operations
+        self.use_basic_summaries = use_basic_summaries
 
         # Processing statistics
         self._stats = {
@@ -87,10 +97,6 @@ class DocumentProcessor:
         self._stats_lock = Lock()
 
         # OpenAI configuration (from split_and_upload_md.py)
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
-        if not self.openai_api_key:
-            raise Exception("OPENAI_API_KEY environment variable not set")
-
         self.summary_model = "gpt-4.1-mini"  # Updated model name
         self.encoding_name = "cl100k_base"
         self.summary_rpm = 2000  # requests per minute
@@ -98,9 +104,17 @@ class DocumentProcessor:
         # Initialize tiktoken encoding
         self.encoding = tiktoken.get_encoding(self.encoding_name)
 
-        # OpenAI client and rate limiter
-        self.openai_client = AsyncOpenAI(api_key=self.openai_api_key)
-        self.summary_rate_limiter = AsyncLimiter(self.summary_rpm, 60)
+        # Only initialize OpenAI if not using basic summaries
+        if not self.use_basic_summaries:
+            self.openai_api_key = os.getenv("OPENAI_API_KEY")
+            if not self.openai_api_key:
+                raise Exception("OPENAI_API_KEY environment variable not set")
+            self.openai_client = AsyncOpenAI(api_key=self.openai_api_key)
+            self.summary_rate_limiter = AsyncLimiter(self.summary_rpm, 60)
+        else:
+            self.openai_api_key = None
+            self.openai_client = None
+            self.summary_rate_limiter = None
 
         # Chunking method configuration
         self.chunking_method = chunking_method.lower()
@@ -290,6 +304,23 @@ Answer only with the succinct context and nothing else.
             overlap=self.chunking_params.get('overlap', 100)
         )
 
+    def _generate_basic_summary(self, chunk_text: str) -> str:
+        """Generate basic summary from chunk content"""
+        # Clean the text
+        clean_text = chunk_text.strip()
+        
+        # Take first 150 characters
+        if len(clean_text) <= 150:
+            return clean_text
+        
+        # Find the last complete word within 150 chars
+        truncated = clean_text[:150]
+        last_space = truncated.rfind(' ')
+        if last_space > 100:  # Only truncate at word boundary if reasonable
+            return truncated[:last_space] + "..."
+        else:
+            return truncated + "..."
+            
     @backoff.on_exception(backoff.expo,
                           OpenAIError,
                           max_tries=10,
@@ -356,79 +387,111 @@ Answer only with the succinct context and nothing else.
             logger.error(f"Error parsing {file_name} (type: {file_type}): {e}")
             raise
 
+    # async def chunk_and_summarize(self, markdown_content: str, document: Documents) -> List[Dict]:
+    #     """Chunk the markdown content and generate summaries for each chunk"""
+    #     try:
+    #         logger.info(f"Starting the summarization process for {document.file_name} with {len(markdown_content)} characters")
+    #         start_time = time.time()
+
+    #         # Generate chunks using the configured method
+    #         chunks = self.chunk_text(markdown_content)
+    #         logger.info(
+    #             f"Generated {len(chunks)} chunks for document {document.file_name}")
+
+    #         if not chunks:
+    #             raise Exception(
+    #                 f"No chunks generated for document {document.file_name}")
+
+    #         chunk_data = []
+
+    #         # Process chunks in batches to avoid overwhelming the API
+    #         chunk_batch_size = 5  # From split_and_upload_md.py
+
+    #         for batch_start in range(0, len(chunks), chunk_batch_size):
+    #             batch = chunks[batch_start:batch_start + chunk_batch_size]
+
+    #             # Generate summaries for this batch
+    #             summary_tasks = [
+    #                 self.generate_contextual_summary_async(
+    #                     markdown_content, chunk_text)
+    #                 for chunk_text in batch
+    #             ]
+
+    #             try:
+    #                 summaries = await asyncio.gather(*summary_tasks, return_exceptions=True)
+
+    #                 # Process results
+    #                 for idx, (chunk_text, summary) in enumerate(zip(batch, summaries)):
+    #                     chunk_index = batch_start + idx
+
+    #                     if isinstance(summary, Exception):
+    #                         logger.error(
+    #                             f"Summary generation failed for chunk {chunk_index}: {summary}")
+    #                         summary = f"Summary generation failed: {str(summary)[:100]}..."
+
+    #                     chunk_data.append({
+    #                         'chunk_index': chunk_index,
+    #                         'content': chunk_text,
+    #                         'summary': summary,
+    #                         'token_count': self.num_tokens_from_string(chunk_text)
+    #                     })
+
+    #                     logger.info(
+    #                         f"Processed chunk {chunk_index + 1}/{len(chunks)} for {document.file_name}")
+
+    #             except Exception as e:
+    #                 logger.error(
+    #                     f"Batch processing failed for chunks {batch_start}-{batch_start + len(batch) - 1}: {e}")
+    #                 # Add chunks without summaries as fallback
+    #                 for idx, chunk_text in enumerate(batch):
+    #                     chunk_index = batch_start + idx
+    #                     chunk_data.append({
+    #                         'chunk_index': chunk_index,
+    #                         'content': chunk_text,
+    #                         'summary': f"Summary generation failed: {str(e)[:100]}...",
+    #                         'token_count': self.num_tokens_from_string(chunk_text)
+    #                     })
+
+    #         logger.info(
+    #             f"Completed chunking and summarization for {document.file_name}: {len(chunk_data)} chunks")
+    #         logger.info(f"Time taken: {time.time() - start_time:.2f} seconds")
+    #         return chunk_data
+    #     except Exception as e:
+    #         logger.error(
+    #             f"Error in chunk_and_summarize for document {document.id}: {e}")
+    #         raise
+
     async def chunk_and_summarize(self, markdown_content: str, document: Documents) -> List[Dict]:
         """Chunk the markdown content and generate summaries for each chunk"""
-        try:
-            logger.info(f"Starting the summarization process for {document.file_name} with {len(markdown_content)} characters")
-            start_time = time.time()
-
-            # Generate chunks using the configured method
-            chunks = self.chunk_text(markdown_content)
-            logger.info(
-                f"Generated {len(chunks)} chunks for document {document.file_name}")
-
-            if not chunks:
-                raise Exception(
-                    f"No chunks generated for document {document.file_name}")
-
-            chunk_data = []
-
-            # Process chunks in batches to avoid overwhelming the API
-            chunk_batch_size = 5  # From split_and_upload_md.py
-
-            for batch_start in range(0, len(chunks), chunk_batch_size):
-                batch = chunks[batch_start:batch_start + chunk_batch_size]
-
-                # Generate summaries for this batch
-                summary_tasks = [
-                    self.generate_contextual_summary_async(
-                        markdown_content, chunk_text)
-                    for chunk_text in batch
-                ]
-
-                try:
-                    summaries = await asyncio.gather(*summary_tasks, return_exceptions=True)
-
-                    # Process results
-                    for idx, (chunk_text, summary) in enumerate(zip(batch, summaries)):
-                        chunk_index = batch_start + idx
-
-                        if isinstance(summary, Exception):
-                            logger.error(
-                                f"Summary generation failed for chunk {chunk_index}: {summary}")
-                            summary = f"Summary generation failed: {str(summary)[:100]}..."
-
-                        chunk_data.append({
-                            'chunk_index': chunk_index,
-                            'content': chunk_text,
-                            'summary': summary,
-                            'token_count': self.num_tokens_from_string(chunk_text)
-                        })
-
-                        logger.info(
-                            f"Processed chunk {chunk_index + 1}/{len(chunks)} for {document.file_name}")
-
-                except Exception as e:
-                    logger.error(
-                        f"Batch processing failed for chunks {batch_start}-{batch_start + len(batch) - 1}: {e}")
-                    # Add chunks without summaries as fallback
-                    for idx, chunk_text in enumerate(batch):
-                        chunk_index = batch_start + idx
-                        chunk_data.append({
-                            'chunk_index': chunk_index,
-                            'content': chunk_text,
-                            'summary': f"Summary generation failed: {str(e)[:100]}...",
-                            'token_count': self.num_tokens_from_string(chunk_text)
-                        })
-
-            logger.info(
-                f"Completed chunking and summarization for {document.file_name}: {len(chunk_data)} chunks")
-            logger.info(f"Time taken: {time.time() - start_time:.2f} seconds")
-            return chunk_data
-        except Exception as e:
-            logger.error(
-                f"Error in chunk_and_summarize for document {document.id}: {e}")
-            raise
+        chunks = self.chunk_text(markdown_content)
+        chunk_data = []
+        
+        for idx, chunk_text in enumerate(chunks):
+            if self.use_basic_summaries:
+                logger.info("Using basic summaries")
+                start_time = time.time()
+                # Generate basic summary (first 150 chars + "...")
+                basic_summary = self._generate_basic_summary(chunk_text)
+                summary = basic_summary
+                end_time = time.time()
+                logger.info(f"Basic summary generation time: {end_time - start_time:.2f} seconds for chunk {idx}")
+            else:
+                logger.info("Using AI-enhanced summaries")
+                start_time = time.time()
+                # Use existing AI summarization
+                summary = await self.generate_contextual_summary_async(markdown_content, chunk_text)
+                end_time = time.time()
+                logger.info(f"AI-enhanced summary generation time: {end_time - start_time:.2f} seconds for chunk {idx}")
+            
+            chunk_data.append({
+                'chunk_index': idx,
+                'content': chunk_text,
+                'summary': summary,
+                'summary_type': 'basic' if self.use_basic_summaries else 'ai_enhanced',
+                'token_count': self.num_tokens_from_string(chunk_text)
+            })
+        
+        return chunk_data
 
     def _safe_chunk_save(self, chunk: Chunks):
         """Thread-safe chunk save with rate limiting"""

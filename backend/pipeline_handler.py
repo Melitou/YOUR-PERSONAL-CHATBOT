@@ -195,7 +195,8 @@ class PipelineHandler:
         user_namespace: str,
         chunking_method: Optional[ChunkingMethod] = None,
         embedding_model: Optional[EmbeddingModel] = None,
-        agent_provider: Optional[AgentProvider] = None
+        agent_provider: Optional[AgentProvider] = None,
+        use_basic_summaries: bool = True
     ) -> Dict:
         """Process the complete agent creation workflow"""
 
@@ -258,7 +259,8 @@ class PipelineHandler:
                 rate_limit_delay=0.2,
                 chunking_method=chunking_method.value,
                 chunking_params={},
-                user=user
+                user=user,
+                use_basic_summaries=use_basic_summaries
             )
             # The document processor doesn't have a user field, but it operates on documents
             # We need to ensure it processes documents for this specific user
@@ -274,7 +276,7 @@ class PipelineHandler:
                 embedding_model=embedding_model.value,
                 use_parallel_upload=True,
                 use_parallel_processing=True,
-                chatbot=chatbot
+                chatbot=chatbot,
             )
 
             # Close pipeline connections
@@ -304,7 +306,10 @@ class PipelineHandler:
                 'file_metadata': file_metadata,
                 'processing_results': None,
                 'embedding_results': results.get('embedding_results'),
-                'total_time': results.get('total_complete_workflow_time', 0)
+                'total_time': results.get('total_complete_workflow_time', 0),
+                'can_enhance': True,
+                'basic_summaries': use_basic_summaries,
+                'enhancement_available': True
             }
 
             # Add processing results if available

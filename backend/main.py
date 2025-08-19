@@ -2,20 +2,22 @@ import os
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Dict
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, status, Depends, UploadFile, File, Form, Query
+from fastapi import FastAPI, HTTPException, status, Depends, UploadFile, File, Form, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.websockets import WebSocket, WebSocketDisconnect
 
 from api_models import (
-    CreateAgentRequest, CreateAgentResponse, LoginRequest, LoginResponse,
-    SigninRequest, SigninResponse, UserResponse, ErrorResponse,
+    CreateAgentResponse, LoginRequest, LoginResponse,
+    SigninRequest, SigninResponse, UserResponse,
     ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse,
-    CreateSessionRequest, CreateSessionResponse, ChatMessageRequest, ChatMessageResponse, ConversationMessagesResponse, ConversationSummary
+    CreateSessionResponse, ConversationSummary, ChatbotHealthResponse,
+    CheckDocumentsRequest, CheckDocumentsResponse, ExistingDocumentInfo,
+    EnhancementStatus
 )
 from auth_utils import (
     authenticate_user, create_user, create_access_token, verify_token,
@@ -129,20 +131,28 @@ def user_to_response(user: User_Auth_Table) -> UserResponse:
         role=user.role if user.role else "User"  # Default to "User" if role is None
     )
 
+async def authenticate_websocket(websocket: WebSocket, token: str) -> User_Auth_Table:
+    """Authenticate WebSocket connection using JWT token"""
+    try:
+        payload = verify_token(token)
+        username = payload.get("sub")
 
-class CheckDocumentsRequest(BaseModel):
-    hashes: List[str]
+        user = get_user_by_username(username)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+
+        return user
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token"
+        )
 
 
-class ExistingDocumentInfo(BaseModel):
-    hash: str
-    file_name: str
-    namespace: str
-    chatbots: List[str]
-
-
-class CheckDocumentsResponse(BaseModel):
-    duplicates: List[ExistingDocumentInfo]
+# ==============================================ENDPOINTS==============================================
 
 
 @app.post("/documents/check-exists", response_model=CheckDocumentsResponse, tags=["Documents"])
@@ -177,19 +187,6 @@ async def check_documents_exists(request: CheckDocumentsRequest, current_user: U
         logger.error(f"Error checking document existence: {e}")
         raise HTTPException(
             status_code=500, detail="Error checking document existence")
-
-
-class ChatbotHealthResponse(BaseModel):
-    chatbot_id: str
-    name: str
-    namespace: str
-    provider: str
-    embedding_model: str
-    pinecone_index: str
-    pinecone_vectors: int
-    mongo_chunks_total: int
-    mongo_embedded: int
-    ready: bool
 
 
 @app.get("/chatbots/{chatbot_id}/health", response_model=ChatbotHealthResponse, tags=["Chatbot"])
@@ -369,10 +366,15 @@ async def create_agent(
     files: List[UploadFile] = File(...,
                                    description="Documents to process (PDF, DOCX, TXT, CSV)"),
     # Authentication
-    current_user: User_Auth_Table = Depends(get_current_user)
+    current_user: User_Auth_Table = Depends(get_current_user),
+    use_basic_summaries: bool = Form(True, description="Use basic summaries instead of AI-enhanced summaries")
 ):
     """Create a new agent with document processing and embedding generation"""
     try:
+
+        # TODO: DELETE THIS
+        # For testing purposes, we will set use_basic_summaries to False to see the basic summaries
+        use_basic_summaries = True
 
         # Log the request
         logger.info(f"\n\n\nCreating agent for user: {current_user.user_name}")
@@ -458,7 +460,8 @@ async def create_agent(
             user_namespace=user_namespace,
             chunking_method=chunking_method_enum,
             embedding_model=embedding_model_enum,
-            agent_provider=agent_provider_enum
+            agent_provider=agent_provider_enum,
+            use_basic_summaries=use_basic_summaries
         )
 
         # Create response
@@ -488,6 +491,130 @@ async def create_agent(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
+
+@app.post("/enhance_agent/{chatbot_id}", response_model=Dict[str, str], tags=["Agent Management"])
+async def enhance_agent_summaries(
+    chatbot_id: str,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Start background enhancement of agent summaries using OpenAI Batch API"""
+    try:
+        from batch_enhancement_service import BatchEnhancementService
+        from bson import ObjectId
+        from db_service import ChatBots
+
+        chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=current_user).first()
+        if not chatbot:
+            raise HTTPException(status_code=404, detail="Chatbot not found")
+
+        service = BatchEnhancementService()
+        batch_id = await service.start_enhancement_job(chatbot_id=chatbot_id, user_id=str(current_user.id))
+        return {"batch_id": batch_id, "status": "submitted"}
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Error starting enhancement job for chatbot {chatbot_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to start enhancement job")
+
+@app.get("/enhancement_status/{chatbot_id}", response_model=EnhancementStatus, tags=["Agent Management"])
+async def get_enhancement_status(
+    chatbot_id: str,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Get status of background enhancement job"""
+    try:
+        from bson import ObjectId
+        from db_service import ChatBots, BatchSummarizationJob
+        from api_models import EnhancementStatus, BatchJobStatus
+
+        chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=current_user).first()
+        if not chatbot:
+            raise HTTPException(status_code=404, detail="Chatbot not found")
+
+        job = BatchSummarizationJob.objects(chatbot=chatbot, user=current_user).order_by('-created_at').first()
+        if not job:
+            raise HTTPException(status_code=404, detail="No enhancement job found for this chatbot")
+
+        return EnhancementStatus(
+            batch_id=job.batch_id,
+            status=BatchJobStatus(job.status),
+            total_requests=job.total_requests,
+            request_counts=job.request_counts_by_status or {},
+            created_at=job.created_at,
+            completed_at=job.completed_at
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving enhancement status for chatbot {chatbot_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve enhancement status")
+
+@app.post("/webhooks/openai/batch", tags=["Webhooks"])
+async def openai_batch_webhook(request: Request):
+    """Handle OpenAI batch completion webhooks"""
+    try:
+        from webhook_handlers import WebhookHandler
+
+        body = await request.body()
+        signature = (
+            request.headers.get('OpenAI-Signature') or
+            request.headers.get('OpenAI-Signature-256') or
+            request.headers.get('x-openai-signature') or
+            request.headers.get('X-OpenAI-Signature') or
+            ''
+        )
+
+        webhook_secret = os.getenv('OPENAI_WEBHOOK_SECRET', '')
+        if not webhook_secret:
+            logger.warning("OPENAI_WEBHOOK_SECRET not set; rejecting webhook for safety")
+            raise HTTPException(status_code=401, detail="Webhook not configured")
+
+        handler = WebhookHandler(webhook_secret)
+        if not handler.verify_webhook_signature(body, signature):
+            raise HTTPException(status_code=401, detail="Invalid signature")
+
+        try:
+            event_data = await request.json()
+        except Exception:
+            event_data = json.loads(body.decode('utf-8'))
+
+        result = await handler.handle_batch_event(event_data)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error handling OpenAI webhook: {e}")
+        raise HTTPException(status_code=500, detail="Webhook processing error")
+
+@app.get("/notifications", response_model=List[Dict], tags=["User Management"])
+async def get_user_notifications(
+    current_user: User_Auth_Table = Depends(get_current_user),
+    unread_only: bool = False
+):
+    """Get user notifications"""
+    try:
+        from notification_service import NotificationService
+
+        notifications = NotificationService.get_user_notifications(current_user, unread_only)
+        response: List[Dict] = []
+        for n in notifications:
+            response.append({
+                "id": str(n.id),
+                "type": n.notification_type,
+                "title": n.title,
+                "message": n.message,
+                "is_read": bool(getattr(n, 'is_read', False)),
+                "created_at": n.created_at.isoformat() if getattr(n, 'created_at', None) else None,
+                "read_at": n.read_at.isoformat() if getattr(n, 'read_at', None) else None,
+                "chatbot_id": str(n.chatbot.id) if getattr(n, 'chatbot', None) else None,
+                "batch_id": n.batch_job.batch_id if getattr(n, 'batch_job', None) else None,
+            })
+        return response
+    except Exception as e:
+        logger.error(f"Error fetching user notifications: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch notifications")
 
 
 @app.get("/chatbots", response_model=List[ChatbotDetailResponse], tags=["Chatbot"])
@@ -566,28 +693,6 @@ async def create_conversation_session(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error creating conversation session"
         )
-
-
-async def authenticate_websocket(websocket: WebSocket, token: str) -> User_Auth_Table:
-    """Authenticate WebSocket connection using JWT token"""
-    try:
-        payload = verify_token(token)
-        username = payload.get("sub")
-
-        user = get_user_by_username(username)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
-            )
-
-        return user
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token"
-        )
-
 
 @app.websocket("/ws/conversation/session/{session_id}")
 async def websocket_conversation(websocket: WebSocket, session_id: str):
@@ -1012,8 +1117,8 @@ async def delete_chatbot(chatbot_id: str, current_user: User_Auth_Table = Depend
         logger.error(f"Error deleting chatbot {chatbot_id}: {e}")
         raise HTTPException(status_code=500, detail="Error deleting chatbot")
 
+# ==============================================Error handlers==============================================
 
-# Error handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc: HTTPException):
     """Handle HTTP exceptions"""

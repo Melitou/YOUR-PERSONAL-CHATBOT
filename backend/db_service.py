@@ -6,7 +6,7 @@ from gridfs import GridFS
 import hashlib
 
 
-def initialize_db(db_url: str = "mongodb://localhost:27017/"):
+def initialize_db(db_url: str = "mongodb://localhost:50000/"):
     """Initialize MongoDB connection and create necessary indexes"""
     try:
         database_name = "your_personal_chatbot_db"
@@ -176,6 +176,52 @@ class Documents(Document):
     def __str__(self) -> str:
         return f"Documents(user={self.user}, file_name={self.file_name}, file_type={self.file_type}, status={self.status}, namespace={self.namespace}, chunking_method={self.chunking_method}, created_at={self.created_at})"
 
+class BatchSummarizationJob(Document):
+    """Track OpenAI batch summarization jobs"""
+    # Core identifiers
+    chatbot = ReferenceField(ChatBots, required=True)
+    user = ReferenceField(User_Auth_Table, required=True)
+    batch_id = StringField(required=True, unique=True)  # OpenAI batch ID
+    
+    # Job tracking
+    status = StringField(
+        required=True,
+        choices=['submitted', 'validating', 'in_progress', 'finalizing', 'completed', 'failed', 'expired', 'cancelled'],
+        default='submitted'
+    )
+    
+    # Progress tracking
+    total_requests = IntField(required=True)
+    request_counts_by_status = DictField(default={})  # OpenAI batch status breakdown
+    
+    # Timestamps
+    created_at = DateTimeField(required=True, default=datetime.utcnow)
+    submitted_at = DateTimeField()
+    started_at = DateTimeField()
+    completed_at = DateTimeField()
+    failed_at = DateTimeField()
+    
+    # OpenAI file references
+    input_file_id = StringField(required=True)
+    output_file_id = StringField()
+    error_file_id = StringField()
+    
+    # Error handling
+    error_message = StringField()
+    retry_count = IntField(default=0)
+    
+    meta = {
+        'collection': 'batch_summarization_jobs',
+        'indexes': [
+            {'fields': ['chatbot']},
+            {'fields': ['user']},
+            {'fields': ['batch_id'], 'unique': True},
+            {'fields': ['status']},
+            {'fields': ['created_at']},
+            {'fields': [('user', 1), ('status', 1)]},
+            {'fields': [('chatbot', 1), ('status', 1)]}
+        ]
+    }
 
 class Chunks(Document):
     """Chunks table for document text chunks with vector IDs"""
@@ -187,7 +233,19 @@ class Chunks(Document):
     # The sequential order of the chunk within the document
     chunk_index = IntField(required=True)
     content = StringField(required=True)
-    summary = StringField(required=True)
+    # Now optional/nullable for basic summaries
+
+    summary = StringField(required=True) # Keep required but allow basic summaries
+    
+    # Fields for enhancement tracking
+    summary_type = StringField(
+        choices=['basic', 'ai_enhanced'], 
+        default='basic'
+    )
+    enhanced_at = DateTimeField()  # When AI enhancement was applied
+    batch_job = ReferenceField(BatchSummarizationJob, required=False)  # Reference to enhancement job
+
+    
     # Chunking method used to generate this chunk
     chunking_method = StringField(required=False, choices=[
         'token', 'semantic', 'line', 'recursive'], default='token')
@@ -210,6 +268,36 @@ class Chunks(Document):
     def __str__(self) -> str:
         return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, file_name={self.file_name}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, vector_id={self.vector_id}, created_at={self.created_at})"
 
+class UserNotification(Document):
+    """User notifications for batch job completions"""
+    user = ReferenceField(User_Auth_Table, required=True)
+    chatbot = ReferenceField(ChatBots, required=True)
+    batch_job = ReferenceField(BatchSummarizationJob, required=True)
+    
+    notification_type = StringField(
+        choices=['enhancement_completed', 'enhancement_failed', 'enhancement_started'],
+    required=True
+    )
+    
+    title = StringField(required=True)
+    message = StringField(required=True)
+    
+    # Status tracking
+    is_read = BooleanField(default=False)
+    created_at = DateTimeField(required=True, default=datetime.utcnow)
+    read_at = DateTimeField()
+    
+    meta = {
+        'collection': 'user_notifications',
+        'indexes': [
+            {'fields': ['user']},
+            {'fields': ['chatbot']},
+            {'fields': ['batch_job']},
+            {'fields': [('user', 1), ('is_read', 1)]},
+            {'fields': ['created_at']}
+        ]
+    }
+
 class ChatbotDocumentsMapper(Document):
     """Mapping table between ChatBots and Documents"""
     chatbot = ReferenceField(ChatBots, required=True)
@@ -228,6 +316,7 @@ class ChatbotDocumentsMapper(Document):
 
     def __str__(self) -> str:
         return f"ChatbotDocumentsMapper(chatbot={self.chatbot}, document={self.document}, user={self.user}, assigned_at={self.assigned_at})"
+
 
 def upload_file_to_gridfs(fs: GridFS, file_content: bytes, filename: str, content_type: str = "text/plain") -> ObjectId:
     """Upload a file to GridFS and return the file ObjectId"""

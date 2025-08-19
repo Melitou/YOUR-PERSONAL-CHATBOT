@@ -71,6 +71,7 @@ summary_preview: "This chunk contains the beginning of \"Alice's Ad
 - One error
 - Try again button is missing
 - Remove real time data from manage chatbots
+- Chunking and embeddings options shown ✅
 - Delete and rename conversations
 - Back to the home page
 - Add final agent in super (hold)

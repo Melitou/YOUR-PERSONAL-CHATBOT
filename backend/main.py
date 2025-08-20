@@ -90,10 +90,11 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    #allow_origins=["https://yourdomain.com"], # TODO: Add specific domains only
+    allow_origins=["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000", "http://127.0.0.1:8000", "http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -364,8 +365,7 @@ async def create_agent(
     user_namespace: str = Form(
         ..., description="Namespace prefix for the chatbot (no underscores, max 50 chars)"),
     # Files
-    files: List[UploadFile] = File(...,
-                                   description="Documents to process (PDF, DOCX, TXT, CSV)"),
+    files: List[UploadFile] = File(..., max_size=10_000_000),  # 10MB limit
     # Authentication
     current_user: User_Auth_Table = Depends(get_current_user),
     use_basic_summaries: bool = Form(True, description="Use basic summaries instead of AI-enhanced summaries")

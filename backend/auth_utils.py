@@ -3,6 +3,8 @@ Authentication utilities for the FastAPI server
 """
 import os
 from datetime import datetime, timedelta
+import random
+import string
 from typing import Optional
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -14,7 +16,11 @@ from db_service import User_Auth_Table
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT settings
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-here-change-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", None)
+
+if SECRET_KEY is None:
+    SECRET_KEY = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(64))
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

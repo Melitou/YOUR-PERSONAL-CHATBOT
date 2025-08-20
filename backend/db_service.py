@@ -6,7 +6,7 @@ from gridfs import GridFS
 import hashlib
 
 
-def initialize_db(db_url: str = "mongodb://localhost:50000/"):
+def initialize_db(db_url: str = "mongodb://localhost:27017/"):
     """Initialize MongoDB connection and create necessary indexes"""
     try:
         database_name = "your_personal_chatbot_db"
@@ -27,6 +27,7 @@ def initialize_db(db_url: str = "mongodb://localhost:50000/"):
     except Exception as e:
         print(f"Error initializing database: {e}")
         return None, None, None
+
 
 class User_Auth_Table(Document):
     """User authentication table with user_id as main connector"""
@@ -49,6 +50,7 @@ class User_Auth_Table(Document):
 
     def __str__(self) -> str:
         return f"User_Auth_Table(user_name={self.user_name}, first_name={self.first_name}, last_name={self.last_name}, email={self.email}, role={self.role})"
+
 
 class ChatBots(Document):
     """ChatBots table to store chatbot configurations"""
@@ -75,9 +77,11 @@ class ChatBots(Document):
     def __str__(self) -> str:
         return f"ChatBots(name={self.name}, description={self.description}, embedding_model={self.embedding_model}, chunking_method={self.chunking_method}, date_created={self.date_created}, user_id={self.user_id}, namespace={self.namespace})"
 
+
 class Conversation(Document):
     """A conversation made between a user and a chatbot, it belongs to the chatbot"""
-    conversation_title = StringField(required=False, default="New Conversation")
+    conversation_title = StringField(
+        required=False, default="New Conversation")
     chatbot = ReferenceField(ChatBots, required=True)
     created_at = DateTimeField(required=True)
     updated_at = DateTimeField(required=True)
@@ -93,6 +97,7 @@ class Conversation(Document):
 
     def __str__(self) -> str:
         return f"Conversation(conversation_title={self.conversation_title}, chatbot={self.chatbot}, created_at={self.created_at}, updated_at={self.updated_at})"
+
 
 class Messages(Document):
     """A message made between a user and a chatbot, it belongs to the conversation"""
@@ -113,12 +118,15 @@ class Messages(Document):
     def __str__(self) -> str:
         return f"Messages(conversation_id={self.conversation_id}, message={self.message}, role={self.role}, created_at={self.created_at})"
 
+
 class ConversationSession(Document):
     """Active conversation sessions for real-time conversations"""
     user_id = ReferenceField(User_Auth_Table, required=True)
-    chatbot_id = ReferenceField(ChatBots, required=True) # The chatbot that the conversation belongs to
+    # The chatbot that the conversation belongs to
+    chatbot_id = ReferenceField(ChatBots, required=True)
     conversation_id = ReferenceField(Conversation, required=True)
-    session_id = StringField(required=True, unique=True)  # UUID for WebSocket connection
+    # UUID for WebSocket connection
+    session_id = StringField(required=True, unique=True)
     created_at = DateTimeField(required=True)
     last_activity = DateTimeField(required=True)
     is_active = BooleanField(required=True, default=True)
@@ -132,12 +140,14 @@ class ConversationSession(Document):
             {'fields': ['created_at']},
             {'fields': ['last_activity']},
             {'fields': ['is_active']},
-            {'fields': [('user_id', 1), ('is_active', 1)]},  # For finding active user sessions
+            # For finding active user sessions
+            {'fields': [('user_id', 1), ('is_active', 1)]},
         ]
     }
 
     def __str__(self) -> str:
         return f"ConversationSession(user_id={self.user_id}, chatbot_id={self.chatbot_id}, session_id={self.session_id}, is_active={self.is_active})"
+
 
 class Documents(Document):
     user = ReferenceField(User_Auth_Table, required=True)
@@ -145,23 +155,28 @@ class Documents(Document):
     file_type = StringField(required=True)
     gridfs_file_id = ObjectIdField(
         required=True, unique=True)  # Link to GridFS ObjectId
-    status = StringField(required=True, choices=['pending', 'processed', 'failed'])
-    full_hash = StringField(required=True) # SHA256 hash
+    status = StringField(required=True, choices=[
+                         'pending', 'processed', 'failed'])
+    full_hash = StringField(required=True)  # SHA256 hash
     namespace = StringField(required=True)
-    chunking_method = StringField(required=False, choices=['token', 'semantic', 'line', 'recursive'], default='token')
+    chunking_method = StringField(required=False, choices=[
+                                  'token', 'semantic', 'line', 'recursive'], default='token')
     created_at = DateTimeField(required=True)
 
     meta = {
         'collection': 'documents',
         'indexes': [
             {'fields': ['user']},
-            {'fields': ['gridfs_file_id'], 'unique': True},  # Restored unique constraint
+            # Restored unique constraint
+            {'fields': ['gridfs_file_id'], 'unique': True},
             {'fields': ['full_hash']},
             {'fields': ['status']},
             {'fields': ['chunking_method']},
             {'fields': ['namespace']},
-            {'fields': [('user', 1), ('full_hash', 1)], 'unique': True},  # Restored unique constraint
-            {'fields': [('user', 1), ('full_hash', 1), ('namespace', 1)]}  # For faster duplicate detection
+            # Restored unique constraint
+            {'fields': [('user', 1), ('full_hash', 1)], 'unique': True},
+            # For faster duplicate detection
+            {'fields': [('user', 1), ('full_hash', 1), ('namespace', 1)]}
         ]
     }
 
@@ -176,40 +191,43 @@ class Documents(Document):
     def __str__(self) -> str:
         return f"Documents(user={self.user}, file_name={self.file_name}, file_type={self.file_type}, status={self.status}, namespace={self.namespace}, chunking_method={self.chunking_method}, created_at={self.created_at})"
 
+
 class BatchSummarizationJob(Document):
     """Track OpenAI batch summarization jobs"""
     # Core identifiers
     chatbot = ReferenceField(ChatBots, required=True)
     user = ReferenceField(User_Auth_Table, required=True)
     batch_id = StringField(required=True, unique=True)  # OpenAI batch ID
-    
+
     # Job tracking
     status = StringField(
         required=True,
-        choices=['submitted', 'validating', 'in_progress', 'finalizing', 'completed', 'failed', 'expired', 'cancelled'],
+        choices=['submitted', 'validating', 'in_progress',
+                 'finalizing', 'completed', 'failed', 'expired', 'cancelled'],
         default='submitted'
     )
-    
+
     # Progress tracking
     total_requests = IntField(required=True)
-    request_counts_by_status = DictField(default={})  # OpenAI batch status breakdown
-    
+    request_counts_by_status = DictField(
+        default={})  # OpenAI batch status breakdown
+
     # Timestamps
     created_at = DateTimeField(required=True, default=datetime.utcnow)
     submitted_at = DateTimeField()
     started_at = DateTimeField()
     completed_at = DateTimeField()
     failed_at = DateTimeField()
-    
+
     # OpenAI file references
     input_file_id = StringField(required=True)
     output_file_id = StringField()
     error_file_id = StringField()
-    
+
     # Error handling
     error_message = StringField()
     retry_count = IntField(default=0)
-    
+
     meta = {
         'collection': 'batch_summarization_jobs',
         'indexes': [
@@ -223,6 +241,7 @@ class BatchSummarizationJob(Document):
         ]
     }
 
+
 class Chunks(Document):
     """Chunks table for document text chunks with vector IDs"""
     document = ReferenceField(Documents, required=True)
@@ -235,17 +254,18 @@ class Chunks(Document):
     content = StringField(required=True)
     # Now optional/nullable for basic summaries
 
-    summary = StringField(required=True) # Keep required but allow basic summaries
-    
+    # Keep required but allow basic summaries
+    summary = StringField(required=True)
+
     # Fields for enhancement tracking
     summary_type = StringField(
-        choices=['basic', 'ai_enhanced'], 
+        choices=['basic', 'ai_enhanced'],
         default='basic'
     )
     enhanced_at = DateTimeField()  # When AI enhancement was applied
-    batch_job = ReferenceField(BatchSummarizationJob, required=False)  # Reference to enhancement job
+    # Reference to enhancement job
+    batch_job = ReferenceField(BatchSummarizationJob, required=False)
 
-    
     # Chunking method used to generate this chunk
     chunking_method = StringField(required=False, choices=[
         'token', 'semantic', 'line', 'recursive'], default='token')
@@ -268,25 +288,27 @@ class Chunks(Document):
     def __str__(self) -> str:
         return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, file_name={self.file_name}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, vector_id={self.vector_id}, created_at={self.created_at})"
 
+
 class UserNotification(Document):
     """User notifications for batch job completions"""
     user = ReferenceField(User_Auth_Table, required=True)
     chatbot = ReferenceField(ChatBots, required=True)
     batch_job = ReferenceField(BatchSummarizationJob, required=True)
-    
+
     notification_type = StringField(
-        choices=['enhancement_completed', 'enhancement_failed', 'enhancement_started'],
-    required=True
+        choices=['enhancement_completed',
+                 'enhancement_failed', 'enhancement_started'],
+        required=True
     )
-    
+
     title = StringField(required=True)
     message = StringField(required=True)
-    
+
     # Status tracking
     is_read = BooleanField(default=False)
     created_at = DateTimeField(required=True, default=datetime.utcnow)
     read_at = DateTimeField()
-    
+
     meta = {
         'collection': 'user_notifications',
         'indexes': [
@@ -297,6 +319,7 @@ class UserNotification(Document):
             {'fields': ['created_at']}
         ]
     }
+
 
 class ChatbotDocumentsMapper(Document):
     """Mapping table between ChatBots and Documents"""

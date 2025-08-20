@@ -60,6 +60,21 @@ class ApiClient {
         }
     }
 
+    async put(endpoint: string, data: any) {
+        try {
+            const response = await fetch(`${this.baseURL}${endpoint}`, {
+                method: 'PUT',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify(data),
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Network error occurred';
+            console.error('PUT request failed:', errorMessage);
+            throw error;
+        }
+    }
+
     async delete(endpoint: string) {
         try {
             const response = await fetch(`${this.baseURL}${endpoint}`, {
@@ -245,6 +260,16 @@ export const chatbotApi = {
     createNewConversationWithSession: (chatbotId: string) => {
         return apiClient.post(`/chatbot/${chatbotId}/conversation/new`, {});
     },
+
+    // Update conversation name
+    updateConversationName: (chatbotId: string, conversationId: string, newName: string) =>
+        apiClient.put(`/chatbot/${chatbotId}/conversation/${conversationId}`, {
+            new_conversation_title: newName
+        }),
+
+    // Delete conversation
+    deleteConversation: (chatbotId: string, conversationId: string) =>
+        apiClient.delete(`/chatbot/${chatbotId}/conversation/${conversationId}`),
 };
 
 // Admin API (Super User only)

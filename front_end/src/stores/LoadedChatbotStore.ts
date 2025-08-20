@@ -55,7 +55,7 @@ const LoadedChatbotStore = create((set, get) => ({
         if (state.webSocket) {
             state.webSocket.close();
         }
-        set({ 
+        set({
             loadedChatbot,
             conversationMessages: null, // Clear previous conversation
             chatbotSession: null,     // Clear previous session
@@ -86,15 +86,15 @@ const LoadedChatbotStore = create((set, get) => ({
         const state = get() as any;
         const conversation = state.conversationMessages;
         if (!conversation) return;
-        
+
         const currentMessages = [...(conversation.messages || [])];
-        
+
         // Check if the last message is an agent message that's still being built
         const lastMessage = currentMessages[currentMessages.length - 1];
-        
+
         console.log('handleStreamingChunk - lastMessage:', lastMessage);
         console.log('handleStreamingChunk - chunk:', chunk);
-        
+
         if (lastMessage && lastMessage.role === 'agent') {
             // Append to existing assistant message (ensure it's marked as streaming)
             console.log('Appending to last assistant message');
@@ -111,7 +111,7 @@ const LoadedChatbotStore = create((set, get) => ({
             };
             currentMessages.push(newMessage);
         }
-        
+
         set({ conversationMessages: { ...conversation, messages: currentMessages } });
     },
 
@@ -120,14 +120,14 @@ const LoadedChatbotStore = create((set, get) => ({
         const state = get() as any;
         const conversation = state.conversationMessages;
         if (!conversation) return;
-        
+
         const currentMessages = [...(conversation.messages || [])];
-        
+
         // Find and update the last agent message that was streaming
         const lastMessage = currentMessages[currentMessages.length - 1];
         console.log('completeStreamingResponse - lastMessage:', lastMessage);
         console.log('completeStreamingResponse - fullResponse length:', fullResponse?.length);
-        
+
         if (lastMessage && lastMessage.role === 'agent') {
             console.log('Completing streaming response');
             // Ensure the message content is finalized and timestamped
@@ -139,10 +139,10 @@ const LoadedChatbotStore = create((set, get) => ({
             // Mark streaming as finished so UI stops showing the typing indicator
             lastMessage.isStreaming = false;
         }
-        
-        set({ 
+
+        set({
             conversationMessages: { ...conversation, messages: currentMessages },
-            isThinking: false 
+            isThinking: false
         });
     },
 
@@ -151,16 +151,16 @@ const LoadedChatbotStore = create((set, get) => ({
         const state = get() as any;
         const conversation = state.conversationMessages;
         if (!conversation) return;
-        
+
         const currentMessages = [...(conversation.messages || [])];
-        
+
         // Find and update the last agent message that was streaming
         const lastMessage = currentMessages[currentMessages.length - 1];
         if (lastMessage && lastMessage.role === 'agent' && lastMessage.isStreaming === true) {
             delete lastMessage.isStreaming; // Remove streaming flag
         }
-        
-        set({ 
+
+        set({
             conversationMessages: { ...conversation, messages: currentMessages }
         });
     },
@@ -173,17 +173,17 @@ const LoadedChatbotStore = create((set, get) => ({
     startConversationSession: async (conversationId: string, chatbotId: string): Promise<string> => {
         try {
             console.log('Starting conversation session for conversationId:', conversationId);
-            
+
             // 1. Disconnect existing WebSocket first
             const state = get() as any;
             if (state.webSocket) {
                 state.webSocket.close();
             }
-            
+
             const response = await chatbotApi.createConversationSession(chatbotId, conversationId);
             set({ chatbotSession: response });
             set({ conversationMessages: response });
-            
+
             return response.session_id; // return the session_id to later connect to WebSocket
         } catch (error) {
             console.error('Failed to start conversation session:', error);
@@ -196,10 +196,10 @@ const LoadedChatbotStore = create((set, get) => ({
         /*
         This function creates a new conversation and a session id for it.
         It returns the conversation_id to later connect to WebSocket.
-        */  
+        */
         try {
             const response = await chatbotApi.createNewConversationWithSession(chatbotId);
-            
+
             set({ conversationMessages: response }); // we expect the messages to be empty, because it is a new conversation
 
             return response.session_id; // return the session_id to later connect to WebSocket
@@ -215,18 +215,18 @@ const LoadedChatbotStore = create((set, get) => ({
             if (!userToken) {
                 throw new Error('No authentication token found');
             }
-    
+
             const wsUrl = `ws://localhost:8000/ws/conversation/session/${sessionId}?token=${userToken}`;
             const ws = new WebSocket(wsUrl);
-            
+
             ws.onopen = () => {
                 set({ webSocket: ws });
             };
-            
+
             ws.onmessage = (event) => {
                 try {
                     const messageData = JSON.parse(event.data);
-                    
+
                     if (messageData.type === 'response_chunk') { // Streaming response chunks
                         const state = get() as any;
                         state.handleStreamingChunk(messageData.chunk);
@@ -245,16 +245,16 @@ const LoadedChatbotStore = create((set, get) => ({
                     console.error('Failed to parse WebSocket message:', parseError);
                 }
             };
-            
+
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
                 set({ webSocket: null });
             };
-            
+
             ws.onclose = () => {
                 set({ webSocket: null });
             };
-            
+
             return ws;
         } catch (error) {
             console.error('Failed to connect to WebSocket:', error);
@@ -262,45 +262,121 @@ const LoadedChatbotStore = create((set, get) => ({
         }
     },
 
-     // Disconnect WebSocket
-     disconnectWebSocket: () => {
-         const state = get() as any;
-         if (state.webSocket) {
-             state.webSocket.close();
-             set({ webSocket: null });
-         }
-     },
+    // Disconnect WebSocket
+    disconnectWebSocket: () => {
+        const state = get() as any;
+        if (state.webSocket) {
+            state.webSocket.close();
+            set({ webSocket: null });
+        }
+    },
 
-     // Send message via WebSocket
-     sendMessage: (message: string) => {
-         const state = get() as any;
-         if (state.webSocket && state.webSocket.readyState === WebSocket.OPEN) {
-             // Add user message to conversation immediately
-             const userMessage: Message = {
-                 message: message,
-                 created_at: new Date().toISOString(),
-                 role: 'user'
-             };
-             
-             const conversation = state.conversationMessages;
-             const currentMessages = [...(conversation?.messages || [])];
-             currentMessages.push(userMessage);
-             set({ 
-                 conversationMessages: { ...conversation, messages: currentMessages },
-                 isThinking: true // Set thinking state while waiting for response
-             });
+    // Send message via WebSocket
+    sendMessage: (message: string) => {
+        const state = get() as any;
+        if (state.webSocket && state.webSocket.readyState === WebSocket.OPEN) {
+            // Add user message to conversation immediately
+            const userMessage: Message = {
+                message: message,
+                created_at: new Date().toISOString(),
+                role: 'user'
+            };
 
-             const messageData = {
-                 message: message,
-                 timestamp: new Date().toISOString()
-             };
-                         state.webSocket.send(JSON.stringify(messageData));
+            const conversation = state.conversationMessages;
+            const currentMessages = [...(conversation?.messages || [])];
+            currentMessages.push(userMessage);
+            set({
+                conversationMessages: { ...conversation, messages: currentMessages },
+                isThinking: true // Set thinking state while waiting for response
+            });
+
+            const messageData = {
+                message: message,
+                timestamp: new Date().toISOString()
+            };
+            state.webSocket.send(JSON.stringify(messageData));
             return true;
-         } else {
-             console.error('WebSocket is not connected');
-             return false;
-         }
-     },
+        } else {
+            console.error('WebSocket is not connected');
+            return false;
+        }
+    },
+
+    // Update conversation name
+    updateConversationName: async (conversationId: string, newName: string) => {
+        const state = get() as any;
+        const { loadedChatbot, loadedChatbotHistory } = state;
+
+        if (!loadedChatbot) {
+            throw new Error('No chatbot loaded');
+        }
+
+        try {
+            // Call API to update conversation name
+            await chatbotApi.updateConversationName(loadedChatbot.id, conversationId, newName);
+
+            // Update local state optimistically
+            const updatedHistory = loadedChatbotHistory.map((conversation: ConversationSummary) =>
+                conversation.conversation_id === conversationId
+                    ? { ...conversation, conversation_title: newName }
+                    : conversation
+            );
+
+            set({ loadedChatbotHistory: updatedHistory });
+
+            // Update current conversation messages if it's the active conversation
+            const currentConversation = state.conversationMessages;
+            if (currentConversation && currentConversation.conversation_id === conversationId) {
+                // We don't need to update conversation messages as the title isn't stored there
+                // The title update will be reflected in the sidebar
+            }
+        } catch (error) {
+            console.error('Failed to update conversation name:', error);
+            throw error;
+        }
+    },
+
+    // Delete conversation
+    deleteConversation: async (conversationId: string) => {
+        const state = get() as any;
+        const { loadedChatbot, loadedChatbotHistory } = state;
+
+        if (!loadedChatbot) {
+            throw new Error('No chatbot loaded');
+        }
+
+        try {
+            // Call API to delete conversation
+            await chatbotApi.deleteConversation(loadedChatbot.id, conversationId);
+
+            // Update local state optimistically
+            const updatedHistory = loadedChatbotHistory.filter((conversation: ConversationSummary) =>
+                conversation.conversation_id !== conversationId
+            );
+
+            set({ loadedChatbotHistory: updatedHistory });
+
+            // If the deleted conversation is currently active, clear it
+            const currentConversation = state.conversationMessages;
+            if (currentConversation && currentConversation.conversation_id === conversationId) {
+                // Close WebSocket connection
+                if (state.webSocket) {
+                    state.webSocket.close();
+                }
+
+                // Clear current conversation
+                set({
+                    conversationMessages: null,
+                    chatbotSession: null,
+                    webSocket: null,
+                    isThinking: false
+                });
+            }
+        } catch (error) {
+            console.error('Failed to delete conversation:', error);
+            throw error;
+        }
+    },
 
     resetStore: () => {
         const state = get() as any;

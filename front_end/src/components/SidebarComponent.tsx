@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaEdit, FaTrash } from "react-icons/fa";
 //import UserComponent from "./UserComponent";    
 import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
 import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent";
+import EditConversationModalComponent from "./EditConversationModalComponent";
+import DeleteConversationModalComponent from "./DeleteConversationModalComponent";
 import UserAuthStore from "../stores/UserAuthStore";
 import ViewStore from "../stores/ViewStore";
 import ManageChatbotsModalComponent from "./ManageChatbotsModalComponent";
@@ -12,11 +14,17 @@ import { chatbotApi } from "../utils/api";
 
 const SidebarComponent = () => {
     const user = UserAuthStore((state: any) => state.user);
-    const { loadedChatbot, loadedChatbotHistory, startConversationSession, setLoadedChatbotHistory, connectToWebSocket, createNewConversationWithSession, webSocket } = LoadedChatbotStore((state: any) => state);
+    const { loadedChatbot, loadedChatbotHistory, startConversationSession, setLoadedChatbotHistory, connectToWebSocket, createNewConversationWithSession, webSocket, updateConversationName, deleteConversation } = LoadedChatbotStore((state: any) => state);
     const { setSidebarOpen, setCurrentView } = ViewStore();
 
     const [createBotModalOpen, setCreateBotModalOpen] = useState(false);
     const [existingChatbotsModalOpen, setExistingChatbotsModalOpen] = useState(false);
+
+    // Modal states for conversation editing and deleting
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [selectedConversation, setSelectedConversation] = useState<ConversationSummary | null>(null);
+    const [actionLoading, setActionLoading] = useState(false);
 
 
     const handleNewChatbotClick = () => {
@@ -60,6 +68,42 @@ const SidebarComponent = () => {
             console.error('Failed to start new conversation:', error);
         }
     }
+
+    // Handle edit conversation
+    const handleEditConversation = (conversation: ConversationSummary, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent conversation click
+        setSelectedConversation(conversation);
+        setEditModalOpen(true);
+    };
+
+    // Handle delete conversation
+    const handleDeleteConversation = (conversation: ConversationSummary, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent conversation click
+        setSelectedConversation(conversation);
+        setDeleteModalOpen(true);
+    };
+
+    // Save conversation name
+    const handleSaveConversationName = async (newName: string) => {
+        if (!selectedConversation) return;
+        setActionLoading(true);
+        try {
+            await updateConversationName(selectedConversation.conversation_id, newName);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // Confirm delete conversation
+    const handleConfirmDeleteConversation = async () => {
+        if (!selectedConversation) return;
+        setActionLoading(true);
+        try {
+            await deleteConversation(selectedConversation.conversation_id);
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (loadedChatbot) {
@@ -152,16 +196,39 @@ const SidebarComponent = () => {
                             return (
                                 <div
                                     key={conversation.conversation_id}
-                                    className="p-3 rounded-md hover:glass-light cursor-pointer transition-colors group"
+                                    className="p-3 rounded-md hover:glass-light cursor-pointer transition-colors group relative"
                                     onClick={() => handleConversationClick(conversation)}
                                 >
-                                    <div className="flex flex-col gap-1">
-                                        <div className="truncate glass-text text-sm font-medium">
-                                            {conversationTitle}
+                                    <div className="flex items-start gap-2">
+                                        {/* Conversation content */}
+                                        <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                            <div className="truncate glass-text text-sm font-medium">
+                                                {conversationTitle}
+                                            </div>
+                                            <div className="text-xs glass-text opacity-70 flex items-center justify-between">
+                                                <span>Click to open</span>
+                                                <span>{new Date(conversation.created_at).toLocaleDateString()}</span>
+                                            </div>
                                         </div>
-                                        <div className="text-xs glass-text opacity-70 flex items-center justify-between">
-                                            <span>Click to open</span>
-                                            <span>{new Date(conversation.created_at).toLocaleDateString()}</span>
+
+                                        {/* Action buttons - visible on hover */}
+                                        <div className="flex-none flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={(e) => handleEditConversation(conversation, e)}
+                                                className="p-1.5 hover:bg-blue-500/20 rounded text-blue-400 hover:text-blue-300 transition-colors"
+                                                title="Edit conversation name"
+                                                disabled={actionLoading}
+                                            >
+                                                <FaEdit size={12} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDeleteConversation(conversation, e)}
+                                                className="p-1.5 hover:bg-red-500/20 rounded text-red-400 hover:text-red-300 transition-colors"
+                                                title="Delete conversation"
+                                                disabled={actionLoading}
+                                            >
+                                                <FaTrash size={12} />
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -197,6 +264,29 @@ const SidebarComponent = () => {
                 onSelectChatbot={() => { }}
             />
 
+            {/* Edit conversation modal */}
+            <EditConversationModalComponent
+                open={editModalOpen}
+                onClose={() => {
+                    setEditModalOpen(false);
+                    setSelectedConversation(null);
+                }}
+                currentName={selectedConversation?.conversation_title || ""}
+                onSave={handleSaveConversationName}
+                loading={actionLoading}
+            />
+
+            {/* Delete conversation modal */}
+            <DeleteConversationModalComponent
+                open={deleteModalOpen}
+                onClose={() => {
+                    setDeleteModalOpen(false);
+                    setSelectedConversation(null);
+                }}
+                conversationName={selectedConversation?.conversation_title || ""}
+                onConfirm={handleConfirmDeleteConversation}
+                loading={actionLoading}
+            />
 
         </>
     );

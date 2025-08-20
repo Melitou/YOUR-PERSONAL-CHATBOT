@@ -28,6 +28,10 @@ class BatchEnhancementService:
 	
 	async def start_enhancement_job(self, chatbot_id: str, user_id: str) -> str:
 		"""Start a batch enhancement job for a chatbot's chunks"""
+
+		# TODO: WRONG: We need to check in the Mapper
+		# Based on the chatbot in the param, take the namespace of the "father" chatbot
+
 		chatbot = ChatBots.objects(id=chatbot_id).first()
 		user = User_Auth_Table.objects(id=user_id).first()
 		if not chatbot or not user:
@@ -36,7 +40,7 @@ class BatchEnhancementService:
 		# Target only basic summaries for enhancement
 		chunks: List[Chunks] = list(Chunks.objects(
 			namespace=chatbot.namespace,
-            user=user,
+            user=user_id,
 			summary_type="basic"
 		).order_by("chunk_index"))
 		
@@ -57,7 +61,7 @@ class BatchEnhancementService:
 			purpose="batch"
 		)
 		
-		# Create Batch job (24h window is typical for batch processing)
+		# Create Batch job (24h window)
 		batch = await self.openai_client.batches.create(
 			input_file_id=input_file.id,
 			endpoint="/v1/chat/completions",
@@ -109,6 +113,7 @@ class BatchEnhancementService:
 					{
 						"role": "user",
 						"content": f"Summarize the following text chunk, focusing on the key facts and entities.\n\nChunk:\n{ch.content}"
+						# TODO: Add the full contents of the document
 					}
 				],
 				"max_tokens": self.max_tokens,
@@ -154,7 +159,6 @@ class BatchEnhancementService:
 				# Download batch output JSONL
 				file_resp = await self.openai_client.files.content(output_file_id)
 				
-				# Handle different return types from SDK
 				text_data: Optional[str] = None
 				try:
 					# Some SDK versions expose .text
@@ -164,7 +168,6 @@ class BatchEnhancementService:
 				if not text_data:
 					# Try reading bytes
 					try:
-						# file_resp may be an httpx Response-like stream
 						if hasattr(file_resp, "aread"):
 							raw = await file_resp.aread()
 							text_data = raw.decode("utf-8")
@@ -172,7 +175,6 @@ class BatchEnhancementService:
 							raw = await file_resp.read()
 							text_data = raw.decode("utf-8")
 						else:
-							# Fallback if SDK already returns bytes/str
 							if isinstance(file_resp, (bytes, bytearray)):
 								text_data = file_resp.decode("utf-8")
 							elif isinstance(file_resp, str):
@@ -224,7 +226,7 @@ class BatchEnhancementService:
 			
 			elif status in {"failed", "expired", "cancelled"}:
 				job.failed_at = datetime.utcnow()
-				# If there is an error file, you could download and summarize it here
+				# If there is an error file
 				await NotificationService.create_enhancement_notification(
 					user=job.user,
 					chatbot=job.chatbot,

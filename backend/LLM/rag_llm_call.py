@@ -64,7 +64,8 @@ RAG_CONFIG = {
     # namespace: None 
     'namespaces': [], # This is the new approach
     'embedding_model': None,
-    'chatbot_model': None
+    'chatbot_model': None,
+    'chatbot_description': None # Added for chatbot description
 }
 
 
@@ -99,7 +100,7 @@ def get_model_provider(model: str) -> str:
         return 'unknown'
 
 
-def initialize_rag_config(user_id: str, namespaces: list, embedding_model: str, chatbot_model: str = "gpt-4.1"):
+def initialize_rag_config(user_id: str, namespaces: list, embedding_model: str, chatbot_model: str = "gpt-4.1", chatbot_description: str = None):
     """Initialize RAG configuration for the chatbot session
 
     Args:
@@ -107,6 +108,7 @@ def initialize_rag_config(user_id: str, namespaces: list, embedding_model: str, 
         namespaces: List of document namespaces
         embedding_model: Embedding model used for the documents
         chatbot_model: Model to use for chat generation (default: gpt-4.1)
+        chatbot_description: Custom description of what this chatbot is about
     """
     global RAG_CONFIG
 
@@ -119,6 +121,7 @@ def initialize_rag_config(user_id: str, namespaces: list, embedding_model: str, 
     RAG_CONFIG['namespaces'] = namespaces
     RAG_CONFIG['embedding_model'] = embedding_model
     RAG_CONFIG['chatbot_model'] = chatbot_model
+    RAG_CONFIG['chatbot_description'] = chatbot_description
 
     provider = get_model_provider(chatbot_model)
     # Suppress verbose init prints in server mode
@@ -207,6 +210,50 @@ SYSTEM_PROMPT = (
     "## PLANNING\n"
     "Plan extensively: decide whether to search, what to search for, reflect on results, then finalize the answer.\n"
 )
+
+def get_system_prompt(chatbot_description: str = None) -> str:
+    """Generate system prompt with optional chatbot description"""
+    
+    base_prompt = (
+        "# Identity\n"
+        "You are a Personal Document Assistant, an AI agent that helps users find and understand information from their uploaded documents.\n\n"
+    )
+    
+    if chatbot_description:
+        base_prompt += (
+            f"# Specialization\n"
+            f"This chatbot is specifically designed for: {chatbot_description}\n"
+            f"Keep your responses focused on this domain and use case.\n\n"
+        )
+    
+    base_prompt += (
+        "# Instructions\n"
+        "## THINKING PROCESS\n"
+        "Before answering, always think through your approach step by step:\n"
+        "1. ANALYZE the user's question to understand what information they need\n"
+        "2. PLAN your search strategy - what queries will you use and why\n"
+        "3. EXECUTE searches using the rag_search_tool\n"
+        "4. EVALUATE the search results and determine if you need more information\n"
+        "5. SYNTHESIZE the information into a comprehensive answer\n\n"
+        "## PERSISTENCE\n"
+        "You are an agent—keep working until the user's query is fully resolved. Only stop when you're sure the question is answered completely.\n"
+        "## TOOL CALLING\n"
+        "Use the rag_search_tool function to search the user's documents for relevant information. Do NOT guess or hallucinate information about the user's documents."
+        " Always search their documents first before providing answers about document content.\n"
+        "## SEARCH STRATEGY\n"
+        "- Use specific search queries that target the information the user is asking about\n"
+        "- If the first search doesn't provide complete information, try different search terms\n"
+        "- Combine information from multiple searches if needed to provide comprehensive answers\n"
+        "## RESPONSE STYLE\n"
+        "- Provide clear, accurate answers based on the retrieved document content\n"
+        "- Always cite which documents or sections your information comes from\n"
+        "- If information is not found in the documents, clearly state this\n"
+        "- Be helpful and conversational while staying accurate to the source material\n"
+        "## PLANNING\n"
+        "Plan extensively: decide whether to search, what to search for, reflect on results, then finalize the answer.\n"
+    )
+    
+    return base_prompt
 
 MAX_TOOL_CALLS = 4
 
@@ -385,8 +432,9 @@ def ask_openai_assistant(history: list, query: str, model: str) -> str:
     Returns:
         Assistant's response string
     """
-    # Initialize message history
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # Initialize message history with dynamic system prompt
+    system_prompt = get_system_prompt(RAG_CONFIG.get('chatbot_description'))
+    messages = [{"role": "system", "content": system_prompt}]
 
     # Include last 8 user-assistant exchanges
     for turn in history[-8:]:
@@ -474,8 +522,9 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
     Enhanced streaming version that includes thinking process events.
     Returns an async generator that yields content deltas and thinking events.
     """
-    # Initialize message history
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # Initialize message history with dynamic system prompt
+    system_prompt = get_system_prompt(RAG_CONFIG.get('chatbot_description'))
+    messages = [{"role": "system", "content": system_prompt}]
 
     # Include last 8 user-assistant exchanges
     for turn in history[-8:]:
@@ -638,10 +687,11 @@ def ask_gemini_assistant(history: list, query: str, model: str) -> str:
     # Convert conversation history to Gemini format
     contents = []
 
-    # Add system instruction
+    # Add system instruction with dynamic prompt
+    system_prompt = get_system_prompt(RAG_CONFIG.get('chatbot_description'))
     contents.append({
         "role": "user",
-        "parts": [{"text": f"System instructions: {SYSTEM_PROMPT}"}]
+        "parts": [{"text": f"System instructions: {system_prompt}"}]
     })
     contents.append({
         "role": "model",
@@ -769,10 +819,11 @@ async def ask_gemini_assistant_stream(history: list, query: str, model: str) -> 
     # Convert conversation history to Gemini format
     contents = []
 
-    # Add system instruction
+    # Add system instruction with dynamic prompt
+    system_prompt = get_system_prompt(RAG_CONFIG.get('chatbot_description'))
     contents.append({
         "role": "user",
-        "parts": [{"text": f"System instructions: {SYSTEM_PROMPT}"}]
+        "parts": [{"text": f"System instructions: {system_prompt}"}]
     })
     contents.append({
         "role": "model",
@@ -1022,7 +1073,7 @@ def ask_rag_assistant_sync_stream(history: list, query: str) -> str:
     finally:
         loop.close()
 
-def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, chatbot_model: str = "gpt-4.1"):
+def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, chatbot_model: str = "gpt-4.1", chatbot_description: str = None):
     """
     Start an interactive RAG chat session with the user
 
@@ -1031,9 +1082,10 @@ def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, c
         namespace: Document namespace (without user_id suffix)
         embedding_model: Embedding model used for the documents
         chatbot_model: Model to use for chat generation (default: gpt-4.1)
+        chatbot_description: Custom description of what this chatbot is about
     """
     # Initialize RAG configuration
-    initialize_rag_config(user_id, namespace, embedding_model, chatbot_model)
+    initialize_rag_config(user_id, namespace, embedding_model, chatbot_model, chatbot_description)
 
     print("\n" + "=" * 80)
     print("🤖 PERSONAL DOCUMENT ASSISTANT")
@@ -1092,9 +1144,10 @@ def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, c
 #     test_namespace = input("Enter namespace: ").strip()
 #     test_embedding_model = input(
 #         "Enter embedding model (text-embedding-3-small/gemini-embedding-001): ").strip()
+#     test_chatbot_description = input("Enter chatbot description (optional): ").strip()
 
 #     if test_user_id and test_namespace and test_embedding_model:
 #         start_rag_chat_session(
-#             test_user_id, test_namespace, test_embedding_model)
+#             test_user_id, test_namespace, test_embedding_model, chatbot_description=test_chatbot_description if test_chatbot_description else None)
 #     else:
 #         print("❌ All fields are required for testing.")

@@ -189,6 +189,20 @@ class ConversationMessagesResponse(BaseModel):
     conversation_id: str = Field(..., description="Conversation ID")
     messages: List[Message] = Field(..., description="List of messages in the conversation")
 
+class UpdateConversationRequest(BaseModel):
+    """Request model for updating the name of a conversation"""
+    new_conversation_title: str = Field(..., description="New title of the conversation")
+
+class UpdateConversationResponse(BaseModel):
+    """Response model for updating the name of a conversation"""
+    success: bool = Field(..., description="Whether the operation was successful")
+    message: str = Field(..., description="Status message")
+
+class DeleteConversationResponse(BaseModel):
+    """Response model for deleting a conversation"""
+    success: bool = Field(..., description="Whether the operation was successful")
+    message: str = Field(..., description="Status message")
+
 # Not used
 # class CreateSessionRequest(BaseModel):
 #     """Request model for creating a chat session"""

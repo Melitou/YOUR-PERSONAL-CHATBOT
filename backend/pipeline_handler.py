@@ -897,3 +897,77 @@ class PipelineHandler:
                 logger.info("Database connections closed")
         except Exception as e:
             logger.error(f"Error closing database connections: {e}")
+
+    def update_name_of_conversation(self, user_id: str, chatbot_id: str, conversation_id: str, new_conversation_title: str):
+        """Update the name of a conversation"""
+        try:
+            # Validate user
+            user = User_Auth_Table.objects(id=ObjectId(user_id)).first()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            # Validate chatbot and also see if it belongs to the user
+            chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=user).first()
+            if not chatbot:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chatbot not found or doesn't belong to user"
+                )
+
+            # Validate conversation and also see if it belongs to the chatbot
+            conversation = Conversation.objects(id=ObjectId(conversation_id), chatbot=chatbot).first()
+            if not conversation:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Conversation not found or doesn't belong to chatbot"
+                )
+            conversation.conversation_title = new_conversation_title
+            conversation.save()
+            logger.info(f"Updated name of conversation {conversation_id} for chatbot {chatbot_id} to {new_conversation_title} by user {user.user_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error updating name of conversation: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error updating name of conversation: {str(e)}"
+            )
+    
+    def delete_conversation(self, user_id: str, chatbot_id: str, conversation_id: str):
+        """Delete a conversation"""
+        try:
+            # Validate user
+            user = User_Auth_Table.objects(id=ObjectId(user_id)).first()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            # Validate chatbot and also see if it belongs to the user
+            chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=user).first()
+            if not chatbot:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chatbot not found or doesn't belong to user"
+                )
+            # Validate conversation and also see if it belongs to the chatbot
+            conversation = Conversation.objects(id=ObjectId(conversation_id), chatbot=chatbot).first()
+            if not conversation:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Conversation not found or doesn't belong to chatbot"
+                )
+            # Delete conversation
+            # First delete all messages in the conversation
+            Messages.objects(conversation_id=conversation).delete()
+            # Then delete the conversation
+            conversation.delete()
+            logger.info(f"Deleted conversation {conversation_id} for chatbot {chatbot_id} by user {user.user_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting conversation: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error deleting conversation: {str(e)}"
+            )

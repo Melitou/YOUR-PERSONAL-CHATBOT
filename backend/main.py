@@ -17,7 +17,8 @@ from api_models import (
     ChunkingMethod, EmbeddingModel, AgentProvider, ChatbotDetailResponse,
     CreateSessionResponse, ConversationSummary, ChatbotHealthResponse,
     CheckDocumentsRequest, CheckDocumentsResponse, ExistingDocumentInfo,
-    EnhancementStatus
+    EnhancementStatus, UpdateConversationRequest, UpdateConversationResponse,
+    DeleteConversationResponse
 )
 from auth_utils import (
     authenticate_user, create_user, create_access_token, verify_token,
@@ -694,6 +695,47 @@ async def create_conversation_session(
             detail="Error creating conversation session"
         )
 
+@app.put("/chatbot/{chatbot_id}/conversation/{conversation_id}", response_model=UpdateConversationResponse, tags=["Conversation Name Update"])
+async def update_name_of_conversation(
+    chatbot_id: str,
+    conversation_id: str,
+    request: UpdateConversationRequest,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Update the name of a conversation"""
+    try:
+        pipeline_handler.update_name_of_conversation(str(current_user.id), chatbot_id, conversation_id, request.new_conversation_title)
+        logger.info(f"Updated name of conversation {conversation_id} for chatbot {chatbot_id} to {request.new_conversation_title} by user {current_user.user_name}")
+        return UpdateConversationResponse(
+            success=True,
+            message=f"Conversation with ID {conversation_id} and new name {request.new_conversation_title} updated successfully for chatbot {chatbot_id} by user {current_user.user_name}"
+        )
+    except Exception as e:
+        logger.error(
+            f"Error updating name of conversation for chatbot {chatbot_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error updating name of conversation"
+        )
+
+@app.delete("/chatbot/{chatbot_id}/conversation/{conversation_id}", response_model=DeleteConversationResponse, tags=["Conversation Deletion"])
+async def delete_conversation(
+    chatbot_id: str,
+    conversation_id: str,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Delete a conversation"""
+    try:
+        pipeline_handler.delete_conversation(str(current_user.id), chatbot_id, conversation_id)
+        logger.info(f"Deleted conversation {conversation_id} for chatbot {chatbot_id} by user {current_user.user_name}")
+        return DeleteConversationResponse(
+            success=True,
+            message=f"Conversation with ID {conversation_id} deleted successfully for chatbot {chatbot_id} by user {current_user.user_name}"
+        )
+    except Exception as e:
+        logger.error(f"Error deleting conversation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete conversation")
+
 @app.websocket("/ws/conversation/session/{session_id}")
 async def websocket_conversation(websocket: WebSocket, session_id: str):
     """Handle WebSocket conversation session with streaming responses"""
@@ -811,11 +853,18 @@ async def websocket_conversation(websocket: WebSocket, session_id: str):
                 chatbot_namespace = chatbot.namespace
                 logger.info(
                     f"Using single namespace for RAG: {chatbot_namespace}")
+                
+                # Log chatbot description for debugging
+                if chatbot.description:
+                    logger.info(f"Using personalized prompt for chatbot: {chatbot.description}")
+                else:
+                    logger.info("Using default prompt (no chatbot description provided)")
 
                 initialize_rag_config(
                     user_id=str(user.id),
                     namespaces=[chatbot_namespace],  # Single namespace only
-                    embedding_model=chatbot.embedding_model
+                    embedding_model=chatbot.embedding_model,
+                    chatbot_description=chatbot.description  # Add chatbot description for personalized prompts
                 )
 
                 # Get conversation history for context

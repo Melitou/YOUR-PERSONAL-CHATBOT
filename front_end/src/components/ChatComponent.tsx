@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import LoadedChatbotStore from '../stores/LoadedChatbotStore';
+import { InlineThinkingComponent } from './ThoughtVisualizerComponent';
 
 // Typewriter component for smooth text animation
 const TypewriterText = ({ text, isStreaming, speed = 25, onComplete }: { text: string, isStreaming: boolean, speed?: number, onComplete?: () => void }) => {
@@ -141,30 +142,31 @@ const ChatComponent = () => {
                 {conversationMessages?.conversation_id ? (
                     <>
                         {conversationMessages?.messages && conversationMessages.messages.length > 0 ? (
-                            conversationMessages.messages.map((message: any, index: number) => (
-                                <div
-                                    key={index}
-                                    className={`chat-message-container ${message.role === 'user' ? 'user-message-container' : 'bot-message-container'}`}
-                                >
-                                    <div
-                                        className={`chat-message-bubble px-5 py-3 ${message.role === 'user'
-                                            ? 'glass-card user-message-bubble'
-                                            : 'glass bot-message-bubble'
-                                            }`}
-                                    >
-                                        <p className="text-xs sm:text-sm glass-text">
-                                            <TypewriterText
-                                                text={message.message}
-                                                isStreaming={message.isStreaming || false}
-                                                speed={30}
-                                                onComplete={() => {
-                                                    // Mark as complete when animation finishes
-                                                    markStreamingComplete();
-                                                }}
-                                            />
-                                        </p>
-                                        {message.isStreaming && (
-                                            <div className="flex items-center mt-3 p-3 glass-dark rounded-lg">
+                            <>
+                                {conversationMessages.messages.map((message: any, index: number) => (
+                                    <div key={index}>
+                                        <div
+                                            className={`chat-message-container ${message.role === 'user' ? 'user-message-container' : 'bot-message-container'}`}
+                                        >
+                                            <div
+                                                className={`chat-message-bubble px-5 py-3 ${message.role === 'user'
+                                                    ? 'glass-card user-message-bubble'
+                                                    : 'glass bot-message-bubble'
+                                                    }`}
+                                            >
+                                                <p className="text-xs sm:text-sm glass-text">
+                                                    <TypewriterText
+                                                        text={message.message}
+                                                        isStreaming={message.isStreaming || false}
+                                                        speed={30}
+                                                        onComplete={() => {
+                                                            // Mark as complete when animation finishes
+                                                            markStreamingComplete();
+                                                        }}
+                                                    />
+                                                </p>
+                                                {message.isStreaming && (
+                                                    <div className="flex items-center mt-3 p-3 glass-dark rounded-lg">
                                                 <div className="flex space-x-1">
                                                     <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce"></div>
                                                     <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '1.5s' }}></div>
@@ -181,7 +183,15 @@ const ChatComponent = () => {
                                         </p>
                                     </div>
                                 </div>
-                            ))
+                                
+                            </div>
+                        ))}
+                        
+                        {/* Show inline thinking component on small screens at the end */}
+                        <div className="lg:hidden">
+                            <InlineThinkingComponent />
+                        </div>
+                    </>
                         ) : (
                             <>
                                 <div className="flex justify-center items-center py-8">

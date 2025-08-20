@@ -5,9 +5,10 @@ import WelcomeScreenComponent from "../components/WelcomeScreenComponent";
 import OrganizationsPage from "./OrganizationsPage";
 import ViewStore from "../stores/ViewStore";
 import LoadedChatbotStore from "../stores/LoadedChatbotStore";
+import ThoughtVisualizerComponent from "../components/ThoughtVisualizerComponent";
 
 const MainPage = () => {
-    const { sidebarOpen, setSidebarOpen, currentView } = ViewStore();
+    const { sidebarOpen, setSidebarOpen, currentView, thoughtVisualizerOpen } = ViewStore();
     const chatbot = LoadedChatbotStore((state: any) => state.loadedChatbot);
 
     // Show organizations page when currentView is 'organizations'
@@ -41,14 +42,29 @@ const MainPage = () => {
                     </div>
                 )}
                 {/* Main Content */}
-                <div className="flex-1 min-w-0 flex flex-col p-2">
-                    <div className="flex flex-row flex-1 min-h-0 min-w-0 w-full justify-center">
-                        {chatbot ? (
-                            <ChatComponent />
-                        ) : (
-                            <WelcomeScreenComponent />
-                        )}
-                    </div>
+                {/* Main Content Area - Takes remaining space after sidebar */}
+                <div className="flex-1 min-w-0 flex flex-row">
+                    {chatbot ? (
+                        <>
+                            {/* Thought Visualizer - Half of main content area on the left */}
+                            {/* Chat Component - Takes remaining space in main content area */}
+                            <div className={`${thoughtVisualizerOpen ? 'w-full lg:w-2/3' : 'w-full'} flex justify-center p-2 transition-all duration-300`}>
+                                <ChatComponent />
+                            </div>
+                            {thoughtVisualizerOpen && (
+                                <div className="hidden lg:flex w-1/3 h-full items-center justify-center">
+                                    <ThoughtVisualizerComponent />
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {/* Welcome Screen - Takes remaining space in main content area */}
+                            <div className={`${thoughtVisualizerOpen ? 'w-1/2' : 'w-full'} flex-none flex justify-center p-2 transition-all duration-300`}>
+                                <WelcomeScreenComponent />
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Mobile overlay */}

@@ -630,12 +630,20 @@ class PipelineHandler:
                     detail="User not found"
                 )
 
-            chatbot = ChatBots.objects(id=ObjectId(
-                chatbot_id), user_id=user).first()
+            # Find the chatbot first
+            chatbot = ChatBots.objects(id=ObjectId(chatbot_id)).first()
             if not chatbot:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Chatbot not found or doesn't belong to user"
+                    detail="Chatbot not found"
+                )
+
+            # Validate user has access to the chatbot (owner or assigned client)
+            from main import validate_chatbot_access
+            if not validate_chatbot_access(user, chatbot_id):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chatbot not found or access denied"
                 )
 
             # Validate the conversation exists and belongs to the chatbot

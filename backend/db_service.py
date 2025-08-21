@@ -470,10 +470,13 @@ def create_sample_data(client, db, fs):
 def assign_chatbot_to_client(chatbot_id: str, client_id: str, assigned_by_user_id: str) -> ChatbotClientMapper:
     """Assign a chatbot to a client"""
     try:
+        from bson import ObjectId
         # Validate entities exist
-        chatbot = ChatBots.objects(id=chatbot_id).first()
-        client = User_Auth_Table.objects(id=client_id, role='Client').first()
-        assigned_by = User_Auth_Table.objects(id=assigned_by_user_id).first()
+        chatbot = ChatBots.objects(id=ObjectId(chatbot_id)).first()
+        client = User_Auth_Table.objects(
+            id=ObjectId(client_id), role='Client').first()
+        assigned_by = User_Auth_Table.objects(
+            id=ObjectId(assigned_by_user_id)).first()
 
         if not all([chatbot, client, assigned_by]):
             raise ValueError("Invalid chatbot, client, or assigner")
@@ -506,9 +509,10 @@ def assign_chatbot_to_client(chatbot_id: str, client_id: str, assigned_by_user_i
 def revoke_chatbot_from_client(chatbot_id: str, client_id: str) -> bool:
     """Revoke a chatbot assignment from a client"""
     try:
+        from bson import ObjectId
         assignment = ChatbotClientMapper.objects(
-            chatbot=chatbot_id,
-            client=client_id
+            chatbot=ObjectId(chatbot_id),
+            client=ObjectId(client_id)
         ).first()
 
         if assignment:
@@ -553,9 +557,10 @@ def get_chatbot_clients(chatbot_id: str) -> List[User_Auth_Table]:
 def validate_client_chatbot_access(client_id: str, chatbot_id: str) -> bool:
     """Validate if a client has access to a specific chatbot"""
     try:
+        from bson import ObjectId
         assignment = ChatbotClientMapper.objects(
-            client=client_id,
-            chatbot=chatbot_id,
+            client=ObjectId(client_id),
+            chatbot=ObjectId(chatbot_id),
             is_active=True
         ).first()
         return assignment is not None

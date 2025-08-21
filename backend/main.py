@@ -42,6 +42,17 @@ shared_embedding_service = None
 security = HTTPBearer()
 
 
+def validate_object_id(id_string: str) -> bool:
+    """Validate that a string is a valid ObjectId format"""
+    try:
+        from bson import ObjectId
+        from bson.errors import InvalidId
+        ObjectId(id_string)
+        return True
+    except InvalidId:
+        return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
@@ -178,17 +189,38 @@ Your Chatbot Team
 
 def validate_chatbot_access(user: User_Auth_Table, chatbot_id: str) -> bool:
     """Validate if user has access to chatbot based on their role"""
+    logger.info(
+        f"Validating chatbot access for user {user.user_name} (role: {user.role}) to chatbot {chatbot_id}")
+
     if user.role in ['User', 'Super User']:
         # Check if they own the chatbot (or Super User has access to all)
         if user.role == 'Super User':
+            logger.info(
+                f"Super User {user.user_name} granted access to chatbot {chatbot_id}")
             return True  # Super Users have access to all chatbots
         from db_service import ChatBots
-        chatbot = ChatBots.objects(id=chatbot_id, user_id=user.id).first()
-        return chatbot is not None
+        from bson import ObjectId
+        try:
+            chatbot = ChatBots.objects(id=ObjectId(
+                chatbot_id), user_id=user.id).first()
+            result = chatbot is not None
+            logger.info(
+                f"User {user.user_name} chatbot ownership check result: {result}")
+            return result
+        except Exception as e:
+            logger.error(
+                f"Error validating chatbot access for user {user.user_name}: {e}")
+            return False
     elif user.role == 'Client':
         # Check if chatbot is assigned to them
+        logger.info(
+            f"Checking client assignment for user {user.user_name} to chatbot {chatbot_id}")
         from db_service import validate_client_chatbot_access
-        return validate_client_chatbot_access(str(user.id), chatbot_id)
+        result = validate_client_chatbot_access(str(user.id), chatbot_id)
+        logger.info(f"Client assignment check result: {result}")
+        return result
+
+    logger.warning(f"Unknown role {user.role} for user {user.user_name}")
     return False
 
 
@@ -842,6 +874,13 @@ async def create_new_conversation_with_session(
     current_user: User_Auth_Table = Depends(get_current_user)
 ):
     """Create a new conversation and session for a chatbot"""
+    # Validate ObjectId format
+    if not validate_object_id(chatbot_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid chatbot ID format"
+        )
+
     try:
         # Validate user has access to this chatbot (owner or assigned client)
         if not validate_chatbot_access(current_user, chatbot_id):
@@ -1427,8 +1466,9 @@ async def assign_chatbot_by_email(
 
         # Check if already assigned
         from db_service import ChatbotClientMapper
+        from bson import ObjectId
         existing = ChatbotClientMapper.objects(
-            chatbot=request.chatbot_id,
+            chatbot=ObjectId(request.chatbot_id),
             client=client.id,
             is_active=True
         ).first()
@@ -1521,10 +1561,11 @@ async def get_chatbot_assignments(
 
     try:
         from db_service import ChatbotClientMapper
+        from bson import ObjectId
 
         # Get all active assignments for this chatbot
         assignments = ChatbotClientMapper.objects(
-            chatbot=chatbot_id,
+            chatbot=ObjectId(chatbot_id),
             is_active=True
         )
 

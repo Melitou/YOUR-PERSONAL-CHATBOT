@@ -269,40 +269,40 @@ const LoadedChatbotStore = create((set, get) => ({
             if (!userToken) {
                 throw new Error('No authentication token found');
             }
-    
+
             const wsUrl = `ws://localhost:8000/ws/conversation/session/${sessionId}?token=${userToken}`;
             const ws = new WebSocket(wsUrl);
-            
+
             ws.onopen = () => {
                 set({ webSocket: ws });
             };
-            
+
             ws.onmessage = (event) => {
                 try {
                     const messageData = JSON.parse(event.data);
-                    
+
                     if (messageData.type === 'thinking_start') {
-                        // Open the thought visualizer and start thinking process
-                        ViewStore.getState().setThoughtVisualizerOpen(true);
+                        // Clear previous thinking data and start new thinking process
+                        ViewStore.getState().resetThinking();
                         ViewStore.getState().addThinkingStart(messageData.message || 'Starting to think...');
-                        
+
                     } else if (messageData.type === 'thinking_step') {
                         // Add a thinking step
                         ViewStore.getState().addThinkingStep(
-                            messageData.step || 'Processing', 
+                            messageData.step || 'Processing',
                             messageData.message || 'Working on the problem...'
                         );
-                        
+
                     } else if (messageData.type === 'thinking_complete') {
                         // Complete the thinking process
                         ViewStore.getState().completeThinking(messageData.message || 'Thinking complete');
-                        
+
                         // Auto-close the visualizer after a short delay to let user see completion
-                        setTimeout(() => {
-                            ViewStore.getState().setThoughtVisualizerOpen(false);
-                            ViewStore.getState().resetThinking();
-                        }, 2000);
-                        
+                        // setTimeout(() => {
+                        //     ViewStore.getState().setThoughtVisualizerOpen(false);
+                        //     ViewStore.getState().resetThinking();
+                        // }, 2000);
+
                     } else if (messageData.type === 'response_chunk') { // Streaming response chunks
                         const state = get() as any;
                         state.handleStreamingChunk(messageData.chunk);
@@ -321,16 +321,16 @@ const LoadedChatbotStore = create((set, get) => ({
                     console.error('Failed to parse WebSocket message:', parseError);
                 }
             };
-            
+
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
                 set({ webSocket: null });
             };
-            
+
             ws.onclose = () => {
                 set({ webSocket: null });
             };
-            
+
             return ws;
         } catch (error) {
             console.error('Failed to connect to WebSocket:', error);

@@ -115,6 +115,17 @@ const ChatComponent = () => {
         }
     };
 
+    const scrollToBottomInstant = () => {
+        if (messagesContainerRef.current) {
+            requestAnimationFrame(() => {
+                messagesContainerRef.current?.scrollTo({
+                    top: messagesContainerRef.current.scrollHeight,
+                    behavior: 'auto'
+                });
+            });
+        }
+    };
+
     useEffect(() => {
         // Auto-scroll to bottom ONLY when the agent stops thinking (response is complete)
         if (!isThinking && conversationMessages?.messages && conversationMessages.messages.length > 0) {
@@ -125,6 +136,13 @@ const ChatComponent = () => {
             }
         }
     }, [isThinking]);
+
+    useEffect(() => {
+        // Instant scroll to bottom when conversation loads (show most recent messages)
+        if (conversationMessages?.messages && conversationMessages.messages.length > 0) {
+            scrollToBottomInstant();
+        }
+    }, [conversationMessages?.conversation_id]);
 
     const handleSendMessage = () => {
         if (!inputMessage.trim()) return; // Don't send empty messages

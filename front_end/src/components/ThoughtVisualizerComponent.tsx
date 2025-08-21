@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import ViewStore, { type ThinkingStep } from "../stores/ViewStore";
 
 // Typewriter animation for smooth text reveal
-const TypewriterText: React.FC<{ text: string; speed?: number; onComplete?: () => void }> = ({ 
-    text, 
-    speed = 30, 
-    onComplete 
+const TypewriterText: React.FC<{ text: string; speed?: number; onComplete?: () => void }> = ({
+    text,
+    speed = 30,
+    onComplete
 }) => {
     const [displayedText, setDisplayedText] = useState('');
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -15,7 +15,7 @@ const TypewriterText: React.FC<{ text: string; speed?: number; onComplete?: () =
         setCurrentIndex(0);
     }, [text]);
 
-useEffect(() => {
+    useEffect(() => {
         if (currentIndex < text.length) {
             const timer = setTimeout(() => {
                 setDisplayedText(text.slice(0, currentIndex + 1));
@@ -49,9 +49,9 @@ const ThinkingDots: React.FC = () => {
 };
 
 // Individual step component with animation
-const ThinkingStepComponent: React.FC<{ 
-    step: ThinkingStep; 
-    index: number; 
+const ThinkingStepComponent: React.FC<{
+    step: ThinkingStep;
+    index: number;
     isVisible: boolean;
 }> = ({ step, index, isVisible }) => {
     const [isAnimated, setIsAnimated] = useState(false);
@@ -64,12 +64,11 @@ const ThinkingStepComponent: React.FC<{
     }, [isVisible, index]);
 
     return (
-        <div 
-            className={`transform transition-all duration-500 ease-out ${
-                isAnimated 
-                    ? 'translate-x-0 opacity-100' 
-                    : 'translate-x-4 opacity-0'
-            }`}
+        <div
+            className={`transform transition-all duration-500 ease-out ${isAnimated
+                ? 'translate-x-0 opacity-100'
+                : 'translate-x-4 opacity-0'
+                }`}
         >
             <div className="flex items-start space-x-3 mb-4">
                 <div className="flex-shrink-0 w-6 h-6 bg-white bg-opacity-80 text-black rounded-full flex items-center justify-center text-xs font-bold">
@@ -92,6 +91,7 @@ const ThoughtVisualizerComponent: React.FC = () => {
     const thoughtVisualizerData = ViewStore((state) => state.thoughtVisualizerData);
 
     const [visibleSteps, setVisibleSteps] = useState(0);
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         if (thoughtVisualizerData.steps.length > visibleSteps) {
@@ -102,8 +102,26 @@ const ThoughtVisualizerComponent: React.FC = () => {
         }
     }, [thoughtVisualizerData.steps.length, visibleSteps]);
 
+    const scrollToBottom = () => {
+        if (scrollContainerRef.current) {
+            requestAnimationFrame(() => {
+                scrollContainerRef.current?.scrollTo({
+                    top: scrollContainerRef.current.scrollHeight,
+                    behavior: 'smooth'
+                });
+            });
+        }
+    };
+
+    useEffect(() => {
+        // Auto-scroll to bottom ONLY when actively thinking and new content is added
+        if (thoughtVisualizerData.isActive) {
+            scrollToBottom();
+        }
+    }, [thoughtVisualizerData.steps, thoughtVisualizerData.currentMessage, thoughtVisualizerData.isActive]);
+
     return (
-        <div className="h-1/2 w-110 glass-card flex flex-col mr-5">
+        <div className="h-full w-full glass-card flex flex-col">
             {/* Header */}
             <div className="glass border-b border-white border-opacity-20 p-4 flex-shrink-0 rounded-t-3xl">
                 <div className="flex items-center justify-between">
@@ -119,7 +137,7 @@ const ThoughtVisualizerComponent: React.FC = () => {
             </div>
 
             {/* Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Start Message */}
                 {thoughtVisualizerData.startMessage && (
                     <div className="p-4 glass-light rounded-2xl">
@@ -182,16 +200,16 @@ const ThoughtVisualizerComponent: React.FC = () => {
                 )}
 
                 {/* Empty state */}
-                {!thoughtVisualizerData.startMessage && 
-                 thoughtVisualizerData.steps.length === 0 && 
-                 !thoughtVisualizerData.completeMessage && (
-                    <div className="text-center py-8">
-                        <div className="w-16 h-16 glass rounded-full flex items-center justify-center mx-auto mb-4">
-                            <ThinkingDots />
+                {!thoughtVisualizerData.startMessage &&
+                    thoughtVisualizerData.steps.length === 0 &&
+                    !thoughtVisualizerData.completeMessage && (
+                        <div className="text-center py-8">
+                            <div className="w-16 h-16 glass rounded-full flex items-center justify-center mx-auto mb-4">
+                                <ThinkingDots />
+                            </div>
+                            <p className="glass-text opacity-75">Waiting for thought process to begin...</p>
                         </div>
-                        <p className="glass-text opacity-75">Waiting for thought process to begin...</p>
-                    </div>
-                )}
+                    )}
             </div>
 
             {/* Footer */}
@@ -223,7 +241,7 @@ export const InlineThinkingComponent: React.FC = () => {
                 isComplete: true
             };
         }
-        
+
         if (thoughtVisualizerData.isActive && thoughtVisualizerData.currentMessage) {
             return {
                 text: thoughtVisualizerData.currentMessage,
@@ -267,8 +285,8 @@ export const InlineThinkingComponent: React.FC = () => {
                             <ThinkingDots />
                         )}
                         <div className="glass-text text-xs opacity-60 font-light italic">
-                            <TypewriterText 
-                                text={currentDisplay.text} 
+                            <TypewriterText
+                                text={currentDisplay.text}
                                 speed={15}
                             />
                         </div>

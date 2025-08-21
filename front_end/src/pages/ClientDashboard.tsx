@@ -7,6 +7,7 @@ import ViewStore from '../stores/ViewStore';
 import UserAuthStore from '../stores/UserAuthStore';
 import EditConversationModalComponent from '../components/EditConversationModalComponent';
 import DeleteConversationModalComponent from '../components/DeleteConversationModalComponent';
+import ThoughtVisualizerComponent from '../components/ThoughtVisualizerComponent';
 
 interface AssignedChatbot {
     id: string;
@@ -50,7 +51,7 @@ const ClientDashboard: React.FC = () => {
         updateConversationName,
         deleteConversation
     } = LoadedChatbotStore((state: any) => state);
-    const { addError } = ViewStore();
+    const { addError, thoughtVisualizerOpen, setThoughtVisualizerOpen } = ViewStore();
     const { user, logout } = UserAuthStore();
 
 
@@ -245,7 +246,7 @@ const ClientDashboard: React.FC = () => {
     }
 
     return (
-        <div className="h-screen flex glass-bg">
+        <div className="h-screen flex glass-bg overflow-hidden">
             {/* Sidebar */}
             <aside className="w-80 h-full shadow-lg border-r border-white/20 flex flex-col" style={{ backgroundColor: "#6b846c" }}>
                 {/* Chatbot Selector Section */}
@@ -380,8 +381,19 @@ const ClientDashboard: React.FC = () => {
                         {/* User info and logout - right side */}
                         <div className="flex items-center space-x-4">
                             <span className="text-lg glass-text font-small">
-                                Welcome, {user?.name}!
+                                Welcome, {user?.name}
                             </span>
+                            {/* Thinking Visualizer Toggle */}
+                            <button
+                                onClick={() => setThoughtVisualizerOpen(!thoughtVisualizerOpen)}
+                                className="px-3 py-2 text-sm glass-text hover:glass-light rounded-md transition-colors cursor-pointer flex items-center gap-2"
+                                title={thoughtVisualizerOpen ? "Hide AI Thinking" : "Show AI Thinking"}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                                </svg>
+                                {thoughtVisualizerOpen ? "Hide Thinking" : "Show Thinking"}
+                            </button>
                             <button
                                 onClick={handleLogout}
                                 className="px-4 py-2 text-base glass-text hover:glass-light rounded-md transition-colors font-small cursor-pointer"
@@ -392,21 +404,33 @@ const ClientDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Chat interface */}
-                <div className="flex-1 p-4">
-                    {selectedChatbot ? (
-                        <div className="h-155 glass-card rounded-lg shadow-sm border border-gray-200 border-opacity-20 overflow-hidden">
-                            <ChatComponent />
-                        </div>
-                    ) : (
-                        <div className="h-full flex items-center justify-center glass-card rounded-lg shadow-sm border border-gray-200 border-opacity-20">
-                            <div className="text-center">
-                                <div className="w-12 h-12 glass-dark rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <svg className="w-6 h-6 glass-text opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                    </svg>
+                {/* Chat interface with thinking visualizer */}
+                <div className="flex-1 flex p-4 gap-4 min-h-0">
+                    {/* Chat Component */}
+                    <div className={`${thoughtVisualizerOpen ? 'w-2/3' : 'w-full'} transition-all duration-300 flex flex-col min-h-0`}>
+                        {selectedChatbot ? (
+                            <div className="h-full flex flex-col min-h-0">
+                                <ChatComponent />
+                            </div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center glass-card rounded-lg shadow-sm border border-gray-200 border-opacity-20">
+                                <div className="text-center">
+                                    <div className="w-12 h-12 glass-dark rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <svg className="w-6 h-6 glass-text opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                        </svg>
+                                    </div>
+                                    <div className="glass-text opacity-70">Select a chatbot to start chatting</div>
                                 </div>
-                                <div className="glass-text opacity-70">Select a chatbot to start chatting</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Thinking Visualizer - Only show when thoughtVisualizerOpen is true */}
+                    {thoughtVisualizerOpen && (
+                        <div className="w-1/3 hidden lg:flex flex-col min-h-0">
+                            <div className="h-full">
+                                <ThoughtVisualizerComponent />
                             </div>
                         </div>
                     )}

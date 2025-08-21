@@ -1,40 +1,33 @@
-import { useEffect, ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import UserAuthStore from '../stores/UserAuthStore';
 
 interface ProtectedRouteProps {
     children: ReactNode;
-    requiredPermission?: string;
-    requiredRole?: string;
+    requiredRole?: 'User' | 'Super User' | 'Client';
+    allowedRoles?: ('User' | 'Super User' | 'Client')[];
     fallback?: ReactNode;
 }
 
-const ProtectedRoute = ({ 
-    children, 
-    requiredPermission, 
-    requiredRole, 
-    fallback = <div>Access Denied</div> 
+const ProtectedRoute = ({
+    children,
+    requiredRole,
+    allowedRoles,
+    fallback = <div>Access Denied</div>
 }: ProtectedRouteProps) => {
-    const { user, isLoggedIn, hasPermission, refreshUserData } = UserAuthStore();
-
-    useEffect(() => {
-        // Refresh user data to ensure we have latest permissions
-        if (isLoggedIn) {
-            refreshUserData();
-        }
-    }, [isLoggedIn, refreshUserData]);
+    const { user, isLoggedIn } = UserAuthStore();
 
     // Not logged in
     if (!isLoggedIn || !user) {
         return <div>Please log in to access this feature</div>;
     }
 
-    // Check specific permission
-    if (requiredPermission && !hasPermission(requiredPermission)) {
+    // Check specific role
+    if (requiredRole && user.role !== requiredRole) {
         return <>{fallback}</>;
     }
 
-    // Check specific role
-    if (requiredRole && user.role !== requiredRole) {
+    // Check allowed roles
+    if (allowedRoles && !allowedRoles.includes(user.role as any)) {
         return <>{fallback}</>;
     }
 

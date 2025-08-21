@@ -20,6 +20,7 @@ const AuthPage: React.FC = () => {
 
         try {
             const response = await authApi.login({ username, password });
+            console.log('Login response:', response);
 
             // Ensure we have a token from the server (check for access_token)
             if (!response.access_token) {
@@ -27,11 +28,15 @@ const AuthPage: React.FC = () => {
             }
 
             // Update the auth store with user data and token
-            login({
-                name: `${response.user.first_name} ${response.user.last_name}` || response.user.user_name || username,
+            const userData = {
+                name: (response.user.first_name?.trim() && response.user.last_name?.trim())
+                    ? `${response.user.first_name.trim()} ${response.user.last_name.trim()}`
+                    : response.user.user_name || username,
                 role: response.user.role || 'User',
                 email: response.user.email || username
-            }, response.access_token);
+            };
+            console.log('Login userData:', userData);
+            login(userData, response.access_token);
 
         } catch (err: any) {
             const errorMessage = err.message || 'Login failed. Please check your credentials.';

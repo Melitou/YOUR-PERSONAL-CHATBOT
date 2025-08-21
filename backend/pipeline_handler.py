@@ -535,11 +535,12 @@ class PipelineHandler:
                     detail="Chatbot not found"
                 )
 
-            # Validate the chatbot belongs to the user
-            if chatbot.user_id.id != user.id:
+            # Validate user has access to the chatbot (owner or assigned client)
+            from main import validate_chatbot_access
+            if not validate_chatbot_access(user, chatbot_id):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Chatbot doesn't belong to user"
+                    detail="Chatbot not found or access denied"
                 )
 
             # Get all conversations for the chatbot
@@ -577,13 +578,20 @@ class PipelineHandler:
                     detail="User not found"
                 )
 
-            # Validate the chatbot exists and belongs to the user
-            chatbot = ChatBots.objects(id=ObjectId(
-                chatbot_id), user_id=user).first()
+            # Validate the chatbot exists and user has access
+            chatbot = ChatBots.objects(id=ObjectId(chatbot_id)).first()
             if not chatbot:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Chatbot not found or doesn't belong to user"
+                    detail="Chatbot not found"
+                )
+
+            # Validate user has access to the chatbot (owner or assigned client)
+            from main import validate_chatbot_access
+            if not validate_chatbot_access(user, chatbot_id):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chatbot not found or access denied"
                 )
 
             # Create new conversation
@@ -908,16 +916,25 @@ class PipelineHandler:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="User not found"
                 )
-            # Validate chatbot and also see if it belongs to the user
-            chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=user).first()
+            # Validate chatbot exists and user has access
+            chatbot = ChatBots.objects(id=ObjectId(chatbot_id)).first()
             if not chatbot:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Chatbot not found or doesn't belong to user"
+                    detail="Chatbot not found"
+                )
+
+            # Validate user has access to the chatbot (owner or assigned client)
+            from main import validate_chatbot_access
+            if not validate_chatbot_access(user, chatbot_id):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chatbot not found or access denied"
                 )
 
             # Validate conversation and also see if it belongs to the chatbot
-            conversation = Conversation.objects(id=ObjectId(conversation_id), chatbot=chatbot).first()
+            conversation = Conversation.objects(
+                id=ObjectId(conversation_id), chatbot=chatbot).first()
             if not conversation:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -925,7 +942,8 @@ class PipelineHandler:
                 )
             conversation.conversation_title = new_conversation_title
             conversation.save()
-            logger.info(f"Updated name of conversation {conversation_id} for chatbot {chatbot_id} to {new_conversation_title} by user {user.user_name}")
+            logger.info(
+                f"Updated name of conversation {conversation_id} for chatbot {chatbot_id} to {new_conversation_title} by user {user.user_name}")
             return True
         except Exception as e:
             logger.error(f"Error updating name of conversation: {e}")
@@ -933,7 +951,7 @@ class PipelineHandler:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error updating name of conversation: {str(e)}"
             )
-    
+
     def delete_conversation(self, user_id: str, chatbot_id: str, conversation_id: str):
         """Delete a conversation"""
         try:
@@ -944,15 +962,24 @@ class PipelineHandler:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="User not found"
                 )
-            # Validate chatbot and also see if it belongs to the user
-            chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=user).first()
+            # Validate chatbot exists and user has access
+            chatbot = ChatBots.objects(id=ObjectId(chatbot_id)).first()
             if not chatbot:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Chatbot not found or doesn't belong to user"
+                    detail="Chatbot not found"
+                )
+
+            # Validate user has access to the chatbot (owner or assigned client)
+            from main import validate_chatbot_access
+            if not validate_chatbot_access(user, chatbot_id):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chatbot not found or access denied"
                 )
             # Validate conversation and also see if it belongs to the chatbot
-            conversation = Conversation.objects(id=ObjectId(conversation_id), chatbot=chatbot).first()
+            conversation = Conversation.objects(
+                id=ObjectId(conversation_id), chatbot=chatbot).first()
             if not conversation:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -963,7 +990,8 @@ class PipelineHandler:
             Messages.objects(conversation_id=conversation).delete()
             # Then delete the conversation
             conversation.delete()
-            logger.info(f"Deleted conversation {conversation_id} for chatbot {chatbot_id} by user {user.user_name}")
+            logger.info(
+                f"Deleted conversation {conversation_id} for chatbot {chatbot_id} by user {user.user_name}")
             return True
         except Exception as e:
             logger.error(f"Error deleting conversation: {e}")

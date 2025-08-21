@@ -6,7 +6,7 @@ import ViewStore from "./ViewStore";
 interface User {
     name: string;
     email?: string;
-    role?: string;
+    role?: 'User' | 'Super User' | 'Client';
 }
 
 interface UserAuthState {

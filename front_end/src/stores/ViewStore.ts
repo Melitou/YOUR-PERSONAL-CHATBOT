@@ -22,13 +22,17 @@ export interface ThinkingData {
 interface ViewState {
     sidebarOpen: boolean;
     errors: string[];
+    successes: string[];
     currentView: 'chat' | 'organizations';
     setSidebarOpen: (sidebarOpen: boolean) => void;
     setCurrentView: (view: 'chat' | 'organizations') => void;
     navigateToHome: () => void;
     addError: (error: string) => void;
+    addSuccess: (message: string) => void;
     dismissError: (index: number) => void;
+    dismissSuccess: (index: number) => void;
     clearAllErrors: () => void;
+    clearAllSuccesses: () => void;
     resetStore: () => void;
 
     thoughtVisualizerOpen: boolean;
@@ -45,6 +49,7 @@ const ViewStore = create<ViewState>((set, get) => ({
 
     sidebarOpen: true,
     errors: [],
+    successes: [],
     currentView: 'chat' as const,
     thoughtVisualizerOpen: false,
     thoughtVisualizerData: {
@@ -106,15 +111,38 @@ const ViewStore = create<ViewState>((set, get) => ({
         }, 10000);
     },
 
+    addSuccess: (message: string) => {
+        console.log('Success logged:', message);
+        set((state) => ({
+            successes: [...state.successes, message]
+        }));
+
+        // Auto-dismiss success after 5 seconds
+        setTimeout(() => {
+            const currentSuccesses = get().successes;
+            const successIndex = currentSuccesses.indexOf(message);
+            if (successIndex !== -1) {
+                get().dismissSuccess(successIndex);
+            }
+        }, 5000);
+    },
+
     dismissError: (index: number) => set((state) => ({
         errors: state.errors.filter((_, i) => i !== index)
     })),
 
+    dismissSuccess: (index: number) => set((state) => ({
+        successes: state.successes.filter((_, i) => i !== index)
+    })),
+
     clearAllErrors: () => set({ errors: [] }),
+
+    clearAllSuccesses: () => set({ successes: [] }),
 
     resetStore: () => set({
         sidebarOpen: false,
         errors: [],
+        successes: [],
         currentView: 'chat' as const,
         thoughtVisualizerOpen: false,
         thoughtVisualizerData: {
@@ -129,7 +157,7 @@ const ViewStore = create<ViewState>((set, get) => ({
     }),
 
     setThoughtVisualizerOpen: (thoughtVisualizerOpen: boolean) => set({ thoughtVisualizerOpen }),
-    
+
     setThoughtVisualizerData: (thoughtVisualizerData: ThinkingData) => set({ thoughtVisualizerData }),
 
     addThinkingStart: (message: string) => {
@@ -151,7 +179,7 @@ const ViewStore = create<ViewState>((set, get) => ({
     addThinkingStep: (step: string, message: string) => {
         const timestamp = new Date().toISOString();
         const stepId = `step-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
+
         set(state => ({
             thoughtVisualizerData: {
                 ...state.thoughtVisualizerData,

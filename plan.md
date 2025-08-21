@@ -3,7 +3,7 @@
 ## Overview
 Add a new "Client" role to the system that allows users to assign chatbots to clients. Clients will have access only to assigned chatbots and cannot create or manage chatbots themselves. They will only see the chat interface.
 
-**Note:** Super User functionality is on hold - this implementation focuses only on User and Client roles.
+**Note:** This implementation adds Client role while preserving existing User and Super User functionality.
 
 ## Database Schema Changes
 
@@ -15,8 +15,8 @@ Add a new "Client" role to the system that allows users to assign chatbots to cl
 # Current
 role = StringField(required=True, choices=['User', 'Super User'])
 
-# New  
-role = StringField(required=True, choices=['User', 'Client'])
+# New
+role = StringField(required=True, choices=['User', 'Super User', 'Client'])
 ```
 
 ### 2. Add New Collection - ChatbotClientMapper
@@ -172,6 +172,7 @@ class UserRole(str, Enum):
 class UserRole(str, Enum):
     """Enumeration for user roles"""
     USER = "User"
+    SUPER_USER = "Super User"
     CLIENT = "Client"
 ```
 
@@ -215,11 +216,11 @@ async def assign_chatbot_by_email(
     request: EmailAssignmentRequest,
     current_user: User_Auth_Table = Depends(get_current_user)
 ):
-    """Assign chatbot to client by email - creates client if doesn't exist (Users only)"""
-    if current_user.role != 'User':
+    """Assign chatbot to client by email - creates client if doesn't exist (Users and Super Users only)"""
+    if current_user.role not in ['User', 'Super User']:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Users can assign chatbots to clients"
+            detail="Only Users and Super Users can assign chatbots to clients"
         )
     
     try:
@@ -296,10 +297,10 @@ async def revoke_chatbot_from_client(
     current_user: User_Auth_Table = Depends(get_current_user)
 ):
     """Revoke a chatbot assignment from a client by email"""
-    if current_user.role != 'User':
+    if current_user.role not in ['User', 'Super User']:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Users can revoke chatbot assignments"
+            detail="Only Users and Super Users can revoke chatbot assignments"
         )
     
     try:
@@ -337,10 +338,10 @@ async def get_chatbot_assignments(
     current_user: User_Auth_Table = Depends(get_current_user)
 ):
     """Get all clients assigned to a chatbot"""
-    if current_user.role != 'User':
+    if current_user.role not in ['User', 'Super User']:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Users can view chatbot assignments"
+            detail="Only Users and Super Users can view chatbot assignments"
         )
     
     try:
@@ -462,6 +463,9 @@ async def get_user_chatbots(current_user: User_Auth_Table = Depends(get_current_
         elif current_user.role == 'User':
             # Users see owned chatbots
             chatbots = ChatBots.objects(user_id=current_user.id)
+        elif current_user.role == 'Super User':
+            # Super Users see all chatbots
+            chatbots = ChatBots.objects()
         else:
             # Invalid role
             raise HTTPException(
@@ -480,8 +484,10 @@ async def get_user_chatbots(current_user: User_Auth_Table = Depends(get_current_
 # Add this helper function
 def validate_chatbot_access(user: User_Auth_Table, chatbot_id: str) -> bool:
     """Validate if user has access to chatbot based on their role"""
-    if user.role == 'User':
-        # Check if they own the chatbot
+    if user.role in ['User', 'Super User']:
+        # Check if they own the chatbot (or Super User has access to all)
+        if user.role == 'Super User':
+            return True  # Super Users have access to all chatbots
         chatbot = ChatBots.objects(id=chatbot_id, user_id=user.id).first()
         return chatbot is not None
     elif user.role == 'Client':
@@ -535,7 +541,7 @@ export const clientApi = {
 interface User {
     name: string;
     email?: string;
-    role?: 'User' | 'Client';  // Updated to focus on User and Client only
+    role?: 'User' | 'Super User' | 'Client';  // All three roles supported
 }
 ```
 
@@ -885,8 +891,8 @@ import UserAuthStore from '../stores/UserAuthStore';
 interface ProtectedRouteProps {
     children: ReactNode;
     requiredPermission?: string;
-    requiredRole?: 'User' | 'Client';
-    allowedRoles?: ('User' | 'Client')[];
+    requiredRole?: 'User' | 'Super User' | 'Client';
+    allowedRoles?: ('User' | 'Super User' | 'Client')[];
     fallback?: ReactNode;
 }
 
@@ -927,24 +933,24 @@ export default ProtectedRoute;
 
 ```typescript
 // Add after the existing Super User conditional (around line 156)
-{user?.role === 'User' && (
-    <>
-        <button
-            onClick={handleExistingChatbotsClick}
-            className="w-full p-3 glass-effect rounded-lg text-white hover:bg-white/10 transition-colors"
-        >
-            <span className="material-symbols-outlined text-sm mr-2">smart_toy</span>
-            Choose Chatbot
-        </button>
-        <button
-            onClick={() => setAssignClientsModalOpen(true)}
-            className="w-full p-3 glass-effect rounded-lg text-white hover:bg-white/10 transition-colors"
-        >
-            <span className="material-symbols-outlined text-sm mr-2">group_add</span>
-            Assign to Clients
-        </button>
-    </>
-)}
+                {(user?.role === 'User' || user?.role === 'Super User') && (
+                    <>
+                        <button
+                            onClick={handleExistingChatbotsClick}
+                            className="w-full p-3 glass-effect rounded-lg text-white hover:bg-white/10 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-sm mr-2">smart_toy</span>
+                            Choose Chatbot
+                        </button>
+                        <button
+                            onClick={() => setAssignClientsModalOpen(true)}
+                            className="w-full p-3 glass-effect rounded-lg text-white hover:bg-white/10 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-sm mr-2">group_add</span>
+                            Assign to Clients
+                        </button>
+                    </>
+                )}
 
 // Add state and modal for client assignment
 const [assignClientsModalOpen, setAssignClientsModalOpen] = useState(false);
@@ -977,7 +983,7 @@ return (
             <Route 
                 path="/" 
                 element={
-                    <ProtectedRoute allowedRoles={['User', 'Client']}>
+                    <ProtectedRoute allowedRoles={['User', 'Super User', 'Client']}>
                         {user?.role === 'Client' ? (
                             <ClientDashboard />
                         ) : (
@@ -998,7 +1004,7 @@ return (
 
 ```typescript
 // Add in the chatbot actions section (around where edit/delete buttons are)
-{user?.role === 'User' && (
+{(user?.role === 'User' || user?.role === 'Super User') && (
     <button
         onClick={() => {
             setAssignClientsModalOpen(true);
@@ -1057,26 +1063,26 @@ const [selectedChatbotForAssignment, setSelectedChatbotForAssignment] = useState
 
 ### Phase 1: Database Foundation (Day 1)
 1. **Update db_service.py**
-   - Update User_Auth_Table role choices (remove 'Super User', add 'Client')
+   - Add 'Client' to User_Auth_Table role choices (keep existing User, Super User)
    - Create ChatbotClientMapper collection
    - Add database service functions
    - Test database operations
 
 ### Phase 2: Backend API (Day 2)
 1. **Update api_models.py**
-   - Update UserRole enum (remove 'Super User', add 'Client')
+   - Add 'Client' to UserRole enum (keep existing User, Super User)
    - Add new email-based request/response models
 2. **Update main.py**
-   - Add email-based assignment endpoint with auto-client creation
+   - Add email-based assignment endpoint with auto-client creation (Users and Super Users)
    - Add helper functions (password generation, email sending)
-   - Update existing endpoints with role-based access
-   - Add access validation helper functions
-3. **Test API endpoints with email workflow**
+   - Update existing endpoints with three-role access control
+   - Add access validation helper functions (Super Users have full access)
+3. **Test API endpoints with email workflow and three-role system**
 
 ### Phase 3: Frontend Core (Day 3)
 1. **Update stores and types**
-   - Update UserAuthStore interface
-   - Update ProtectedRoute component
+   - Update UserAuthStore interface (support all three roles)
+   - Update ProtectedRoute component for three-role system
 2. **Create ClientDashboard**
    - Simple interface for clients
    - Chatbot selection and chat interface
@@ -1089,11 +1095,11 @@ const [selectedChatbotForAssignment, setSelectedChatbotForAssignment] = useState
    - Real-time client assignment/removal
    - Auto-client creation feedback
 2. **Update SidebarComponent**
-   - Add client assignment option for Users
+   - Add client assignment option for Users and Super Users
 3. **Update ManageChatbotsModalComponent**
-   - Add "Manage Clients" button for each chatbot
+   - Add "Manage Clients" button for Users and Super Users
 4. **Update App.tsx**
-   - Role-based routing between User and Client interfaces
+   - Three-role routing (Client → ClientDashboard, User/Super User → MainPage)
 
 ### Phase 5: Testing & Refinement (Day 5)
 1. **End-to-end testing**
@@ -1127,10 +1133,11 @@ const [selectedChatbotForAssignment, setSelectedChatbotForAssignment] = useState
 
 ### Frontend Level
 - [ ] Client dashboard shows only assigned chatbots
-- [ ] Assignment modal works for Users only
+- [ ] Assignment modal works for Users and Super Users
 - [ ] Role-based UI elements display correctly
-- [ ] Navigation works for both User and Client roles
-- [ ] Clients cannot access User management features
+- [ ] Navigation works for all three roles (User, Super User, Client)
+- [ ] Clients cannot access User/Super User management features
+- [ ] Super Users have full system access
 
 ### Security
 - [ ] Clients cannot access unassigned chatbots
@@ -1158,9 +1165,10 @@ This updated plan implements an **email-first assignment system** that makes cli
 - ✅ **Intuitive UI** with email validation and error handling
 
 **Benefits:**
-- **Users** can assign chatbots by simply typing emails (no need to know who's in the system)
+- **Users and Super Users** can assign chatbots by simply typing emails (no need to know who's in the system)
+- **Super Users** have full access to all chatbots and can manage any client assignments
 - **New clients** are automatically onboarded with welcome emails
 - **Existing clients** are assigned immediately
 - **Security** is maintained with email validation and temporary passwords
 
-This approach ensures a smooth, professional workflow where users can easily share their chatbots with clients through a simple email interface.
+This approach ensures a smooth, professional workflow where Users and Super Users can easily share chatbots with clients through a simple email interface, while maintaining the existing Super User privileges.

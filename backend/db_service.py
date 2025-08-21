@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 from mongoengine import connect, Document, StringField, DateTimeField, IntField, ReferenceField, ObjectIdField, ListField, DictField, BooleanField
 from bson import ObjectId
 from pymongo import MongoClient
@@ -6,7 +7,7 @@ from gridfs import GridFS
 import hashlib
 
 
-def initialize_db(db_url: str = "mongodb://localhost:50000/"):
+def initialize_db(db_url: str = "mongodb://localhost:27017/"):
     """Initialize MongoDB connection and create necessary indexes"""
     try:
         database_name = "your_personal_chatbot_db"
@@ -37,7 +38,7 @@ class User_Auth_Table(Document):
     last_name = StringField(required=True)
     email = StringField(required=True, unique=True)
     created_at = DateTimeField(required=True)
-    role = StringField(required=True, choices=['User', 'Super User'])
+    role = StringField(required=True, choices=['User', 'Super User', 'Client'])
 
     meta = {
         'collection': 'user_auth_table',
@@ -341,6 +342,30 @@ class ChatbotDocumentsMapper(Document):
         return f"ChatbotDocumentsMapper(chatbot={self.chatbot}, document={self.document}, user={self.user}, assigned_at={self.assigned_at})"
 
 
+class ChatbotClientMapper(Document):
+    """Mapping table between ChatBots and Client Users"""
+    chatbot = ReferenceField(ChatBots, required=True)
+    # Must have role='Client'
+    client = ReferenceField(User_Auth_Table, required=True)
+    # The User who assigned it (role='User')
+    assigned_by = ReferenceField(User_Auth_Table, required=True)
+    assigned_at = DateTimeField(required=True)
+    is_active = BooleanField(default=True)  # Allow revoking access
+
+    meta = {
+        'collection': 'chatbot_client_mapper',
+        'indexes': [
+            {'fields': [('chatbot', 1), ('client', 1)], 'unique': True},
+            {'fields': ['client']},
+            {'fields': ['assigned_by']},
+            {'fields': ['is_active']}
+        ]
+    }
+
+    def __str__(self) -> str:
+        return f"ChatbotClientMapper(chatbot={self.chatbot}, client={self.client}, assigned_by={self.assigned_by}, is_active={self.is_active})"
+
+
 def upload_file_to_gridfs(fs: GridFS, file_content: bytes, filename: str, content_type: str = "text/plain") -> ObjectId:
     """Upload a file to GridFS and return the file ObjectId"""
     try:
@@ -440,6 +465,114 @@ def create_sample_data(client, db, fs):
         print(f"Error creating sample data: {e}")
     finally:
         client.close()
+
+
+def assign_chatbot_to_client(chatbot_id: str, client_id: str, assigned_by_user_id: str) -> ChatbotClientMapper:
+    """Assign a chatbot to a client"""
+    try:
+        # Validate entities exist
+        chatbot = ChatBots.objects(id=chatbot_id).first()
+        client = User_Auth_Table.objects(id=client_id, role='Client').first()
+        assigned_by = User_Auth_Table.objects(id=assigned_by_user_id).first()
+
+        if not all([chatbot, client, assigned_by]):
+            raise ValueError("Invalid chatbot, client, or assigner")
+
+        # Check if assignment already exists
+        existing = ChatbotClientMapper.objects(
+            chatbot=chatbot, client=client).first()
+        if existing:
+            existing.is_active = True
+            existing.assigned_at = datetime.now()
+            existing.save()
+            return existing
+
+        # Create new assignment
+        assignment = ChatbotClientMapper(
+            chatbot=chatbot,
+            client=client,
+            assigned_by=assigned_by,
+            assigned_at=datetime.now(),
+            is_active=True
+        )
+        assignment.save()
+        return assignment
+
+    except Exception as e:
+        print(f"Error assigning chatbot to client: {e}")
+        raise
+
+
+def revoke_chatbot_from_client(chatbot_id: str, client_id: str) -> bool:
+    """Revoke a chatbot assignment from a client"""
+    try:
+        assignment = ChatbotClientMapper.objects(
+            chatbot=chatbot_id,
+            client=client_id
+        ).first()
+
+        if assignment:
+            assignment.is_active = False
+            assignment.save()
+            return True
+        return False
+
+    except Exception as e:
+        print(f"Error revoking chatbot from client: {e}")
+        return False
+
+
+def get_client_assigned_chatbots(client_id: str) -> List[ChatBots]:
+    """Get all chatbots assigned to a client"""
+    try:
+        assignments = ChatbotClientMapper.objects(
+            client=client_id,
+            is_active=True
+        )
+        return [assignment.chatbot for assignment in assignments]
+
+    except Exception as e:
+        print(f"Error getting client assigned chatbots: {e}")
+        return []
+
+
+def get_chatbot_clients(chatbot_id: str) -> List[User_Auth_Table]:
+    """Get all clients assigned to a chatbot"""
+    try:
+        assignments = ChatbotClientMapper.objects(
+            chatbot=chatbot_id,
+            is_active=True
+        )
+        return [assignment.client for assignment in assignments]
+
+    except Exception as e:
+        print(f"Error getting chatbot clients: {e}")
+        return []
+
+
+def validate_client_chatbot_access(client_id: str, chatbot_id: str) -> bool:
+    """Validate if a client has access to a specific chatbot"""
+    try:
+        assignment = ChatbotClientMapper.objects(
+            client=client_id,
+            chatbot=chatbot_id,
+            is_active=True
+        ).first()
+        return assignment is not None
+
+    except Exception as e:
+        print(f"Error validating client chatbot access: {e}")
+        return False
+
+
+def get_available_clients() -> List[User_Auth_Table]:
+    """Get all users with Client role"""
+    try:
+        return User_Auth_Table.objects(role='Client')
+    except Exception as e:
+        print(f"Error getting available clients: {e}")
+        return []
+
 
 ##############################################################################################################################
 ##############################################################################################################################

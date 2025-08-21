@@ -272,6 +272,28 @@ export const chatbotApi = {
         apiClient.delete(`/chatbot/${chatbotId}/conversation/${conversationId}`),
 };
 
+// Client Assignment API
+export const clientApi = {
+    // Assign chatbot to client by email (creates client if doesn't exist)
+    assignChatbotByEmail: (chatbotId: string, clientEmail: string) =>
+        apiClient.post('/api/assign-chatbot-by-email', {
+            chatbot_id: chatbotId,
+            client_email: clientEmail
+        }),
+
+    // Revoke chatbot from client by email
+    revokeChatbotFromClient: (chatbotId: string, clientEmail: string) =>
+        apiClient.delete(`/api/revoke-chatbot-from-client?chatbot_id=${chatbotId}&client_email=${clientEmail}`),
+
+    // Get chatbot assignments (returns list of clients with emails)
+    getChatbotAssignments: (chatbotId: string) =>
+        apiClient.get(`/api/chatbot-assignments/${chatbotId}`),
+
+    // Get assigned chatbots (for clients)
+    getMyAssignedChatbots: () =>
+        apiClient.get('/api/my-assigned-chatbots'),
+};
+
 // Admin API (Super User only)
 export const adminApi = {
     // Get all clients and organizations

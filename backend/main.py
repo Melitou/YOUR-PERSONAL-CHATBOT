@@ -18,11 +18,12 @@ from api_models import (
     CreateSessionResponse, ConversationSummary, ChatbotHealthResponse,
     CheckDocumentsRequest, CheckDocumentsResponse, ExistingDocumentInfo,
     EnhancementStatus, UpdateConversationRequest, UpdateConversationResponse,
-    DeleteConversationResponse
+    DeleteConversationResponse, EmailAssignmentRequest, EmailAssignmentResponse,
+    ChatbotClientInfo
 )
 from auth_utils import (
     authenticate_user, create_user, create_access_token, verify_token,
-    check_user_exists, get_user_by_username
+    check_user_exists, get_user_by_username, get_password_hash
 )
 from pipeline_handler import PipelineHandler
 from db_service import initialize_db, User_Auth_Table
@@ -90,8 +91,9 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    #allow_origins=["https://yourdomain.com"], # TODO: Add specific domains only
-    allow_origins=["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000", "http://127.0.0.1:8000", "http://localhost:5173"],
+    # allow_origins=["https://yourdomain.com"], # TODO: Add specific domains only
+    allow_origins=["http://localhost:3000", "http://localhost:8000",
+                   "http://127.0.0.1:3000", "http://127.0.0.1:8000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
@@ -132,6 +134,63 @@ def user_to_response(user: User_Auth_Table) -> UserResponse:
         created_at=user.created_at,
         role=user.role if user.role else "User"  # Default to "User" if role is None
     )
+
+
+def generate_random_password(length: int = 12) -> str:
+    """Generate a random temporary password"""
+    import string
+    import secrets
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+def send_welcome_email(email: str, temp_password: str, chatbot_name: str = ""):
+    """Send welcome email to new client with login instructions"""
+    try:
+        subject = f"Welcome! You've been given access to {'a chatbot' if not chatbot_name else chatbot_name}"
+        body = f"""
+Hello!
+
+You've been given access to {'a chatbot' if not chatbot_name else f'the chatbot "{chatbot_name}"'}. 
+
+Here are your login credentials:
+Email: {email}
+Temporary Password: {temp_password}
+
+Please log in and change your password as soon as possible.
+
+Login at: {os.getenv('FRONTEND_URL', 'http://localhost:3000')}/auth
+
+Best regards,
+Your Chatbot Team
+        """
+
+        # TODO: Implement actual email sending using your preferred service
+        # Example: SendGrid, AWS SES, etc.
+        logger.info(f"Welcome email would be sent to {email}")
+        print(f"Welcome email for {email}: {body}")
+
+    except Exception as e:
+        logger.error(f"Failed to send welcome email to {email}: {e}")
+        # Don't fail the assignment if email fails
+        pass
+
+
+def validate_chatbot_access(user: User_Auth_Table, chatbot_id: str) -> bool:
+    """Validate if user has access to chatbot based on their role"""
+    if user.role in ['User', 'Super User']:
+        # Check if they own the chatbot (or Super User has access to all)
+        if user.role == 'Super User':
+            return True  # Super Users have access to all chatbots
+        from db_service import ChatBots
+        chatbot = ChatBots.objects(id=chatbot_id, user_id=user.id).first()
+        return chatbot is not None
+    elif user.role == 'Client':
+        # Check if chatbot is assigned to them
+        from db_service import validate_client_chatbot_access
+        return validate_client_chatbot_access(str(user.id), chatbot_id)
+    return False
+
 
 async def authenticate_websocket(websocket: WebSocket, token: str) -> User_Auth_Table:
     """Authenticate WebSocket connection using JWT token"""
@@ -368,7 +427,8 @@ async def create_agent(
     files: List[UploadFile] = File(..., max_size=10_000_000),  # 10MB limit
     # Authentication
     current_user: User_Auth_Table = Depends(get_current_user),
-    use_basic_summaries: bool = Form(True, description="Use basic summaries instead of AI-enhanced summaries")
+    use_basic_summaries: bool = Form(
+        True, description="Use basic summaries instead of AI-enhanced summaries")
 ):
     """Create a new agent with document processing and embedding generation"""
     try:
@@ -493,6 +553,7 @@ async def create_agent(
             detail=f"Internal server error: {str(e)}"
         )
 
+
 @app.post("/enhance_agent/{chatbot_id}", response_model=Dict[str, str], tags=["Agent Management"])
 async def enhance_agent_summaries(
     chatbot_id: str,
@@ -504,7 +565,8 @@ async def enhance_agent_summaries(
         from bson import ObjectId
         from db_service import ChatBots
 
-        chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=current_user).first()
+        chatbot = ChatBots.objects(id=ObjectId(
+            chatbot_id), user_id=current_user).first()
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found")
 
@@ -516,8 +578,11 @@ async def enhance_agent_summaries(
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        logger.error(f"Error starting enhancement job for chatbot {chatbot_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to start enhancement job")
+        logger.error(
+            f"Error starting enhancement job for chatbot {chatbot_id}: {e}")
+        raise HTTPException(
+            status_code=500, detail="Failed to start enhancement job")
+
 
 @app.get("/enhancement_status/{chatbot_id}", response_model=EnhancementStatus, tags=["Agent Management"])
 async def get_enhancement_status(
@@ -530,13 +595,16 @@ async def get_enhancement_status(
         from db_service import ChatBots, BatchSummarizationJob
         from api_models import EnhancementStatus, BatchJobStatus
 
-        chatbot = ChatBots.objects(id=ObjectId(chatbot_id), user_id=current_user).first()
+        chatbot = ChatBots.objects(id=ObjectId(
+            chatbot_id), user_id=current_user).first()
         if not chatbot:
             raise HTTPException(status_code=404, detail="Chatbot not found")
 
-        job = BatchSummarizationJob.objects(chatbot=chatbot, user=current_user).order_by('-created_at').first()
+        job = BatchSummarizationJob.objects(
+            chatbot=chatbot, user=current_user).order_by('-created_at').first()
         if not job:
-            raise HTTPException(status_code=404, detail="No enhancement job found for this chatbot")
+            raise HTTPException(
+                status_code=404, detail="No enhancement job found for this chatbot")
 
         return EnhancementStatus(
             batch_id=job.batch_id,
@@ -549,8 +617,11 @@ async def get_enhancement_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving enhancement status for chatbot {chatbot_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve enhancement status")
+        logger.error(
+            f"Error retrieving enhancement status for chatbot {chatbot_id}: {e}")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve enhancement status")
+
 
 @app.post("/webhooks/openai/batch", tags=["Webhooks"])
 async def openai_batch_webhook(request: Request):
@@ -569,8 +640,10 @@ async def openai_batch_webhook(request: Request):
 
         webhook_secret = os.getenv('OPENAI_WEBHOOK_SECRET', '')
         if not webhook_secret:
-            logger.warning("OPENAI_WEBHOOK_SECRET not set; rejecting webhook for safety")
-            raise HTTPException(status_code=401, detail="Webhook not configured")
+            logger.warning(
+                "OPENAI_WEBHOOK_SECRET not set; rejecting webhook for safety")
+            raise HTTPException(
+                status_code=401, detail="Webhook not configured")
 
         handler = WebhookHandler(webhook_secret)
         if not handler.verify_webhook_signature(body, signature):
@@ -589,6 +662,7 @@ async def openai_batch_webhook(request: Request):
         logger.error(f"Error handling OpenAI webhook: {e}")
         raise HTTPException(status_code=500, detail="Webhook processing error")
 
+
 @app.get("/notifications", response_model=List[Dict], tags=["User Management"])
 async def get_user_notifications(
     current_user: User_Auth_Table = Depends(get_current_user),
@@ -598,7 +672,8 @@ async def get_user_notifications(
     try:
         from notification_service import NotificationService
 
-        notifications = NotificationService.get_user_notifications(current_user, unread_only)
+        notifications = NotificationService.get_user_notifications(
+            current_user, unread_only)
         response: List[Dict] = []
         for n in notifications:
             response.append({
@@ -615,17 +690,118 @@ async def get_user_notifications(
         return response
     except Exception as e:
         logger.error(f"Error fetching user notifications: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch notifications")
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch notifications")
 
 
 @app.get("/chatbots", response_model=List[ChatbotDetailResponse], tags=["Chatbot"])
 async def get_user_chatbots(current_user: User_Auth_Table = Depends(get_current_user)):
-    """Get all chatbots for a user with detailed information including loaded files"""
+    """Get chatbots for current user based on role"""
     try:
-        chatbots = pipeline_handler.get_user_chatbots(str(current_user.id))
-        logger.info(
-            f"Retrieved {len(chatbots)} chatbots for user {current_user.user_name}")
-        return chatbots
+        if current_user.role == 'Client':
+            # Clients see only assigned chatbots
+            from db_service import get_client_assigned_chatbots, ChatbotDocumentsMapper, Chunks
+            chatbots = get_client_assigned_chatbots(str(current_user.id))
+
+            result = []
+            for chatbot in chatbots:
+                # Get loaded files for this chatbot
+                chatbot_docs = ChatbotDocumentsMapper.objects(chatbot=chatbot)
+                loaded_files = []
+                total_chunks = 0
+
+                for mapping in chatbot_docs:
+                    doc = mapping.document
+
+                    # Count chunks for this document
+                    chunk_count = Chunks.objects(document=doc).count()
+                    total_chunks += chunk_count
+
+                    loaded_files.append({
+                        "file_name": doc.file_name,
+                        "file_type": doc.file_type,
+                        "status": doc.status,
+                        "upload_date": doc.created_at,
+                        "total_chunks": chunk_count
+                    })
+
+                result.append(ChatbotDetailResponse(
+                    id=str(chatbot.id),
+                    name=chatbot.name,
+                    description=chatbot.description,
+                    embedding_model=chatbot.embedding_model,
+                    chunking_method=chatbot.chunking_method,
+                    date_created=chatbot.date_created,
+                    namespace=chatbot.namespace,
+                    loaded_files=loaded_files,
+                    total_files=len(loaded_files),
+                    total_chunks=total_chunks
+                ))
+
+            logger.info(
+                f"Retrieved {len(result)} assigned chatbots for client {current_user.user_name}")
+            return result
+
+        elif current_user.role == 'User':
+            # Users see owned chatbots
+            chatbots = pipeline_handler.get_user_chatbots(str(current_user.id))
+            logger.info(
+                f"Retrieved {len(chatbots)} owned chatbots for user {current_user.user_name}")
+            return chatbots
+
+        elif current_user.role == 'Super User':
+            # Super Users see all chatbots
+            from db_service import ChatBots, ChatbotDocumentsMapper, Chunks
+            all_chatbots = ChatBots.objects()
+
+            result = []
+            for chatbot in all_chatbots:
+                # Get loaded files for this chatbot
+                chatbot_docs = ChatbotDocumentsMapper.objects(chatbot=chatbot)
+                loaded_files = []
+                total_chunks = 0
+
+                for mapping in chatbot_docs:
+                    doc = mapping.document
+
+                    # Count chunks for this document
+                    chunk_count = Chunks.objects(document=doc).count()
+                    total_chunks += chunk_count
+
+                    loaded_files.append({
+                        "file_name": doc.file_name,
+                        "file_type": doc.file_type,
+                        "status": doc.status,
+                        "upload_date": doc.created_at,
+                        "total_chunks": chunk_count
+                    })
+
+                result.append(ChatbotDetailResponse(
+                    id=str(chatbot.id),
+                    name=chatbot.name,
+                    description=chatbot.description,
+                    embedding_model=chatbot.embedding_model,
+                    chunking_method=chatbot.chunking_method,
+                    date_created=chatbot.date_created,
+                    namespace=chatbot.namespace,
+                    loaded_files=loaded_files,
+                    total_files=len(loaded_files),
+                    total_chunks=total_chunks
+                ))
+
+            logger.info(
+                f"Retrieved {len(result)} total chatbots for super user {current_user.user_name}")
+            return result
+
+        else:
+            # Invalid role
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid user role"
+            )
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(
             f"Error retrieving chatbots for user {current_user.user_name}: {e}")
@@ -639,6 +815,13 @@ async def get_user_chatbots(current_user: User_Auth_Table = Depends(get_current_
 async def get_chatbot_conversations(chatbot_id: str, current_user: User_Auth_Table = Depends(get_current_user)):
     """Get all conversations for a chatbot"""
     try:
+        # Validate user has access to this chatbot (owner or assigned client)
+        if not validate_chatbot_access(current_user, chatbot_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chatbot not found or access denied"
+            )
+
         conversations = pipeline_handler.get_chatbot_conversations(
             chatbot_id, str(current_user.id))
         logger.info(
@@ -660,6 +843,13 @@ async def create_new_conversation_with_session(
 ):
     """Create a new conversation and session for a chatbot"""
     try:
+        # Validate user has access to this chatbot (owner or assigned client)
+        if not validate_chatbot_access(current_user, chatbot_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chatbot not found or access denied"
+            )
+
         session_response = pipeline_handler.create_new_conversation_with_session(
             str(current_user.id), chatbot_id)
         logger.info(
@@ -682,6 +872,13 @@ async def create_conversation_session(
 ):
     """Create a new conversation session"""
     try:
+        # Validate user has access to this chatbot (owner or assigned client)
+        if not validate_chatbot_access(current_user, chatbot_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chatbot not found or access denied"
+            )
+
         session_response = pipeline_handler.create_conversation_session(
             str(current_user.id), chatbot_id, conversation_id)
         logger.info(
@@ -695,6 +892,7 @@ async def create_conversation_session(
             detail="Error creating conversation session"
         )
 
+
 @app.put("/chatbot/{chatbot_id}/conversation/{conversation_id}", response_model=UpdateConversationResponse, tags=["Conversation Name Update"])
 async def update_name_of_conversation(
     chatbot_id: str,
@@ -704,8 +902,10 @@ async def update_name_of_conversation(
 ):
     """Update the name of a conversation"""
     try:
-        pipeline_handler.update_name_of_conversation(str(current_user.id), chatbot_id, conversation_id, request.new_conversation_title)
-        logger.info(f"Updated name of conversation {conversation_id} for chatbot {chatbot_id} to {request.new_conversation_title} by user {current_user.user_name}")
+        pipeline_handler.update_name_of_conversation(
+            str(current_user.id), chatbot_id, conversation_id, request.new_conversation_title)
+        logger.info(
+            f"Updated name of conversation {conversation_id} for chatbot {chatbot_id} to {request.new_conversation_title} by user {current_user.user_name}")
         return UpdateConversationResponse(
             success=True,
             message=f"Conversation with ID {conversation_id} and new name {request.new_conversation_title} updated successfully for chatbot {chatbot_id} by user {current_user.user_name}"
@@ -718,6 +918,7 @@ async def update_name_of_conversation(
             detail="Error updating name of conversation"
         )
 
+
 @app.delete("/chatbot/{chatbot_id}/conversation/{conversation_id}", response_model=DeleteConversationResponse, tags=["Conversation Deletion"])
 async def delete_conversation(
     chatbot_id: str,
@@ -726,15 +927,19 @@ async def delete_conversation(
 ):
     """Delete a conversation"""
     try:
-        pipeline_handler.delete_conversation(str(current_user.id), chatbot_id, conversation_id)
-        logger.info(f"Deleted conversation {conversation_id} for chatbot {chatbot_id} by user {current_user.user_name}")
+        pipeline_handler.delete_conversation(
+            str(current_user.id), chatbot_id, conversation_id)
+        logger.info(
+            f"Deleted conversation {conversation_id} for chatbot {chatbot_id} by user {current_user.user_name}")
         return DeleteConversationResponse(
             success=True,
             message=f"Conversation with ID {conversation_id} deleted successfully for chatbot {chatbot_id} by user {current_user.user_name}"
         )
     except Exception as e:
         logger.error(f"Error deleting conversation: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete conversation")
+        raise HTTPException(
+            status_code=500, detail="Failed to delete conversation")
+
 
 @app.websocket("/ws/conversation/session/{session_id}")
 async def websocket_conversation(websocket: WebSocket, session_id: str):
@@ -789,10 +994,17 @@ async def websocket_conversation(websocket: WebSocket, session_id: str):
             return
         logger.info(f"Session found: {session.session_id}")
 
+        # Validate user has access to the chatbot from the session
+        chatbot_id = str(session.chatbot_id.id)
+        if not validate_chatbot_access(user, chatbot_id):
+            logger.error(
+                f"User {user.user_name} does not have access to chatbot {chatbot_id}")
+            await safe_websocket_close(websocket, code=1008, reason="Chatbot access denied")
+            return
+
         # Get the actual chatbot object from the session
         from db_service import ChatBots
-        chatbot = ChatBots.objects(
-            id=session.chatbot_id.id, user_id=user.id).first()
+        chatbot = ChatBots.objects(id=session.chatbot_id.id).first()
         if not chatbot:
             logger.error(f"Chatbot not found for session {session_id}")
             await safe_websocket_close(websocket, code=1008, reason="Chatbot not found")
@@ -853,18 +1065,21 @@ async def websocket_conversation(websocket: WebSocket, session_id: str):
                 chatbot_namespace = chatbot.namespace
                 logger.info(
                     f"Using single namespace for RAG: {chatbot_namespace}")
-                
+
                 # Log chatbot description for debugging
                 if chatbot.description:
-                    logger.info(f"Using personalized prompt for chatbot: {chatbot.description}")
+                    logger.info(
+                        f"Using personalized prompt for chatbot: {chatbot.description}")
                 else:
-                    logger.info("Using default prompt (no chatbot description provided)")
+                    logger.info(
+                        "Using default prompt (no chatbot description provided)")
 
                 initialize_rag_config(
                     user_id=str(user.id),
                     namespaces=[chatbot_namespace],  # Single namespace only
                     embedding_model=chatbot.embedding_model,
-                    chatbot_description=chatbot.description  # Add chatbot description for personalized prompts
+                    # Add chatbot description for personalized prompts
+                    chatbot_description=chatbot.description
                 )
 
                 # Get conversation history for context
@@ -1166,7 +1381,239 @@ async def delete_chatbot(chatbot_id: str, current_user: User_Auth_Table = Depend
         logger.error(f"Error deleting chatbot {chatbot_id}: {e}")
         raise HTTPException(status_code=500, detail="Error deleting chatbot")
 
+
+# Client Assignment Endpoints
+@app.post("/api/assign-chatbot-by-email", response_model=EmailAssignmentResponse, tags=["Client Management"])
+async def assign_chatbot_by_email(
+    request: EmailAssignmentRequest,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Assign chatbot to client by email - creates client if doesn't exist (Users and Super Users only)"""
+    if current_user.role not in ['User', 'Super User']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Users and Super Users can assign chatbots to clients"
+        )
+
+    try:
+        # Find or create client
+        client = User_Auth_Table.objects(email=request.client_email).first()
+        new_client_created = False
+
+        if not client:
+            # Create new client account
+            temp_password = generate_random_password()
+            client = User_Auth_Table(
+                user_name=request.client_email.split(
+                    '@')[0],  # Use email prefix as username
+                email=request.client_email,
+                password=get_password_hash(temp_password),
+                first_name="",  # To be filled by client
+                last_name="",
+                role="Client",
+                created_at=datetime.now()
+            )
+            client.save()
+            new_client_created = True
+
+            # Send welcome email with credentials
+            send_welcome_email(request.client_email, temp_password)
+
+        elif client.role != 'Client':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot assign chatbot to Users - only Clients are allowed"
+            )
+
+        # Check if already assigned
+        from db_service import ChatbotClientMapper
+        existing = ChatbotClientMapper.objects(
+            chatbot=request.chatbot_id,
+            client=client.id,
+            is_active=True
+        ).first()
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Chatbot already assigned to {request.client_email}"
+            )
+
+        # Assign chatbot
+        from db_service import assign_chatbot_to_client
+        assignment = assign_chatbot_to_client(
+            request.chatbot_id,
+            str(client.id),
+            str(current_user.id)
+        )
+
+        return EmailAssignmentResponse(
+            message=f"Chatbot assigned to {request.client_email}",
+            client_email=request.client_email,
+            new_client=new_client_created,
+            assignment_id=str(assignment.id)
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to assign chatbot by email: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to assign chatbot: {str(e)}"
+        )
+
+
+@app.delete("/api/revoke-chatbot-from-client", tags=["Client Management"])
+async def revoke_chatbot_from_client(
+    chatbot_id: str,
+    client_email: str,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Revoke a chatbot assignment from a client by email"""
+    if current_user.role not in ['User', 'Super User']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Users and Super Users can revoke chatbot assignments"
+        )
+
+    try:
+        # Find client by email
+        client = User_Auth_Table.objects(email=client_email).first()
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Client with email {client_email} not found"
+            )
+
+        from db_service import revoke_chatbot_from_client
+        success = revoke_chatbot_from_client(chatbot_id, str(client.id))
+
+        if success:
+            return {"message": f"Chatbot assignment revoked from {client_email}"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assignment not found"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to revoke chatbot from client: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to revoke chatbot assignment: {str(e)}"
+        )
+
+
+@app.get("/api/chatbot-assignments/{chatbot_id}", response_model=List[ChatbotClientInfo], tags=["Client Management"])
+async def get_chatbot_assignments(
+    chatbot_id: str,
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Get all clients assigned to a chatbot"""
+    if current_user.role not in ['User', 'Super User']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Users and Super Users can view chatbot assignments"
+        )
+
+    try:
+        from db_service import ChatbotClientMapper
+
+        # Get all active assignments for this chatbot
+        assignments = ChatbotClientMapper.objects(
+            chatbot=chatbot_id,
+            is_active=True
+        )
+
+        result = []
+        for assignment in assignments:
+            client = assignment.client
+            result.append(ChatbotClientInfo(
+                client_id=str(client.id),
+                user_name=client.user_name,
+                first_name=client.first_name,
+                last_name=client.last_name,
+                email=client.email,
+                assigned_at=assignment.assigned_at,
+                is_active=assignment.is_active
+            ))
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to get chatbot assignments: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to get chatbot assignments: {str(e)}"
+        )
+
+
+@app.get("/api/my-assigned-chatbots", response_model=List[ChatbotDetailResponse], tags=["Client Management"])
+async def get_my_assigned_chatbots(
+    current_user: User_Auth_Table = Depends(get_current_user)
+):
+    """Get chatbots assigned to the current client"""
+    if current_user.role != 'Client':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Clients can access assigned chatbots"
+        )
+
+    try:
+        from db_service import get_client_assigned_chatbots, ChatbotDocumentsMapper
+        chatbots = get_client_assigned_chatbots(str(current_user.id))
+
+        result = []
+        for chatbot in chatbots:
+            # Get loaded files for this chatbot
+            chatbot_docs = ChatbotDocumentsMapper.objects(chatbot=chatbot)
+            loaded_files = []
+            total_chunks = 0
+
+            for mapping in chatbot_docs:
+                doc = mapping.document
+
+                # Count chunks for this document
+                from db_service import Chunks
+                chunk_count = Chunks.objects(document=doc).count()
+                total_chunks += chunk_count
+
+                loaded_files.append({
+                    "file_name": doc.file_name,
+                    "file_type": doc.file_type,
+                    "status": doc.status,
+                    "upload_date": doc.created_at,
+                    "total_chunks": chunk_count
+                })
+
+            result.append(ChatbotDetailResponse(
+                id=str(chatbot.id),
+                name=chatbot.name,
+                description=chatbot.description,
+                embedding_model=chatbot.embedding_model,
+                chunking_method=chatbot.chunking_method,
+                date_created=chatbot.date_created,
+                namespace=chatbot.namespace,
+                loaded_files=loaded_files,
+                total_files=len(loaded_files),
+                total_chunks=total_chunks
+            ))
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to get assigned chatbots: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to get assigned chatbots: {str(e)}"
+        )
+
+
 # ==============================================Error handlers==============================================
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc: HTTPException):

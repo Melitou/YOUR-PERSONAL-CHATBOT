@@ -5,6 +5,7 @@ import CreateBotUserModalComponent from "./CreateBotUserModalComponent";
 import CreateBotSuperUserModalComponent from "./CreateBotSuperUserModalComponent";
 import EditConversationModalComponent from "./EditConversationModalComponent";
 import DeleteConversationModalComponent from "./DeleteConversationModalComponent";
+import AssignClientsModalComponent from "./AssignClientsModalComponent";
 import UserAuthStore from "../stores/UserAuthStore";
 import ViewStore from "../stores/ViewStore";
 import ManageChatbotsModalComponent from "./ManageChatbotsModalComponent";
@@ -19,6 +20,7 @@ const SidebarComponent = () => {
 
     const [createBotModalOpen, setCreateBotModalOpen] = useState(false);
     const [existingChatbotsModalOpen, setExistingChatbotsModalOpen] = useState(false);
+    const [assignClientsModalOpen, setAssignClientsModalOpen] = useState(false);
 
     // Modal states for conversation editing and deleting
     const [editModalOpen, setEditModalOpen] = useState(false);
@@ -172,7 +174,7 @@ const SidebarComponent = () => {
                                 <p className="text-xs glass-text opacity-70">{loadedChatbot.name}</p>
                             </div>
                             <button
-                                className="w-full p-2 mb-3 rounded-md glass-dark hover:glass-light glass-text text-sm transition-colors flex items-center justify-center gap-2"
+                                className="w-full p-2 mb-2 rounded-md glass-dark hover:glass-light glass-text text-sm transition-colors flex items-center justify-center gap-2"
                                 onClick={handleNewConversationClick}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -180,6 +182,19 @@ const SidebarComponent = () => {
                                 </svg>
                                 New Conversation
                             </button>
+
+                            {/* Add client assignment button for Users and Super Users */}
+                            {(user?.role === 'User' || user?.role === 'Super User') && (
+                                <button
+                                    className="w-full p-2 mb-3 rounded-md glass-dark hover:glass-light glass-text text-sm transition-colors flex items-center justify-center gap-2"
+                                    onClick={() => setAssignClientsModalOpen(true)}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                                    </svg>
+                                    Assign to Clients
+                                </button>
+                            )}
                         </div>
                     )}
                     <div className="flex flex-col gap-2">
@@ -287,6 +302,16 @@ const SidebarComponent = () => {
                 onConfirm={handleConfirmDeleteConversation}
                 loading={actionLoading}
             />
+
+            {/* Assign clients modal */}
+            {loadedChatbot && (
+                <AssignClientsModalComponent
+                    open={assignClientsModalOpen}
+                    onClose={() => setAssignClientsModalOpen(false)}
+                    chatbotId={loadedChatbot.id}
+                    chatbotName={loadedChatbot.name}
+                />
+            )}
 
         </>
     );

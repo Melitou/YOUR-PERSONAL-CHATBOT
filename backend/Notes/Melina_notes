@@ -34,7 +34,7 @@ Your embedding step is batched, so it doesn’t contribute to request spikes.
 - Output formated, markdown, equations
 - Summarization to backend
 - Way too long summaries
-- Client **Made changes to the db_service**
+- Client ✅ **Made changes to the db_service** 
          **Added created_by in conversations table so the user and client can see their own conversations**
 - Remove health HTTP
 - For each manage, button Do you want to enhance your chatbot

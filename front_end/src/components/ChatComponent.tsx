@@ -71,6 +71,7 @@ const ChatComponent = () => {
 
     const [inputMessage, setInputMessage] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
     const adjustTextareaHeight = (element?: HTMLTextAreaElement) => {
         const textarea = element ?? textareaRef.current;
@@ -96,12 +97,47 @@ const ChatComponent = () => {
         adjustTextareaHeight();
     }, []);
 
+    useEffect(() => {
+        // Auto-focus the textarea when input is cleared and not thinking
+        if (inputMessage === '' && !isThinking && textareaRef.current) {
+            textareaRef.current.focus();
+        }
+    }, [inputMessage, isThinking]);
+
+    const scrollToBottom = () => {
+        if (messagesContainerRef.current) {
+            requestAnimationFrame(() => {
+                messagesContainerRef.current?.scrollTo({
+                    top: messagesContainerRef.current.scrollHeight,
+                    behavior: 'smooth'
+                });
+            });
+        }
+    };
+
+    useEffect(() => {
+        // Auto-scroll to bottom ONLY when the agent stops thinking (response is complete)
+        if (!isThinking && conversationMessages?.messages && conversationMessages.messages.length > 0) {
+            const lastMessage = conversationMessages.messages[conversationMessages.messages.length - 1];
+            // Only scroll if the last message is from the agent (bot)
+            if (lastMessage.role === 'agent') {
+                scrollToBottom();
+            }
+        }
+    }, [isThinking]);
+
     const handleSendMessage = () => {
         if (!inputMessage.trim()) return; // Don't send empty messages
 
         const success = sendMessage(inputMessage.trim());
         if (success) {
             setInputMessage(''); // Clear input after successful send
+            // Auto-scroll when user sends a message
+            scrollToBottom();
+            //Refocus the text area after sending a message
+            setTimeout(() => {
+                textareaRef.current?.focus();
+            }, 0);
         }
     };
 
@@ -138,7 +174,7 @@ const ChatComponent = () => {
             </div>
 
             {/* Chat Messages Container - Scrollable Area */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2 min-h-0">
+            <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2 min-h-0">
                 {conversationMessages?.conversation_id ? (
                     <>
                         {conversationMessages?.messages && conversationMessages.messages.length > 0 ? (
@@ -167,31 +203,31 @@ const ChatComponent = () => {
                                                 </p>
                                                 {message.isStreaming && (
                                                     <div className="flex items-center mt-3 p-3 glass-dark rounded-lg">
-                                                <div className="flex space-x-1">
-                                                    <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce"></div>
-                                                    <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '1.5s' }}></div>
-                                                    <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0.6s', animationDuration: '1.5s' }}></div>
-                                                </div>
-                                                <span className="text-xs sm:text-sm glass-text ml-3 font-medium">Agent is thinking...</span>
+                                                        <div className="flex space-x-1">
+                                                            <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce"></div>
+                                                            <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '1.5s' }}></div>
+                                                            <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0.6s', animationDuration: '1.5s' }}></div>
+                                                        </div>
+                                                        <span className="text-xs sm:text-sm glass-text ml-3 font-medium">Agent is thinking...</span>
+                                                    </div>
+                                                )}
+                                                <p className="text-xs sm:text-sm mt-2 glass-text opacity-60">
+                                                    {new Date(message.created_at).toLocaleTimeString([], {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </p>
                                             </div>
-                                        )}
-                                        <p className="text-xs sm:text-sm mt-2 glass-text opacity-60">
-                                            {new Date(message.created_at).toLocaleTimeString([], {
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
-                                        </p>
+                                        </div>
+
                                     </div>
+                                ))}
+
+                                {/* Show inline thinking component on small screens at the end */}
+                                <div className="lg:hidden">
+                                    <InlineThinkingComponent />
                                 </div>
-                                
-                            </div>
-                        ))}
-                        
-                        {/* Show inline thinking component on small screens at the end */}
-                        <div className="lg:hidden">
-                            <InlineThinkingComponent />
-                        </div>
-                    </>
+                            </>
                         ) : (
                             <>
                                 <div className="flex justify-center items-center py-8">

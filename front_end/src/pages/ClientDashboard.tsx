@@ -213,11 +213,11 @@ const ClientDashboard: React.FC = () => {
                         <h1 className="text-xl font-semibold glass-text">My Chatbots</h1>
                         <div className="flex items-center space-x-4">
                             <span className="text-sm glass-text opacity-80">
-                                Welcome, {user?.name}
+                                Welcome, {user?.name}!
                             </span>
                             <button
                                 onClick={handleLogout}
-                                className="px-3 py-1.5 text-sm glass-text hover:glass-light rounded-md transition-colors"
+                                className="px-3 py-1.5 text-sm glass-text hover:glass-light rounded-md transition-colors cursor-pointer"
                             >
                                 Logout
                             </button>
@@ -267,7 +267,7 @@ const ClientDashboard: React.FC = () => {
                                     const chatbot = assignedChatbots.find(c => c.id === e.target.value);
                                     if (chatbot) handleChatbotSelect(chatbot);
                                 }}
-                                className="w-full px-3 py-2 glass-dark rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent glass-text text-sm"
+                                className="w-full px-3 py-2 glass-dark rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent glass-text text-sm cursor-pointer"
                             >
                                 {assignedChatbots.map(chatbot => (
                                     <option key={chatbot.id} value={chatbot.id}>
@@ -288,7 +288,7 @@ const ClientDashboard: React.FC = () => {
                                 <p className="text-xs glass-text opacity-70 mb-3">{loadedChatbot.name}</p>
 
                                 <button
-                                    className="w-full p-2 rounded-md glass-dark hover:glass-light glass-text text-sm transition-colors flex items-center justify-center gap-2"
+                                    className="w-full p-2 rounded-md glass-dark hover:glass-light glass-text text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
                                     onClick={handleNewConversationClick}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -380,11 +380,11 @@ const ClientDashboard: React.FC = () => {
                         {/* User info and logout - right side */}
                         <div className="flex items-center space-x-4">
                             <span className="text-lg glass-text font-small">
-                                Welcome, {user?.name}
+                                Welcome, {user?.name}!
                             </span>
                             <button
                                 onClick={handleLogout}
-                                className="px-4 py-2 text-base glass-text hover:glass-light rounded-md transition-colors font-small"
+                                className="px-4 py-2 text-base glass-text hover:glass-light rounded-md transition-colors font-small cursor-pointer"
                             >
                                 Logout
                             </button>
@@ -395,7 +395,7 @@ const ClientDashboard: React.FC = () => {
                 {/* Chat interface */}
                 <div className="flex-1 p-4">
                     {selectedChatbot ? (
-                        <div className="h-full glass-card rounded-lg shadow-sm border border-gray-200 border-opacity-20 overflow-hidden">
+                        <div className="h-155 glass-card rounded-lg shadow-sm border border-gray-200 border-opacity-20 overflow-hidden">
                             <ChatComponent />
                         </div>
                     ) : (

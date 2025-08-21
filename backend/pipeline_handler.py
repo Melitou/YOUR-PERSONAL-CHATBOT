@@ -543,9 +543,9 @@ class PipelineHandler:
                     detail="Chatbot not found or access denied"
                 )
 
-            # Get all conversations for the chatbot
+            # Get all conversations for the chatbot created by this user
             conversations = Conversation.objects(
-                chatbot=chatbot).order_by('-created_at')
+                chatbot=chatbot, created_by=user).order_by('-created_at')
             conversation_summaries = []
             for conversation in conversations:
                 conversation_summary = ConversationSummary(
@@ -597,6 +597,7 @@ class PipelineHandler:
             # Create new conversation
             conversation = Conversation(
                 chatbot=chatbot,
+                created_by=user,
                 created_at=datetime.now(),
                 updated_at=datetime.now()
             )

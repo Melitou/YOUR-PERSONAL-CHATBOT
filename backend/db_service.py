@@ -84,6 +84,7 @@ class Conversation(Document):
     conversation_title = StringField(
         required=False, default="New Conversation")
     chatbot = ReferenceField(ChatBots, required=True)
+    created_by = ReferenceField(User_Auth_Table, required=True)
     created_at = DateTimeField(required=True)
     updated_at = DateTimeField(required=True)
     meta = {
@@ -91,13 +92,15 @@ class Conversation(Document):
         'indexes': [
             {'fields': ['conversation_title']},
             {'fields': ['chatbot']},
+            {'fields': ['created_by']},
             {'fields': ['created_at']},
-            {'fields': ['updated_at']}
+            {'fields': ['updated_at']},
+            {'fields': [('chatbot', 1), ('created_by', 1)]}
         ]
     }
 
     def __str__(self) -> str:
-        return f"Conversation(conversation_title={self.conversation_title}, chatbot={self.chatbot}, created_at={self.created_at}, updated_at={self.updated_at})"
+        return f"Conversation(conversation_title={self.conversation_title}, chatbot={self.chatbot}, created_by={self.created_by}, created_at={self.created_at}, updated_at={self.updated_at})"
 
 
 class Messages(Document):

@@ -18,6 +18,7 @@ YOUR-PERSONAL-CHATBOT is an AI-powered chatbot that helps users search their own
     - **Gemini:** `gemini-2.5-pro`, `gemini-2.5-flash`, and more.
 - **Vector Database:** Uses Pinecone for efficient vector storage and retrieval.
 - **Database:** MongoDB with GridFS for file storage.
+- **Structured Responses:** AI responses are formatted with markdown for better readability (headers, lists, code blocks, etc.)
 - **CLI Interface:** An interactive command-line interface to manage the entire workflow.
 
 ## How It Works
@@ -98,6 +99,7 @@ python main.py
 Now we open another terminal and run the code shown below so that we can initialize the front end:
 ```bash
 cd front_end
+npm install  # This installs all frontend dependencies including markdown rendering
 npm run dev
 ```
 When the app is ready you will be able to login your user.

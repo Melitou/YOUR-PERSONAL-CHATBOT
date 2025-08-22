@@ -61,11 +61,11 @@ GEMINI_MODELS = [
 # Global variables for RAG configuration (will be set during initialization)
 RAG_CONFIG = {
     'user_id': None,
-    # namespace: None 
-    'namespaces': [], # This is the new approach
+    # namespace: None
+    'namespaces': [],  # This is the new approach
     'embedding_model': None,
     'chatbot_model': None,
-    'chatbot_description': None # Added for chatbot description
+    'chatbot_description': None  # Added for chatbot description
 }
 
 
@@ -203,29 +203,35 @@ SYSTEM_PROMPT = (
     "- If the first search doesn't provide complete information, try different search terms\n"
     "- Combine information from multiple searches if needed to provide comprehensive answers\n"
     "## RESPONSE STYLE\n"
-    "- Provide clear, accurate answers based on the retrieved document content\n"
+    "- Format your responses using markdown for better readability\n"
+    "- Use headers (## for main sections, ### for subsections) to organize information\n"
+    "- Use bullet points (-) or numbered lists (1.) to present multiple items\n"
+    "- Use **bold** for important terms and *italics* for emphasis\n"
+    "- Use code blocks (```language```) for any code or technical content\n"
+    "- Break up long paragraphs into shorter, focused sections\n"
     "- Always cite which documents or sections your information comes from\n"
-    "- If information is not found in the documents, clearly state this\n"
+    "- If information is not found in the documents, clearly state this in a dedicated section\n"
     "- Be helpful and conversational while staying accurate to the source material\n"
     "## PLANNING\n"
     "Plan extensively: decide whether to search, what to search for, reflect on results, then finalize the answer.\n"
 )
 
+
 def get_system_prompt(chatbot_description: str = None) -> str:
     """Generate system prompt with optional chatbot description"""
-    
+
     base_prompt = (
         "# Identity\n"
         "You are a Personal Document Assistant, an AI agent that helps users find and understand information from their uploaded documents.\n\n"
     )
-    
+
     if chatbot_description:
         base_prompt += (
             f"# Specialization\n"
             f"This chatbot is specifically designed for: {chatbot_description}\n"
             f"Keep your responses focused on this domain and use case.\n\n"
         )
-    
+
     base_prompt += (
         "# Instructions\n"
         "## THINKING PROCESS\n"
@@ -245,15 +251,21 @@ def get_system_prompt(chatbot_description: str = None) -> str:
         "- If the first search doesn't provide complete information, try different search terms\n"
         "- Combine information from multiple searches if needed to provide comprehensive answers\n"
         "## RESPONSE STYLE\n"
-        "- Provide clear, accurate answers based on the retrieved document content\n"
+        "- Format your responses using markdown for better readability\n"
+        "- Use headers (## for main sections, ### for subsections) to organize information\n"
+        "- Use bullet points (-) or numbered lists (1.) to present multiple items\n"
+        "- Use **bold** for important terms and *italics* for emphasis\n"
+        "- Use code blocks (```language```) for any code or technical content\n"
+        "- Break up long paragraphs into shorter, focused sections\n"
         "- Always cite which documents or sections your information comes from\n"
-        "- If information is not found in the documents, clearly state this\n"
+        "- If information is not found in the documents, clearly state this in a dedicated section\n"
         "- Be helpful and conversational while staying accurate to the source material\n"
         "## PLANNING\n"
         "Plan extensively: decide whether to search, what to search for, reflect on results, then finalize the answer.\n"
     )
-    
+
     return base_prompt
+
 
 MAX_TOOL_CALLS = 4
 
@@ -582,10 +594,10 @@ async def ask_openai_assistant_stream(history: list, query: str, model: str) -> 
         # Execute the function
         debug_print(f"Executing function call: {func_call.name}")
         args = json.loads(func_call.arguments)
-        
+
         # Send search execution event
         yield {"type": "thinking_step", "step": "executing_search", "message": f"Searching documents for: '{args.get('query', '')}'"}
-        
+
         result = rag_search_tool(args.get("query"))
         debug_print(f"Function returned result length: {len(result)}")
 
@@ -1002,6 +1014,7 @@ async def ask_rag_assistant_stream(history: list, query: str) -> AsyncGenerator[
     else:
         yield f"Error: Unsupported model provider for model: {model}"
 
+
 def ask_rag_assistant_sync_stream(history: list, query: str) -> str:
     """
     Synchronous wrapper for streaming assistant that provides real-time output to CLI.
@@ -1073,6 +1086,7 @@ def ask_rag_assistant_sync_stream(history: list, query: str) -> str:
     finally:
         loop.close()
 
+
 def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, chatbot_model: str = "gpt-4.1", chatbot_description: str = None):
     """
     Start an interactive RAG chat session with the user
@@ -1085,7 +1099,8 @@ def start_rag_chat_session(user_id: str, namespace: str, embedding_model: str, c
         chatbot_description: Custom description of what this chatbot is about
     """
     # Initialize RAG configuration
-    initialize_rag_config(user_id, namespace, embedding_model, chatbot_model, chatbot_description)
+    initialize_rag_config(user_id, namespace, embedding_model,
+                          chatbot_model, chatbot_description)
 
     print("\n" + "=" * 80)
     print("🤖 PERSONAL DOCUMENT ASSISTANT")

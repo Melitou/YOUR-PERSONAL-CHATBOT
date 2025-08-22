@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import LoadedChatbotStore from '../stores/LoadedChatbotStore';
 import { InlineThinkingComponent } from './ThoughtVisualizerComponent';
+import TypewriterMarkdown from './TypewriterMarkdown';
 
 // Typewriter component for smooth text animation
 const TypewriterText = ({ text, isStreaming, speed = 25, onComplete }: { text: string, isStreaming: boolean, speed?: number, onComplete?: () => void }) => {
@@ -208,17 +209,31 @@ const ChatComponent = () => {
                                                     : 'glass bot-message-bubble'
                                                     }`}
                                             >
-                                                <p className="text-xs sm:text-sm glass-text">
-                                                    <TypewriterText
-                                                        text={message.message}
-                                                        isStreaming={message.isStreaming || false}
-                                                        speed={30}
-                                                        onComplete={() => {
-                                                            // Mark as complete when animation finishes
-                                                            markStreamingComplete();
-                                                        }}
-                                                    />
-                                                </p>
+                                                {message.role === 'agent' ? (
+                                                    <div className="text-xs sm:text-sm">
+                                                        <TypewriterMarkdown
+                                                            text={message.message}
+                                                            isStreaming={message.isStreaming || false}
+                                                            speed={30}
+                                                            onComplete={() => {
+                                                                // Mark as complete when animation finishes
+                                                                markStreamingComplete();
+                                                            }}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-xs sm:text-sm glass-text">
+                                                        <TypewriterText
+                                                            text={message.message}
+                                                            isStreaming={message.isStreaming || false}
+                                                            speed={30}
+                                                            onComplete={() => {
+                                                                // Mark as complete when animation finishes
+                                                                markStreamingComplete();
+                                                            }}
+                                                        />
+                                                    </p>
+                                                )}
                                                 {message.isStreaming && (
                                                     <div className="flex items-center mt-3 p-3 glass-dark rounded-lg">
                                                         <div className="flex space-x-1">

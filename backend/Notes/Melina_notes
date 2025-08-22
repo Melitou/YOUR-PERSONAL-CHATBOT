@@ -44,3 +44,6 @@ Your embedding step is batched, so it doesn’t contribute to request spikes.
 
 oCBG4HkAwSg$
 
+
+
+cd front_end && npm install react-markdown react-syntax-highlighter @types/react-syntax-highlighter

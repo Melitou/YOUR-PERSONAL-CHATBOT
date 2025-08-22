@@ -45,7 +45,6 @@ The project follows a master pipeline that orchestrates the entire workflow from
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/Melitou/YOUR-PERSONAL-CHATBOT.git
-    cd YOUR-PERSONAL-CHATBOT
     ```
 
 2.  **Create a virtual environment and activate it:**
@@ -63,49 +62,58 @@ The project follows a master pipeline that orchestrates the entire workflow from
     ```
 
 ## Usage
+Before we start we should download MongoDB locally from https://www.mongodb.com/try/download/community. You choose your version (we recommend 8.0.13 or higher) and platform. When the installation is complete we continue.
 
-The main entry point for the application is `master_pipeline.py`. You can run it directly from the command line.
+Before we start with the main application we should add some clients in our local MongoDB.
 
 ```bash
-python master_pipeline.py
+cd backend
+python db_service.py
+```
+This will make a local host in your local MongoDB. 
+To add Users or Super Users you will have to run a **curl** command
+
+```bash
+curl -X POST "http://localhost:8000/signup" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_name": "your_user_name",
+    "password": "your_original_password_here",
+    "first_name": "your_first_name",
+    "last_name": "your_last_name",
+    "email": "your_email",
+    "role": "User"
+  }'
+```
+We create a User first because in order for the client to use a chatbot he/she needs to have access to it via a User or Super User.
+
+
+The main entry point for the application is `main.py`. You can run it directly from the command line.
+
+```bash
+cd backend
+python main.py
 ```
 
-The script will guide you through the following steps:
-
-1.  **Enter the folder path containing your documents.**
-2.  **Enter a namespace** for your chatbot (e.g., `my_project_docs`).
-3.  **Select an embedding provider** (OpenAI or Gemini).
-4.  **Select a chatbot model.**
-5.  **Select a chunking strategy.**
-
-The pipeline will then process your documents, create embeddings, and start an interactive chat session.
-
-### Example
-
+Now we open another terminal and run the code shown below so that we can initialize the front end:
+```bash
+cd front_end
+npm run dev
 ```
-$ python master_pipeline.py
-================================================================================
-🚀 COMPLETE RAG CHATBOT PIPELINE
-================================================================================
-Complete workflow: Documents → Processing → Embeddings → Chat
-• 📤 Upload and process your documents
-• 🧠 Create embeddings and store in vector database
-• 🤖 Start chatting with your personal document assistant
-================================================================================
+When the app is ready you will be able to login your user.
 
-📁 Enter folder path containing documents: /path/to/your/documents
-✅ Found 5 supported files in /path/to/your/documents
-🏷️  Enter namespace (e.g., 'my_documents', 'company_data'): project_docs
-✅ Namespace 'project_docs' is valid.
+These are the following steps to add a Client:
+1. You create a chatbot with your own files.
+2. Then you click on load existing chatbot and Assign Clients.
+3. You then add the email that you want for the client. 
 
-🤖 Select embedding provider:
-1. OpenAI (text-embedding-3-small)
-2. Gemini (gemini-embedding-001)
-Choose provider (1 or 2): 1
-✅ Selected: OpenAI
+To login as the Client you have to:
+1. Logoout of the User.
+2. Pass as the username the characters before the @ symbol. For example, if email: example43@gmail.com then Username: example43.
+3. The password of the Client will be shown in the terminal of the backend as temporary password.
 
-... and so on.
-```
+After logging in you should create a conversation and that is it! Noe you can chat with the chatbot and show the thinking proccess!
+
 
 ## Contributing
 

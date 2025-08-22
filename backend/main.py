@@ -1092,7 +1092,66 @@ async def websocket_conversation(websocket: WebSocket, session_id: str):
                     "timestamp": user_msg_record.created_at.isoformat()
                 })
 
-                # Initialize RAG for this chatbot
+                # CASUAL CONVERSATION PRE-FILTERING
+                # Check if this is a casual conversation that doesn't need RAG processing
+                from casual_conversation_filter import is_casual_message, get_casual_response
+                import time
+
+                # Configuration: Enable/disable casual conversation pre-filtering
+                ENABLE_CASUAL_PREFILTERING = os.getenv(
+                    "ENABLE_CASUAL_PREFILTERING", "true").lower() == "true"
+
+                start_time = time.time()
+                casual_category = is_casual_message(
+                    user_message) if ENABLE_CASUAL_PREFILTERING else None
+
+                if casual_category:
+                    logger.info(
+                        f"🚀 FAST RESPONSE: Detected casual conversation '{user_message}' -> {casual_category}")
+
+                    # Get appropriate casual response
+                    casual_response = get_casual_response(
+                        casual_category,
+                        chatbot_description=chatbot.description
+                    )
+
+                    # Send immediate response without RAG processing
+                    await safe_websocket_send(websocket, {
+                        "type": "response_start",
+                        "message": "Responding..."
+                    })
+
+                    # Send the casual response as a single chunk
+                    await safe_websocket_send(websocket, {
+                        "type": "response_chunk",
+                        "chunk": casual_response
+                    })
+
+                    await safe_websocket_send(websocket, {
+                        "type": "response_end"
+                    })
+
+                    # Save casual response to database
+                    pipeline_handler.save_message_to_session(
+                        session_id, casual_response, "agent"
+                    )
+
+                    # Log performance metrics
+                    response_time = (time.time() - start_time) * \
+                        1000  # Convert to milliseconds
+                    logger.info(
+                        f"⚡ CASUAL RESPONSE COMPLETE: '{user_message}' -> {casual_category} | Response time: {response_time:.2f}ms | Bypassed RAG: YES")
+                    continue  # Skip RAG processing for this message
+                else:
+                    detection_time = (time.time() - start_time) * 1000
+                    if ENABLE_CASUAL_PREFILTERING:
+                        logger.info(
+                            f"🔍 NON-CASUAL: '{user_message}' -> Proceeding to RAG | Detection time: {detection_time:.2f}ms")
+                    else:
+                        logger.info(
+                            f"🔍 PREFILTERING DISABLED: '{user_message}' -> Proceeding to RAG")
+
+                # Initialize RAG for this chatbot (only for non-casual conversations)
                 from LLM.rag_llm_call import initialize_rag_config, ask_rag_assistant_stream
 
                 logger.info(

@@ -827,20 +827,19 @@ class PipelineHandler:
             )
             msg.save()
 
-            # Update conversation title with first user message
+            # Update conversation title with first agent response
             conversation = session.conversation_id
-            if role == "user" and (conversation.conversation_title == "New Conversation" or not conversation.conversation_title):
-                # Check if this is the first user message in the conversation
-                existing_user_messages = Messages.objects(
+            if role == "agent" and (conversation.conversation_title == "New Conversation" or not conversation.conversation_title):
+                # Check if this is the first agent message in the conversation
+                existing_agent_messages = Messages.objects(
                     conversation_id=conversation,
-                    role="user"
+                    role="agent"
                 ).count()
 
-                # This is the first user message (just saved)
-                if existing_user_messages == 1:
-                    # Truncate message if too long for title (limit to 50 characters)
-                    title = message[:50] + \
-                        "..." if len(message) > 50 else message
+                # This is the first agent message (just saved)
+                if existing_agent_messages == 1:
+                    # Truncate message to first 6 characters only
+                    title = message[:35] if len(message) >= 6 else message
                     conversation.conversation_title = title
                     logger.info(
                         f"Updated conversation {conversation.id} title to: {title}")

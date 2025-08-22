@@ -314,6 +314,9 @@ const LoadedChatbotStore = create((set, get) => ({
                             messageData.full_response
                         );
 
+                        // Refresh conversation list to show updated title (after first agent response)
+                        state.refreshConversationList();
+
                     } else if (messageData.type === 'error') {
                         console.error('WebSocket error message:', messageData.message);
                     }
@@ -409,6 +412,19 @@ const LoadedChatbotStore = create((set, get) => ({
         } catch (error) {
             console.error('Failed to update conversation name:', error);
             throw error;
+        }
+    },
+
+    // Refresh conversation list (to show updated titles after responses)
+    refreshConversationList: async () => {
+        const state = get() as any;
+        if (state.loadedChatbot) {
+            try {
+                const conversations = await chatbotApi.getChatbotConversations(state.loadedChatbot.id);
+                set({ loadedChatbotHistory: conversations });
+            } catch (error) {
+                console.error('Failed to refresh conversation list:', error);
+            }
         }
     },
 

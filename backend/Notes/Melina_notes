@@ -30,13 +30,13 @@ Your embedding step is batched, so it doesn’t contribute to request spikes.
 - Back to the home page ✅
 - Auto update the name of the conversation **Needs backend work**
 - Add final agent in super (hold)
-- Description should be added into the agent prompt
-- Output formated, markdown, equations
+- Description should be added into the agent prompt ✅ In initialize_rag_config()
+- Output formated, markdown, equations ✅
 - Summarization to backend
 - Way too long summaries
 - Client ✅ **Made changes to the db_service** 
          **Added created_by in conversations table so the user and client can see their own conversations**
-- Remove health HTTP
+- Remove health HTTP ✅
 - For each manage, button Do you want to enhance your chatbot
 
 

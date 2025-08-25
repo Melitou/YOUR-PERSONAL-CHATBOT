@@ -61,8 +61,8 @@ const MainPage = () => {
                         </>
                     ) : (
                         <>
-                            {/* Welcome Screen - Takes remaining space in main content area */}
-                            <div className={`${thoughtVisualizerOpen ? 'w-1/2' : 'w-full'} flex-none flex justify-center p-2 transition-all duration-300`}>
+                            {/* Welcome Screen - Takes full width regardless of thinking state */}
+                            <div className="w-full flex-none flex justify-center p-2 transition-all duration-300">
                                 <WelcomeScreenComponent />
                             </div>
                         </>

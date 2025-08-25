@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { authApi } from '../utils/api';
 import UserAuthStore from '../stores/UserAuthStore';
 import ViewStore from '../stores/ViewStore';
+import SignupPage from './SignupPage';
 
 const AuthPage: React.FC = () => {
+    const [isSignupMode, setIsSignupMode] = useState(false);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -11,6 +13,11 @@ const AuthPage: React.FC = () => {
 
     const { login } = UserAuthStore();
     const { addError } = ViewStore();
+
+    // If in signup mode, render SignupPage
+    if (isSignupMode) {
+        return <SignupPage onSwitchToLogin={() => setIsSignupMode(false)} />;
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         console.log('handleSubmit');
@@ -128,6 +135,18 @@ const AuthPage: React.FC = () => {
                         )}
                     </button>
                 </form>
+
+                <div className="mt-6 text-center">
+                    <p className="glass-text opacity-70 text-sm">
+                        Don't have an account?{' '}
+                        <button
+                            onClick={() => setIsSignupMode(true)}
+                            className="glass-text hover:opacity-100 transition-opacity duration-200 underline cursor-pointer"
+                        >
+                            Sign up here
+                        </button>
+                    </p>
+                </div>
 
                 <div className="mt-8 text-center">
                     <p className="text-xs glass-text opacity-70">

@@ -97,6 +97,16 @@ export const authApi = {
     login: (credentials: { username: string; password: string }) =>
         apiClient.post('/login', credentials),
 
+    signup: (userData: {
+        user_name: string;
+        password: string;
+        first_name: string;
+        last_name: string;
+        email: string;
+        role: string;
+    }) =>
+        apiClient.post('/signup', userData),
+
     logout: () =>
         apiClient.post('/logout', {}),
 

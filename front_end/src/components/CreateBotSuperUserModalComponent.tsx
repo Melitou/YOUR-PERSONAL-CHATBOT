@@ -254,7 +254,7 @@ const CreateBotSuperUserModalComponent = ({
 
                         {/* Description */}
                         <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium glass-text">Agent Description</label>
+                            <label className="text-sm font-medium glass-text">Agent Instructions</label>
                             <textarea
                                 placeholder="Enter agent description"
                                 className="w-full p-3 glass-input glass-text rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-none placeholder-gray-300"

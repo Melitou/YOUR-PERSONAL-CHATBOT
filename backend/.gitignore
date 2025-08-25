@@ -323,6 +323,7 @@ faiss_index/
 Upload/
 documents/
 files/
+Notes/
 
 # Backend specific
 fastapi_cache/

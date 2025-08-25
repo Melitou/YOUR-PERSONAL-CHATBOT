@@ -38,6 +38,8 @@ Your embedding step is batched, so it doesn’t contribute to request spikes.
          **Added created_by in conversations table so the user and client can see their own conversations**
 - Remove health HTTP ✅
 - For each manage, button Do you want to enhance your chatbot
+- Sign Up page
+- Email clients already exist
 
 
 

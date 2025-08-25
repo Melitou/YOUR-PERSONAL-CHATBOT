@@ -378,6 +378,12 @@ const ManageChatbotsModalComponent = ({
                                                                             })
                                                                         )}
                                                                     </div>
+                                                                    <div className="mt-4">
+                                                                        <button className="w-full px-4 py-2 bg-[#88b999] text-white text-sm rounded-md hover:bg-[#33b849] transition-colors flex items-center justify-center space-x-2 hover:cursor-pointer">
+                                                                            <span className="material-symbols-outlined">auto_fix_high</span>
+                                                                            <span>Enhance Chatbot</span>
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
 

@@ -28,7 +28,7 @@ Your embedding step is batched, so it doesn’t contribute to request spikes.
 - Chunking and embeddings options shown ✅
 - Delete and rename conversations ✅
 - Back to the home page ✅
-- Auto update the name of the conversation **Needs backend work**
+- Auto update the name of the conversation **Needs backend work** ✅
 - Add final agent in super (hold)
 - Description should be added into the agent prompt ✅ In initialize_rag_config()
 - Output formated, markdown, equations ✅

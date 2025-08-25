@@ -1278,7 +1278,7 @@ async def websocket_conversation(websocket: WebSocket, session_id: str):
 
                     # Send completion message
                     await safe_websocket_send(websocket, {
-                        "type": "response_complete",
+                        "type": "response_end",
                         "message_id": str(assistant_msg_record.id),
                         "timestamp": assistant_msg_record.created_at.isoformat(),
                         "full_response": assistant_response

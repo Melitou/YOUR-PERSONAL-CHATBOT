@@ -43,17 +43,19 @@ const MainPage = () => {
                 )}
                 {/* Main Content */}
                 {/* Main Content Area - Takes remaining space after sidebar */}
-                <div className="flex-1 min-w-0 flex flex-row">
+                <div className="flex-1 flex p-4 gap-4 min-h-0">
                     {chatbot ? (
                         <>
                             {/* Thought Visualizer - Half of main content area on the left */}
                             {/* Chat Component - Takes remaining space in main content area */}
-                            <div className={`${thoughtVisualizerOpen ? 'w-full lg:w-2/3' : 'w-full'} flex justify-center p-2 transition-all duration-300`}>
+                            <div className={`${thoughtVisualizerOpen ? 'w-2/3' : 'w-full'} transition-all duration-300 flex flex-col min-h-0`}>
                                 <ChatComponent />
                             </div>
                             {thoughtVisualizerOpen && (
-                                <div className="hidden lg:flex w-1/3 h-full items-center justify-center">
-                                    <ThoughtVisualizerComponent />
+                                <div className="w-1/3 hidden lg:flex flex-col min-h-0 gap-50">
+                                    <div className="h-full">
+                                        <ThoughtVisualizerComponent />
+                                    </div>
                                 </div>
                             )}
                         </>

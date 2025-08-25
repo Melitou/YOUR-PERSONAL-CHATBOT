@@ -4,6 +4,7 @@ Detects simple conversational messages that don't require document search
 """
 import re
 import logging
+import random
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -143,13 +144,11 @@ class CasualConversationFilter:
             category = 'greetings'  # Fallback to greetings
 
         responses = self.CASUAL_RESPONSES[category]
-        # For now, use the first response. Could implement rotation later
-        base_response = responses[0]
+        # Randomly select a response for variety
+        base_response = random.choice(responses)
 
-        # Optionally personalize based on chatbot description
-        if chatbot_description and category == 'greetings':
-            base_response = f"Hello! I'm your personal assistant specialized in {chatbot_description.lower()}. How can I help you with your documents today?"
-        elif chatbot_description and category == 'capability_questions':
+        # Optionally personalize based on chatbot description (only for capability questions)
+        if chatbot_description and category == 'capability_questions':
             base_response = f"I'm your specialized assistant for {chatbot_description.lower()}! I can search through your uploaded documents, answer questions about their content, and help you find exactly what you're looking for in this domain. How can I assist you today?"
 
         return base_response

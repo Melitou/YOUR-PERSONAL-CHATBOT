@@ -231,7 +231,7 @@ const LoadedChatbotStore = create((set, get) => ({
     //                 if (messageData.type === 'response_chunk') { // Streaming response chunks
     //                     const state = get() as any;
     //                     state.handleStreamingChunk(messageData.chunk);
-    //                 } else if (messageData.type === 'response_complete') { // The response is complete
+    //                 } else if (messageData.type === 'response_end') { // The response is complete
     //                     const state = get() as any;
     //                     state.completeStreamingResponse(
     //                         messageData.message_id,
@@ -306,7 +306,7 @@ const LoadedChatbotStore = create((set, get) => ({
                     } else if (messageData.type === 'response_chunk') { // Streaming response chunks
                         const state = get() as any;
                         state.handleStreamingChunk(messageData.chunk);
-                    } else if (messageData.type === 'response_complete') { // The response is complete
+                    } else if (messageData.type === 'response_end') { // The response is complete
                         const state = get() as any;
                         state.completeStreamingResponse(
                             messageData.message_id,

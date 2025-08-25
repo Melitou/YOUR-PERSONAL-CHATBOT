@@ -56,3 +56,5 @@ oCBG4HkAwSg$
 
 Setup for new developers:
 cd front_end && npm install  # This installs all dependencies from package.json
+
+npm install react-markdown react-syntax-highlighter @types/react-syntax-highlighter

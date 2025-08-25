@@ -145,6 +145,16 @@ const ChatComponent = () => {
         }
     }, [conversationMessages?.conversation_id]);
 
+    useEffect(() => {
+        // Auto-focus the textarea when a conversation is loaded
+        if (conversationMessages?.conversation_id && textareaRef.current && !isThinking) {
+            // Use requestAnimationFrame to ensure DOM is fully rendered
+            requestAnimationFrame(() => {
+                textareaRef.current?.focus();
+            });
+        }
+    }, [conversationMessages?.conversation_id, isThinking]);
+
     const handleSendMessage = () => {
         if (!inputMessage.trim()) return; // Don't send empty messages
 

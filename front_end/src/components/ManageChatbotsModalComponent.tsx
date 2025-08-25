@@ -360,7 +360,7 @@ const ManageChatbotsModalComponent = ({
                                                                                 return (
                                                                                     <div
                                                                                         key={file.id}
-                                                                                        className="flex items-center space-x-3 p-2 bg-#8baf83 rounded border"
+                                                                                        className="flex items-center space-x-3 p-2 rounded border"
                                                                                     >
                                                                                         <span className={`material-symbols-outlined ${fileIcon.color}`}>
                                                                                             {fileIcon.icon}

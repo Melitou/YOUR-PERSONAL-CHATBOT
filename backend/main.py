@@ -1500,7 +1500,7 @@ async def assign_chatbot_by_email(
         if not client:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No client found with email {request.client_email}. Client must exist before assignment."
+                detail=f"No client found with email {request.client_email}. Please verify the email address and ensure the client is registered."
             )
 
         if client.role != 'Client':

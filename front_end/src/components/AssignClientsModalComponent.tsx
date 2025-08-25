@@ -30,11 +30,17 @@ const AssignClientsModalComponent: React.FC<AssignClientsModalProps> = ({
     const [assignedClients, setAssignedClients] = useState<AssignedClient[]>([]);
     const [loading, setLoading] = useState(false);
     const [addingClient, setAddingClient] = useState(false);
+    const [duplicateEmailError, setDuplicateEmailError] = useState(false);
+    const [inlineErrorMessage, setInlineErrorMessage] = useState('');
     const { addSuccess, addError } = ViewStore();
 
     useEffect(() => {
         if (open) {
             fetchAssignedClients();
+            // Reset error states when modal opens
+            setDuplicateEmailError(false);
+            setInlineErrorMessage('');
+            setClientEmail('');
         }
     }, [open, chatbotId]);
 
@@ -69,10 +75,44 @@ const AssignClientsModalComponent: React.FC<AssignClientsModalProps> = ({
             addSuccess(`Chatbot assigned to existing client ${clientEmail}`);
 
             setClientEmail('');
+            setDuplicateEmailError(false);
+            setInlineErrorMessage('');
             await fetchAssignedClients(); // Refresh the list
         } catch (error: any) {
             console.error('Failed to assign chatbot:', error);
-            addError(error.message || 'Failed to assign chatbot to client');
+            console.log('Error object:', error);
+            console.log('Error message:', error.message);
+            console.log('Error response:', error.response);
+            // FastAPI sends errors in 'detail' field, but our API client might extract it as 'message'
+            const errorMessage = error.message || error.detail || 'Failed to assign chatbot to client';
+            const fullErrorText = JSON.stringify(error).toLowerCase();
+
+            console.log('Final errorMessage:', errorMessage);
+            console.log('fullErrorText:', fullErrorText);
+
+            // Check if this is a client not found error
+            const isEmailNotFoundError = errorMessage.includes("No client found with email") ||
+                errorMessage.includes("404") ||
+                errorMessage.includes("Please verify the email address") ||
+                (errorMessage.includes("404") && errorMessage.toLowerCase().includes("client"));
+
+            // Check if this is an already assigned error (check multiple sources)
+            const isAlreadyAssignedError = errorMessage.includes("Chatbot already assigned to") ||
+                errorMessage.toLowerCase().includes("already assigned") ||
+                fullErrorText.includes("already assigned") ||
+                (errorMessage.includes("400") && errorMessage.toLowerCase().includes("already assigned"));
+
+            if (isEmailNotFoundError) {
+                setDuplicateEmailError(true);
+                setInlineErrorMessage("Client not found. Please verify the email address and try again.");
+            } else if (isAlreadyAssignedError) {
+                setDuplicateEmailError(true);
+                setInlineErrorMessage("This chatbot is already assigned to this client.");
+            } else {
+                setDuplicateEmailError(false);
+                setInlineErrorMessage('');
+                addError(errorMessage);
+            }
         } finally {
             setAddingClient(false);
         }
@@ -151,12 +191,21 @@ const AssignClientsModalComponent: React.FC<AssignClientsModalProps> = ({
                             <input
                                 type="email"
                                 value={clientEmail}
-                                onChange={(e) => setClientEmail(e.target.value)}
+                                onChange={(e) => {
+                                    setClientEmail(e.target.value);
+                                    // Clear email error when user starts typing new email
+                                    if (duplicateEmailError && e.target.value !== clientEmail) {
+                                        setDuplicateEmailError(false);
+                                        setInlineErrorMessage('');
+                                    }
+                                }}
                                 onKeyPress={handleKeyPress}
                                 placeholder="Enter client email address"
-                                className={`flex-1 px-3 py-2 glass-dark rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent glass-text ${clientEmail.trim() !== '' && !isValidEmail(clientEmail)
-                                    ? 'border-red-300 bg-red-50'
-                                    : ''
+                                className={`flex-1 px-3 py-2 glass-dark rounded-md focus:outline-none focus:ring-2 focus:border-transparent glass-text ${duplicateEmailError
+                                    ? 'focus:ring-yellow-500 border-yellow-300'
+                                    : clientEmail.trim() !== '' && !isValidEmail(clientEmail)
+                                        ? 'border-red-300 bg-red-50'
+                                        : 'focus:ring-blue-500'
                                     }`}
                                 disabled={addingClient}
                                 autoFocus
@@ -176,10 +225,18 @@ const AssignClientsModalComponent: React.FC<AssignClientsModalProps> = ({
                                 )}
                             </button>
                         </div>
+
+                        {/* Inline error message */}
+                        {inlineErrorMessage && (
+                            <div className="mt-2 p-2 text-sm text-yellow-300 bg-yellow-900/20 border border-yellow-300 rounded-md">
+                                {inlineErrorMessage}
+                            </div>
+                        )}
+
                         <p className="text-xs glass-text opacity-70 mt-2">
                             {clientEmail.trim() !== '' && !isValidEmail(clientEmail)
                                 ? 'Please enter a valid email address'
-                                : 'If client doesn\'t exist, a new account will be created automatically'
+                                : 'Client must already be registered to assign chatbot access'
                             }
                         </p>
                     </div>

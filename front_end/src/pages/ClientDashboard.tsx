@@ -366,15 +366,15 @@ const ClientDashboard: React.FC = () => {
                         {/* Chatbot Description */}
                         {selectedChatbot && (
                             <div>
-                                <p className="text-sm glass-text opacity-80 leading-relaxed">
-                                    {selectedChatbot.description}
+                                <p className="glass-text opacity-80 leading-relaxed font-bold text-lg">
+                                    {selectedChatbot.name}
                                 </p>
                                 <div className="flex items-center space-x-4 text-xs glass-text opacity-70 mt-2">
-                                    <span className="glass-dark px-2 py-1 rounded">
+                                    <span
+                                        className="glass-dark px-2 py-1 rounded cursor-help"
+                                        title={selectedChatbot.loaded_files.map(file => file.file_name).join('\n')}
+                                    >
                                         {selectedChatbot.total_files} files
-                                    </span>
-                                    <span className="glass-dark px-2 py-1 rounded">
-                                        {selectedChatbot.total_chunks} chunks
                                     </span>
                                 </div>
                             </div>

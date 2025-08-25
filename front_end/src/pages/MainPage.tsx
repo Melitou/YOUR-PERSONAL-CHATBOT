@@ -43,16 +43,16 @@ const MainPage = () => {
                 )}
                 {/* Main Content */}
                 {/* Main Content Area - Takes remaining space after sidebar */}
-                <div className="flex-1 flex p-4 gap-4 min-h-0">
+                <div className="flex-1 flex min-h-0">
                     {chatbot ? (
                         <>
                             {/* Thought Visualizer - Half of main content area on the left */}
                             {/* Chat Component - Takes remaining space in main content area */}
-                            <div className={`${thoughtVisualizerOpen ? 'w-2/3' : 'w-full'} transition-all duration-300 flex flex-col min-h-0`}>
+                            <div className={`${thoughtVisualizerOpen ? 'w-2/3' : 'w-full'} p-4 transition-all duration-300 flex flex-col min-h-0`}>
                                 <ChatComponent />
                             </div>
                             {thoughtVisualizerOpen && (
-                                <div className="w-1/3 hidden lg:flex flex-col min-h-0 gap-50">
+                                <div className="w-1/3 hidden lg:flex flex-col min-h-0 pt-4 pb-4">
                                     <div className="h-full">
                                         <ThoughtVisualizerComponent />
                                     </div>
@@ -62,7 +62,7 @@ const MainPage = () => {
                     ) : (
                         <>
                             {/* Welcome Screen - Takes full width regardless of thinking state */}
-                            <div className="w-full flex-none flex justify-center p-2 transition-all duration-300">
+                            <div className="w-full p-2 flex-1 flex justify-center transition-all duration-300 min-h-0">
                                 <WelcomeScreenComponent />
                             </div>
                         </>

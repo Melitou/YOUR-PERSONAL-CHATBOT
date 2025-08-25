@@ -64,13 +64,9 @@ const AssignClientsModalComponent: React.FC<AssignClientsModalProps> = ({
 
         setAddingClient(true);
         try {
-            const response = await clientApi.assignChatbotByEmail(chatbotId, clientEmail.trim());
+            await clientApi.assignChatbotByEmail(chatbotId, clientEmail.trim());
 
-            if (response.new_client) {
-                addSuccess(`New client created and chatbot assigned to ${clientEmail}. Welcome email sent.`);
-            } else {
-                addSuccess(`Chatbot assigned to existing client ${clientEmail}`);
-            }
+            addSuccess(`Chatbot assigned to existing client ${clientEmail}`);
 
             setClientEmail('');
             await fetchAssignedClients(); // Refresh the list

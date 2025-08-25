@@ -323,6 +323,8 @@ faiss_index/
 Upload/
 documents/
 files/
+
+#Personal Notes
 Notes/
 
 # Backend specific

@@ -328,8 +328,6 @@ class EmailAssignmentResponse(BaseModel):
     """Response model for email-based chatbot assignment"""
     message: str = Field(..., description="Success message")
     client_email: EmailStr = Field(..., description="Client email")
-    new_client: bool = Field(...,
-                             description="Whether a new client was created")
     assignment_id: str = Field(..., description="Assignment ID")
 
 

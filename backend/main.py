@@ -1486,7 +1486,7 @@ async def assign_chatbot_by_email(
     request: EmailAssignmentRequest,
     current_user: User_Auth_Table = Depends(get_current_user)
 ):
-    """Assign chatbot to client by email - creates client if doesn't exist (Users and Super Users only)"""
+    """Assign chatbot to existing client by email (Users and Super Users only)"""
     if current_user.role not in ['User', 'Super User']:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1494,30 +1494,16 @@ async def assign_chatbot_by_email(
         )
 
     try:
-        # Find or create client
+        # Find existing client
         client = User_Auth_Table.objects(email=request.client_email).first()
-        new_client_created = False
 
         if not client:
-            # Create new client account
-            temp_password = generate_random_password()
-            client = User_Auth_Table(
-                user_name=request.client_email.split(
-                    '@')[0],  # Use email prefix as username
-                email=request.client_email,
-                password=get_password_hash(temp_password),
-                first_name="",  # To be filled by client
-                last_name="",
-                role="Client",
-                created_at=datetime.now()
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No client found with email {request.client_email}. Client must exist before assignment."
             )
-            client.save()
-            new_client_created = True
 
-            # Send welcome email with credentials
-            send_welcome_email(request.client_email, temp_password)
-
-        elif client.role != 'Client':
+        if client.role != 'Client':
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot assign chatbot to Users - only Clients are allowed"
@@ -1549,7 +1535,6 @@ async def assign_chatbot_by_email(
         return EmailAssignmentResponse(
             message=f"Chatbot assigned to {request.client_email}",
             client_email=request.client_email,
-            new_client=new_client_created,
             assignment_id=str(assignment.id)
         )
 

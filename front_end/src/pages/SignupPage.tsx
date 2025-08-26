@@ -258,7 +258,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin }) => {
                             className="glass-input w-full px-3 py-2 glass-text text-white rounded-full"
                         >
                             <option value="User" className="bg-[#474f47] text-white">User</option>
-                            <option value="Super User" className="bg-[#474f47] text-white">Super User</option>
+                            {/* <option value="Super User" className="bg-[#474f47] text-white">Super User</option> */}
                             <option value="Client" className="bg-[#474f47] text-white">Client</option>
                         </select>
                     </div>

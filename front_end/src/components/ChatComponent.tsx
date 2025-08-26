@@ -255,10 +255,16 @@ const ChatComponent = () => {
                                                     </div>
                                                 )}
                                                 <p className="text-xs sm:text-sm mt-2 glass-text opacity-60">
-                                                    {new Date(message.created_at).toLocaleTimeString([], {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
+                                                    {message.created_at && !isNaN(new Date(message.created_at).getTime())
+                                                        ? new Date(message.created_at).toLocaleTimeString([], {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })
+                                                        : new Date().toLocaleTimeString([], {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })
+                                                    }
                                                 </p>
                                             </div>
                                         </div>

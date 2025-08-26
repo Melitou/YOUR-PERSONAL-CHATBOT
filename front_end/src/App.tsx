@@ -4,7 +4,6 @@ import MainPage from './pages/MainPage'
 import AuthPage from './pages/AuthPage'
 import ClientDashboard from './pages/ClientDashboard'
 import UserAuthStore from './stores/UserAuthStore'
-import ThemeStore from './stores/ThemeStore'
 import { authApi } from './utils/api'
 import ErrorComponent from './components/ErrorComponent'
 import SuccessComponent from './components/SuccessComponent'
@@ -14,12 +13,6 @@ import ViewStore from './stores/ViewStore'
 function App() {
   const { isLoggedIn, login, logout, user } = UserAuthStore();
   const { addError } = ViewStore();
-  const { theme } = ThemeStore();
-
-  // Apply theme class to document body
-  useEffect(() => {
-    document.body.className = `${theme}-theme`;
-  }, [theme]);
 
   useEffect(() => {
     // Check if user is already authenticated on app load

@@ -173,7 +173,7 @@ Temporary Password: {temp_password}
 
 Please log in and change your password as soon as possible.
 
-Login at: {os.getenv('FRONTEND_URL', 'http://localhost:3000')}/auth
+Login at: {os.getenv('FRONTEND_URL', 'http://localhost:5173')}/auth
 
 Best regards,
 Your Chatbot Team
@@ -271,10 +271,13 @@ async def enhance_chatbot(
         # Compute namespaces up front so we can return proper status
         chatbot = ChatBots.objects(id=request.chatbot_id).first()
         if not chatbot:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chatbot not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Chatbot not found")
 
-        mappings = ChatbotDocumentsMapper.objects(chatbot=chatbot, user=current_user)
-        namespaces = list({m.document.namespace for m in mappings if getattr(m, "document", None)})
+        mappings = ChatbotDocumentsMapper.objects(
+            chatbot=chatbot, user=current_user)
+        namespaces = list(
+            {m.document.namespace for m in mappings if getattr(m, "document", None)})
 
         # Fallback to chatbot's own namespace if present
         if not namespaces and getattr(chatbot, "namespace", None):
@@ -285,16 +288,17 @@ async def enhance_chatbot(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No namespaces found for chatbot. Upload documents or create mappings first."
             )
-        
+
         if len(namespaces) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No namespaces found for chatbot. Upload documents or create mappings first."
             )
-        
+
         # Check if the chatbot is already enhanced
         # Search in batch_summarization_jobs for chatbot_id and status is completed
-        batch_job = BatchSummarizationJob.objects(chatbot=chatbot, status="completed").first()
+        batch_job = BatchSummarizationJob.objects(
+            chatbot=chatbot, status="completed").first()
         if batch_job:
             return EnhanceChatbotResponse(
                 job_status=batch_job.status,
@@ -304,7 +308,8 @@ async def enhance_chatbot(
             )
 
         # Check if the chatbot has a batch job already running
-        batch_job = BatchSummarizationJob.objects(chatbot=chatbot, status="submitted").first()
+        batch_job = BatchSummarizationJob.objects(
+            chatbot=chatbot, status="submitted").first()
         if batch_job:
             return EnhanceChatbotResponse(
                 job_status=batch_job.status,
@@ -331,8 +336,9 @@ async def enhance_chatbot(
 
     except Exception as e:
         logger.error(f"Error enhancing chatbot batch: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error starting enhancement job")
-        
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Error starting enhancement job")
+
 
 @app.post("/documents/check-exists", response_model=CheckDocumentsResponse, tags=["Documents"])
 async def check_documents_exists(request: CheckDocumentsRequest, current_user: User_Auth_Table = Depends(get_current_user)):
@@ -680,9 +686,10 @@ async def get_user_notifications(
     """Get user notifications (including enhancement completion notifications)"""
     try:
         from notification_service import NotificationService
-        
-        notifications = NotificationService.get_user_notifications(current_user, unread_only)
-        
+
+        notifications = NotificationService.get_user_notifications(
+            current_user, unread_only)
+
         return {
             "notifications": [
                 {
@@ -699,7 +706,8 @@ async def get_user_notifications(
         }
     except Exception as e:
         logger.error(f"Error getting notifications: {e}")
-        raise HTTPException(status_code=500, detail="Error retrieving notifications")
+        raise HTTPException(
+            status_code=500, detail="Error retrieving notifications")
 
 
 @app.post("/notifications/{notification_id}/mark_read", tags=["Notifications"])
@@ -712,23 +720,25 @@ async def mark_notification_read(
         from db_service import UserNotification
         from bson import ObjectId
         from datetime import datetime, timezone
-        
+
         notification = UserNotification.objects(
             id=ObjectId(notification_id),
             user=current_user
         ).first()
-        
+
         if not notification:
-            raise HTTPException(status_code=404, detail="Notification not found")
-        
+            raise HTTPException(
+                status_code=404, detail="Notification not found")
+
         notification.is_read = True
         notification.read_at = datetime.now(timezone.utc)
         notification.save()
-        
+
         return {"status": "marked_as_read"}
     except Exception as e:
         logger.error(f"Error marking notification as read: {e}")
-        raise HTTPException(status_code=500, detail="Error updating notification")
+        raise HTTPException(
+            status_code=500, detail="Error updating notification")
 
 
 @app.get("/openai/batches", tags=["OpenAI"])
@@ -739,12 +749,12 @@ async def get_openai_batches(
     """Get OpenAI batch jobs status directly from OpenAI API"""
     try:
         from batch_enhancement_service import BatchEnhancementService
-        
+
         service = BatchEnhancementService()
-        
+
         # Get batches from OpenAI
         batches = await service.openai_client.batches.list(limit=limit)
-        
+
         batch_list = []
         for batch in batches.data:
             batch_list.append({
@@ -757,11 +767,12 @@ async def get_openai_batches(
                 "endpoint": batch.endpoint,
                 "completion_window": batch.completion_window
             })
-        
+
         return {"batches": batch_list}
     except Exception as e:
         logger.error(f"Error getting OpenAI batches: {e}")
-        raise HTTPException(status_code=500, detail="Error retrieving OpenAI batches")
+        raise HTTPException(
+            status_code=500, detail="Error retrieving OpenAI batches")
 
 
 @app.get("/openai/batches/{batch_id}", tags=["OpenAI"])
@@ -772,12 +783,12 @@ async def get_openai_batch_details(
     """Get specific OpenAI batch job details"""
     try:
         from batch_enhancement_service import BatchEnhancementService
-        
+
         service = BatchEnhancementService()
-        
+
         # Get specific batch from OpenAI
         batch = await service.openai_client.batches.retrieve(batch_id)
-        
+
         return {
             "id": batch.id,
             "status": batch.status,
@@ -793,7 +804,8 @@ async def get_openai_batch_details(
         }
     except Exception as e:
         logger.error(f"Error getting OpenAI batch {batch_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving batch {batch_id}")
+        raise HTTPException(
+            status_code=500, detail=f"Error retrieving batch {batch_id}")
 
 
 @app.get("/enhancement_status/{chatbot_id}", response_model=EnhancementStatus, tags=["Agent Management"])
@@ -854,13 +866,13 @@ async def get_enhancement_status(
 #     #     #     request.headers.get('X-OpenAI-Signature') or
 #     #     #     ''
 #     #     # )
-        
+
 #     #     # logger.info(f"Extracted signature: {signature}")
 
 #     #     # webhook_secret = os.getenv('OPENAI_WEBHOOK_SECRET')
 #     #     # logger.info(f"Webhook secret configured: {bool(webhook_secret)}")
 #     #     # if not webhook_secret:
-#     #     #     logger.warning( 
+#     #     #     logger.warning(
 #     #     #         "OPENAI_WEBHOOK_SECRET not set; rejecting webhook for safety")
 #     #     #     raise HTTPException(
 #     #     #         status_code=401, detail="Webhook not configured")
@@ -897,10 +909,12 @@ async def openai_batch_webhook(request: Request):
     signature = headers.get("webhook-signature")
     timestamp = headers.get("webhook-timestamp")
     webhook_id = headers.get("webhook-id")
-    
+
     if not signature or not timestamp or not webhook_id:
-        logger.error(f"Missing required headers - signature: {bool(signature)}, timestamp: {bool(timestamp)}, webhook-id: {bool(webhook_id)}")
-        raise HTTPException(status_code=401, detail="Missing required webhook headers")
+        logger.error(
+            f"Missing required headers - signature: {bool(signature)}, timestamp: {bool(timestamp)}, webhook-id: {bool(webhook_id)}")
+        raise HTTPException(
+            status_code=401, detail="Missing required webhook headers")
 
     try:
         client = OpenAI()

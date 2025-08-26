@@ -39,7 +39,11 @@ Your embedding step is batched, so it doesn’t contribute to request spikes.
 - Remove health HTTP ✅
 - For each manage, button Do you want to enhance your chatbot
 - Sign Up page ✅
-- Email clients already exist
+- Email clients already exist ✅
+- Remove light dark mode ✅
+- Invalid date ✅
+- Disable buttons when enhancment
+- Your personal chatbot name
 
 
 

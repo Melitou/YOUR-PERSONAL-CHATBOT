@@ -3,14 +3,12 @@ import { Avatar, Menu, MenuItem, IconButton } from '@mui/material';
 import { FaUser, FaBars } from 'react-icons/fa';
 import UserAuthStore from '../stores/UserAuthStore';
 import ViewStore from '../stores/ViewStore';
-import ThemeStore from '../stores/ThemeStore';
 import LoadedChatbotStore from '../stores/LoadedChatbotStore';
 import { authApi } from '../utils/api';
 
 const HeaderComponent = () => {
     const { user, logout } = UserAuthStore();
     const { sidebarOpen, setSidebarOpen, navigateToHome, thoughtVisualizerOpen, setThoughtVisualizerOpen } = ViewStore();
-    const { theme, toggleTheme } = ThemeStore();
     const chatbot = LoadedChatbotStore((state: any) => state.loadedChatbot);
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const isMenuOpen = Boolean(menuAnchorEl);
@@ -62,16 +60,6 @@ const HeaderComponent = () => {
 
                 {user && (
                     <div className="flex items-center gap-3 min-w-0 mr-4">
-                        {/* Theme Toggle Button */}
-                        <button
-                            onClick={toggleTheme}
-                            className="p-2 rounded-md hover:glass-light transition-colors glass-text text-xl"
-                            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-                            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-                        >
-                            {theme === 'light' ? '🌙' : '☀️'}
-                        </button>
-
                         {/* Thinking Visualizer Toggle - Only show when chatbot is loaded */}
                         {chatbot && (
                             <button

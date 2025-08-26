@@ -23,16 +23,20 @@ interface ViewState {
     sidebarOpen: boolean;
     errors: string[];
     successes: string[];
+    infos: string[];
     currentView: 'chat' | 'organizations';
     setSidebarOpen: (sidebarOpen: boolean) => void;
     setCurrentView: (view: 'chat' | 'organizations') => void;
     navigateToHome: () => void;
     addError: (error: string) => void;
     addSuccess: (message: string) => void;
+    addInfo: (message: string) => void;
     dismissError: (index: number) => void;
     dismissSuccess: (index: number) => void;
+    dismissInfo: (index: number) => void;
     clearAllErrors: () => void;
     clearAllSuccesses: () => void;
+    clearAllInfos: () => void;
     resetStore: () => void;
 
     thoughtVisualizerOpen: boolean;
@@ -50,6 +54,7 @@ const ViewStore = create<ViewState>((set, get) => ({
     sidebarOpen: true,
     errors: [],
     successes: [],
+    infos: [],
     currentView: 'chat' as const,
     thoughtVisualizerOpen: false,
     thoughtVisualizerData: {
@@ -127,6 +132,22 @@ const ViewStore = create<ViewState>((set, get) => ({
         }, 5000);
     },
 
+    addInfo: (message: string) => {
+        console.log('Info logged:', message);
+        set((state) => ({
+            infos: [...state.infos, message]
+        }));
+
+        // Auto-dismiss info after 7 seconds
+        setTimeout(() => {
+            const currentInfos = get().infos;
+            const infoIndex = currentInfos.indexOf(message);
+            if (infoIndex !== -1) {
+                get().dismissInfo(infoIndex);
+            }
+        }, 7000);
+    },
+
     dismissError: (index: number) => set((state) => ({
         errors: state.errors.filter((_, i) => i !== index)
     })),
@@ -135,14 +156,21 @@ const ViewStore = create<ViewState>((set, get) => ({
         successes: state.successes.filter((_, i) => i !== index)
     })),
 
+    dismissInfo: (index: number) => set((state) => ({
+        infos: state.infos.filter((_, i) => i !== index)
+    })),
+
     clearAllErrors: () => set({ errors: [] }),
 
     clearAllSuccesses: () => set({ successes: [] }),
+
+    clearAllInfos: () => set({ infos: [] }),
 
     resetStore: () => set({
         sidebarOpen: false,
         errors: [],
         successes: [],
+        infos: [],
         currentView: 'chat' as const,
         thoughtVisualizerOpen: false,
         thoughtVisualizerData: {

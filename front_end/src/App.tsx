@@ -7,6 +7,8 @@ import UserAuthStore from './stores/UserAuthStore'
 import ThemeStore from './stores/ThemeStore'
 import { authApi } from './utils/api'
 import ErrorComponent from './components/ErrorComponent'
+import SuccessComponent from './components/SuccessComponent'
+import InfoComponent from './components/InfoComponent'
 import ViewStore from './stores/ViewStore'
 
 function App() {
@@ -67,6 +69,8 @@ function App() {
     <div>
       {renderMainContent()}
       <ErrorComponent />
+      <SuccessComponent />
+      <InfoComponent />
     </div>
   )
 }

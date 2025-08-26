@@ -117,6 +117,22 @@ export const authApi = {
 
 // Chatbot API
 export const chatbotApi = {
+    enhanceChatbot: async (chatbotId: string) => {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`${apiClient['baseURL']}/chatbot/enhancement`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` }),
+            },
+            body: JSON.stringify({
+                chatbot_id: chatbotId
+            }),
+        });
+        const responseData = await response.json();
+        return responseData;
+    },
+
     createSuperUserChatbot: async (
         name: string,
         description: string,

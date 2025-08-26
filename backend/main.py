@@ -21,7 +21,7 @@ from api_models import (
     CheckDocumentsRequest, CheckDocumentsResponse, ExistingDocumentInfo,
     EnhancementStatus, UpdateConversationRequest, UpdateConversationResponse,
     DeleteConversationResponse, EmailAssignmentRequest, EmailAssignmentResponse,
-    ChatbotClientInfo, EnhanceChatbotBatchRequest
+    ChatbotClientInfo, EnhanceChatbotRequest, EnhanceChatbotResponse
 )
 from auth_utils import (
     authenticate_user, create_user, create_access_token, verify_token,
@@ -250,14 +250,16 @@ async def authenticate_websocket(websocket: WebSocket, token: str) -> User_Auth_
 
 # ==============================================ENDPOINTS==============================================
 
-@app.post("/chatbot/enhancement/batch", tags=["Chatbot"], status_code=status.HTTP_202_ACCEPTED)
-async def enhance_chatbot_batch(
-    request: EnhanceChatbotBatchRequest,
+@app.post("/chatbot/enhancement", tags=["Chatbot"], status_code=status.HTTP_202_ACCEPTED)
+async def enhance_chatbot(
+    request: EnhanceChatbotRequest,
     background_tasks: BackgroundTasks,
     current_user: User_Auth_Table = Depends(get_current_user)
 ):
+    """Enhance a chatbot's chunks of documents included"""
     try:
         from batch_enhancement_service import BatchEnhancementService
+        from db_service import BatchSummarizationJob
 
         # Validate chatbot ownership
         if not validate_chatbot_access(current_user, request.chatbot_id):
@@ -289,6 +291,27 @@ async def enhance_chatbot_batch(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No namespaces found for chatbot. Upload documents or create mappings first."
             )
+        
+        # Check if the chatbot is already enhanced
+        # Search in batch_summarization_jobs for chatbot_id and status is completed
+        batch_job = BatchSummarizationJob.objects(chatbot=chatbot, status="completed").first()
+        if batch_job:
+            return EnhanceChatbotResponse(
+                job_status=batch_job.status,
+                message=f"Chatbot with name '{chatbot.name}' is already enhanced.",
+                chatbot_id=str(batch_job.chatbot.id),
+                batch_id=str(batch_job.id)
+            )
+
+        # Check if the chatbot has a batch job already running
+        batch_job = BatchSummarizationJob.objects(chatbot=chatbot, status="submitted").first()
+        if batch_job:
+            return EnhanceChatbotResponse(
+                job_status=batch_job.status,
+                message=f"Enhancement job already queued for chatbot with name '{chatbot.name}', you will be notified when it is completed.",
+                chatbot_id=str(batch_job.chatbot.id),
+                batch_id=str(batch_job.id)
+            )
 
         # Queue the enhancement job (non-blocking)
         batch_service = BatchEnhancementService()
@@ -299,17 +322,17 @@ async def enhance_chatbot_batch(
             namespaces
         )
 
-        return {
-            "message": f"Enhancement job queued for {len(namespaces)} namespace(s).",
-            "chatbot_id": request.chatbot_id
-        }
+        return EnhanceChatbotResponse(
+            job_status="pending",
+            message=f"Enhancement job queued for chatbot with name '{chatbot.name}', you will be notified when it is completed.",
+            chatbot_id=request.chatbot_id,
+            batch_id="pending"
+        )
 
-    except ValueError as ve:
-        logger.error(f"Validation error enhancing chatbot batch: {ve}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
         logger.error(f"Error enhancing chatbot batch: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error starting enhancement job")
+        
 
 @app.post("/documents/check-exists", response_model=CheckDocumentsResponse, tags=["Documents"])
 async def check_documents_exists(request: CheckDocumentsRequest, current_user: User_Auth_Table = Depends(get_current_user)):
@@ -771,68 +794,6 @@ async def get_openai_batch_details(
     except Exception as e:
         logger.error(f"Error getting OpenAI batch {batch_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving batch {batch_id}")
-
-
-@app.post("/enhance_agent/{chatbot_id}", response_model=Dict[str, str], tags=["Agent Management"])
-async def enhance_agent_summaries(
-    chatbot_id: str,
-    background_tasks: BackgroundTasks,
-    current_user: User_Auth_Table = Depends(get_current_user)
-):
-    """Start background enhancement of agent summaries using OpenAI Batch API"""
-    try:
-        from batch_enhancement_service import BatchEnhancementService
-        from bson import ObjectId
-
-        # Validate chatbot ownership
-        if not validate_chatbot_access(current_user, chatbot_id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have access to this chatbot"
-            )
-
-        # Get chatbot
-        chatbot = ChatBots.objects(id=ObjectId(chatbot_id)).first()
-        if not chatbot:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chatbot not found")
-
-        # Compute namespaces up front so we can return proper status
-        mappings = ChatbotDocumentsMapper.objects(chatbot=chatbot, user=current_user)
-        namespaces = list({m.document.namespace for m in mappings if getattr(m, "document", None)})
-        
-        # Fallback to chatbot's own namespace if present
-        if not namespaces and getattr(chatbot, "namespace", None):
-            namespaces = [chatbot.namespace]
-
-        if not namespaces:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No namespaces found for chatbot. Upload documents or create mappings first."
-            )
-
-        # Queue the enhancement job (non-blocking) - this will automatically send notifications
-        batch_service = BatchEnhancementService()
-        background_tasks.add_task(
-            batch_service.start_enhancement_job,
-            chatbot,
-            current_user,
-            namespaces
-        )
-
-        return {
-            "status": "enhancement_job_queued", 
-            "message": f"Enhancement job queued for {len(namespaces)} namespace(s). You will be notified when complete.",
-            "chatbot_id": chatbot_id
-        }
-    except HTTPException:
-        raise
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        logger.error(
-            f"Error starting enhancement job for chatbot {chatbot_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail="Failed to start enhancement job")
 
 
 @app.get("/enhancement_status/{chatbot_id}", response_model=EnhancementStatus, tags=["Agent Management"])

@@ -7,6 +7,7 @@ import LoadedChatbotStore from "../stores/LoadedChatbotStore";
 import ViewStore from "../stores/ViewStore";
 import AssignClientsModalComponent from "./AssignClientsModalComponent";
 import UserAuthStore from "../stores/UserAuthStore";
+import { chatbotApi } from "../utils/api";
 
 const ManageChatbotsModalComponent = ({
     open,
@@ -29,9 +30,9 @@ const ManageChatbotsModalComponent = ({
     const [selectedChatbotForAssignment, setSelectedChatbotForAssignment] = useState<CreatedChatbot | null>(null);
     const { setLoadedChatbot } = LoadedChatbotStore((state: any) => state);
     // const [health, setHealth] = useState<Record<string, { ready: boolean; vectors: number }>>({});
-    const { addError } = ViewStore();
+    const { addError, addInfo } = ViewStore();
     const { user } = UserAuthStore();
-
+    const { enhanceChatbot } = chatbotApi;
     // Fetch real chatbots when modal opens
     useEffect(() => {
         if (open) {
@@ -221,12 +222,33 @@ const ManageChatbotsModalComponent = ({
                                                                     </span>
                                                                 </div>
                                                                 <div>
-                                                                    <h3 className="text-lg font-medium glass-text">
-                                                                        {chatbot.name}
-                                                                        {/* <span className={`px-2 py-0.5 rounded-full text-xs ${health[chatbot.id]?.ready ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
-                                                                        {health[chatbot.id]?.ready ? 'Ready' : 'Preparing…'}
-                                                                    </span> */}
-                                                                    </h3>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <h3 className="text-lg font-medium glass-text">
+                                                                            {chatbot.name}
+                                                                            {/* <span className={`px-2 py-0.5 rounded-full text-xs ${health[chatbot.id]?.ready ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                                                                            {health[chatbot.id]?.ready ? 'Ready' : 'Preparing…'}
+                                                                        </span> */}
+                                                                        </h3>
+                                                                        <button 
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                enhanceChatbot(chatbot.id).then((res) => {
+                                                                                    if (res.message) {
+                                                                                        addInfo(res.message);
+                                                                                    } else {
+                                                                                        addError('Failed to enhance chatbot. Please try again.');
+                                                                                    }
+                                                                                }).catch((error) => {
+                                                                                    console.error('Enhance chatbot error:', error);
+                                                                                    addError('Failed to enhance chatbot. Please try again.');
+                                                                                });
+                                                                            }} 
+                                                                            className="p-1 text-[#88b999] hover:text-[#33b849] hover:bg-[#88b999]/10 rounded-md transition-colors"
+                                                                            title="Enhance this chatbot"
+                                                                        >
+                                                                            <span className="material-symbols-outlined text-lg">auto_fix_high</span>
+                                                                        </button>
+                                                                    </div>
                                                                     {chatbot.description && (
                                                                         <p className="text-sm glass-text opacity-80 mb-1">
                                                                             {chatbot.description.length > 100
@@ -377,12 +399,6 @@ const ManageChatbotsModalComponent = ({
                                                                                 );
                                                                             })
                                                                         )}
-                                                                    </div>
-                                                                    <div className="mt-4">
-                                                                        <button className="w-full px-4 py-2 bg-[#88b999] text-white text-sm rounded-md hover:bg-[#33b849] transition-colors flex items-center justify-center space-x-2 hover:cursor-pointer">
-                                                                            <span className="material-symbols-outlined">auto_fix_high</span>
-                                                                            <span>Enhance Chatbot</span>
-                                                                        </button>
                                                                     </div>
                                                                 </div>
                                                             </div>

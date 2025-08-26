@@ -13,6 +13,7 @@ class NotificationService:
     @staticmethod
     async def create_enhancement_notification(
         user: User_Auth_Table,
+        namespace: str,
         chatbot: ChatBots,
         batch_job: BatchSummarizationJob,
         notification_type: str,
@@ -28,6 +29,7 @@ class NotificationService:
         
         notification = UserNotification(
             user=user,
+            namespace=namespace,
             chatbot=chatbot,
             batch_job=batch_job,
             notification_type=notification_type,

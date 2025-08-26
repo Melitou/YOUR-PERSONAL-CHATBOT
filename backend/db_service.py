@@ -230,7 +230,6 @@ class BatchSummarizationJob(Document):
 
     # Error handling
     error_message = StringField()
-    retry_count = IntField(default=0)
 
     meta = {
         'collection': 'batch_summarization_jobs',
@@ -296,6 +295,7 @@ class Chunks(Document):
 class UserNotification(Document):
     """User notifications for batch job completions"""
     user = ReferenceField(User_Auth_Table, required=True)
+    namespace = StringField(required=True)
     chatbot = ReferenceField(ChatBots, required=True)
     batch_job = ReferenceField(BatchSummarizationJob, required=True)
 

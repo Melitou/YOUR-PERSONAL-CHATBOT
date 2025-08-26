@@ -199,6 +199,9 @@ class ChatbotDetailResponse(BaseModel):
     total_chunks: int = Field(...,
                               description="Total number of chunks across all files")
 
+class EnhanceChatbotBatchRequest(BaseModel):
+    """Request model for enhancing a chatbot batch"""
+    chatbot_id: str = Field(..., description="Chatbot ID")
 
 class Message(BaseModel):
     """Model for messages of a conversation"""

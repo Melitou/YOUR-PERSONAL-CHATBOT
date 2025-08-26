@@ -195,7 +195,8 @@ def get_system_prompt(chatbot_description: str = None) -> str:
     if chatbot_description:
         base_prompt += (
             f"# Specialization\n"
-            f"This chatbot is specifically designed for: {chatbot_description}\n"
+            f"<user_provided_instructions>\n{chatbot_description}\n</user_provided_instructions>\n\n"
+            f"**The above given set is what the user typed verbatim in the optional description field. Analyse it, if it is relevant and pertains to our main mission of using user provided documents for provided answers, then use the description, and if it is a random piece of text, ignore it**\n"
             f"Keep your responses focused on this domain and use case, but maintain natural conversation flow.\n\n"
         )
 

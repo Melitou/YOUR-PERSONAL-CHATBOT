@@ -1201,3 +1201,12 @@ class EmbeddingService:
             results["processing_time"] = time.time() - start_time
             logger.error(error_msg)
             return results
+
+    def delete_vector_from_pinecone(self, vector_id: str) -> bool:
+        """Delete a vector from Pinecone"""
+        try:
+            self.pinecone_client.delete(ids=[vector_id])
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete vector from Pinecone: {e}")
+            return False

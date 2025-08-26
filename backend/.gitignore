@@ -324,6 +324,9 @@ Upload/
 documents/
 files/
 
+#Personal Notes
+Notes/
+
 # Backend specific
 fastapi_cache/
 .uvicorn.log

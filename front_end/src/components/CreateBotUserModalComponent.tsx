@@ -236,7 +236,7 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
 
                         {/* Description */}
                         <div className="flex flex-col gap-2 min-w-0">
-                            <label className="text-xs sm:text-sm font-medium glass-text">Description</label>
+                            <label className="text-xs sm:text-sm font-medium glass-text">Agent Instructions</label>
                             <input
                                 type="text"
                                 placeholder="Enter chatbot description"

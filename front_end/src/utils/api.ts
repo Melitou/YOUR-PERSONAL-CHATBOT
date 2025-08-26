@@ -23,8 +23,8 @@ class ApiClient {
         }
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-            const errorMessage = error.message || `Request failed with status ${response.status}`;
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            const errorMessage = error.detail || error.message || `Request failed with status ${response.status}`;
             throw new Error(errorMessage);
         }
 
@@ -96,6 +96,16 @@ export const apiClient = new ApiClient();
 export const authApi = {
     login: (credentials: { username: string; password: string }) =>
         apiClient.post('/login', credentials),
+
+    signup: (userData: {
+        user_name: string;
+        password: string;
+        first_name: string;
+        last_name: string;
+        email: string;
+        role: string;
+    }) =>
+        apiClient.post('/signup', userData),
 
     logout: () =>
         apiClient.post('/logout', {}),

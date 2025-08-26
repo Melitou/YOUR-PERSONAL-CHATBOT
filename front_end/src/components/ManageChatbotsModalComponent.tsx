@@ -302,7 +302,7 @@ const ManageChatbotsModalComponent = ({
                                                                         {chatbot.description && (
                                                                             <div>
                                                                                 <span className="text-xs font-medium glass-text opacity-70 uppercase tracking-wide">
-                                                                                    Description
+                                                                                    Agent Instructions
                                                                                 </span>
                                                                                 <p className="text-sm glass-text mt-1">
                                                                                     {chatbot.description}

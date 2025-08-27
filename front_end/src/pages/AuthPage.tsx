@@ -149,8 +149,8 @@ const AuthPage: React.FC = () => {
                     </p>
                 </div>
 
-                <div className="mt-8 text-center flex items-center justify-center space-x-2">
-                    <img src={AIbyDNA} alt="AIbyDNA" className="w-8 h-8 rounded-md" />
+                <div className="mt-8 text-center flex flex-col items-center">
+                    <img src={AIbyDNA} alt="AIbyDNA" className="w-10 h-10 rounded-md mb-2" />
                     <span className="text-xs glass-text opacity-70">
                         Powered by AIbyDNA
                     </span>

@@ -1385,7 +1385,10 @@ async def websocket_conversation(websocket: WebSocket, session_id: str):
                     })
 
                     await safe_websocket_send(websocket, {
-                        "type": "response_end"
+                        "type": "response_end",
+                        "message_id": str(user_msg_record.id),
+                        "timestamp": user_msg_record.created_at.isoformat(),
+                        "full_response": casual_response
                     })
 
                     # Save casual response to database

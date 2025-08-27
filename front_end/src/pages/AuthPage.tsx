@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { authApi } from '../utils/api';
 import UserAuthStore from '../stores/UserAuthStore';
 import ViewStore from '../stores/ViewStore';
@@ -13,7 +13,12 @@ const AuthPage: React.FC = () => {
     const [error, setError] = useState('');
 
     const { login } = UserAuthStore();
-    const { addError } = ViewStore();
+    const { addError, clearAllErrors } = ViewStore();
+
+    // Clear the error notification when page loads
+    useEffect(() => {
+        clearAllErrors();
+    }, []);
 
     // If in signup mode, render SignupPage
     if (isSignupMode) {

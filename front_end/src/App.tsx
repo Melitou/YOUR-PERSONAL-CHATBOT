@@ -5,7 +5,7 @@ import AuthPage from './pages/AuthPage'
 import ClientDashboard from './pages/ClientDashboard'
 import UserAuthStore from './stores/UserAuthStore'
 import { authApi } from './utils/api'
-import ErrorComponent from './components/ErrorComponent'
+// import ErrorComponent from './components/ErrorComponent'
 import SuccessComponent from './components/SuccessComponent'
 import InfoComponent from './components/InfoComponent'
 import ViewStore from './stores/ViewStore'
@@ -61,7 +61,7 @@ function App() {
   return (
     <div>
       {renderMainContent()}
-      <ErrorComponent />
+      {/* <ErrorComponent /> */}
       <SuccessComponent />
       <InfoComponent />
     </div>

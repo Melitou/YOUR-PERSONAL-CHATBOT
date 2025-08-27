@@ -92,7 +92,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin }) => {
         setError('');
 
         if (!validateForm()) {
-            setError('Please fix the errors above');
+            setError('Please fix the errors below');
             return;
         }
 

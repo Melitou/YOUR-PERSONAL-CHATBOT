@@ -75,11 +75,24 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
         )
 
         # First, retrieve full content from MongoDB for all matches
+        # FIXED: Extract chunk IDs from namespace-specific vector IDs
         chunk_object_ids = []
+        vector_to_chunk_mapping = {}  # Track mapping for later use
+        
         for match in query_response.matches:
             try:
-                chunk_object_ids.append(ObjectId(match.id))
-            except Exception:
+                # Import helper function for parsing namespace-specific vector IDs
+                from embeddings import extract_chunk_id_from_vector_id
+                
+                # Extract original chunk ID from namespace-specific vector ID
+                chunk_id = extract_chunk_id_from_vector_id(match.id)
+                chunk_object_id = ObjectId(chunk_id)
+                
+                chunk_object_ids.append(chunk_object_id)
+                vector_to_chunk_mapping[match.id] = chunk_id
+                
+            except Exception as e:
+                logger.warning(f"Failed to extract chunk ID from vector ID '{match.id}': {e}")
                 continue
 
         # Initialize database connection
@@ -94,7 +107,11 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
         doc_mapping = {}
 
         for match in query_response.matches:
-            chunk_id = match.id
+            # Get the original chunk ID from our mapping
+            chunk_id = vector_to_chunk_mapping.get(match.id)
+            if not chunk_id:
+                continue  # Skip if mapping not found
+                
             chunk = chunk_dict.get(chunk_id)
 
             if not chunk:

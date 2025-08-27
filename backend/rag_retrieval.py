@@ -503,15 +503,42 @@ class RAGService:
             logger.info(f"🔗 Full namespaces: {full_namespaces}")
 
             from db_service import Documents, Chunks, ChatBots
-            total_doc_count = 0
-            total_chunk_count = 0
+            
+            # PRODUCTION-READY FIX: Validate chatbot namespaces instead of document namespaces
+            # The old code used Documents.namespace which breaks when original chatbot is deleted
+            # New approach: Validate that chatbot namespaces have embeddings in Pinecone
+            
+            total_valid_namespaces = 0
+            invalid_namespaces = []
+            
             for full_ns in full_namespaces:
-                doc_count = Documents.objects(namespace=full_ns).count()
-                chunk_count = Chunks.objects(namespace=full_ns).count()
-                total_doc_count += doc_count
-                total_chunk_count += chunk_count
-                logger.info(f"🔍 Found {doc_count} documents and {chunk_count} chunks for namespace: {full_ns}")
-            logger.info(f"📊 Total: {total_doc_count} documents and {total_chunk_count} chunks across all namespaces")
+                # Validate chatbot exists for this namespace
+                chatbot = ChatBots.objects(namespace=full_ns).first()
+                if not chatbot:
+                    logger.warning(f"⚠️ No chatbot found for namespace: {full_ns}")
+                    invalid_namespaces.append(full_ns)
+                    continue
+                
+                # Validate chatbot has document mappings (shared documents)
+                from db_service import ChatbotDocumentsMapper
+                doc_mappings = ChatbotDocumentsMapper.objects(chatbot=chatbot).count()
+                
+                if doc_mappings > 0:
+                    total_valid_namespaces += 1
+                    logger.info(f"✅ Valid namespace '{full_ns}' with {doc_mappings} document(s)")
+                else:
+                    logger.warning(f"⚠️ Namespace '{full_ns}' has no document mappings")
+                    invalid_namespaces.append(full_ns)
+            
+            if invalid_namespaces:
+                logger.warning(f"⚠️ Found {len(invalid_namespaces)} invalid namespace(s): {invalid_namespaces}")
+            
+            if total_valid_namespaces == 0:
+                logger.error("❌ No valid namespaces found for RAG search")
+                return "No documents available for this chatbot. Please upload documents first."
+            
+            logger.info(f"🎯 Proceeding with RAG search across {total_valid_namespaces} valid namespace(s)")
+            logger.info(f"🔍 Valid namespaces: {[ns for ns in full_namespaces if ns not in invalid_namespaces]}")
 
             # Use the existing embedding service instance for index/model utilities
             
@@ -567,15 +594,53 @@ class RAGService:
                 if result and result != "No relevant documents found for the query.":
                     collected.append(result)
 
-            if collected:
-                return "\n\n".join(collected)
-            return "No relevant documents found for the query."
+            # PRODUCTION METRICS: Track RAG performance
+            search_success = len(collected) > 0
+            successful_namespaces = len([ns for ns in full_namespaces if ns not in invalid_namespaces])
+            
+            logger.info("=" * 60)
+            logger.info("🎯 RAG SEARCH PERFORMANCE METRICS")
+            logger.info("=" * 60)
+            logger.info(f"📊 Total namespaces requested: {len(full_namespaces)}")
+            logger.info(f"✅ Valid namespaces processed: {successful_namespaces}")
+            logger.info(f"❌ Invalid namespaces skipped: {len(invalid_namespaces)}")
+            logger.info(f"📄 Results collected: {len(collected)}")
+            logger.info(f"🎯 Search success: {'✅ SUCCESS' if search_success else '❌ NO RESULTS'}")
+            
+            if search_success:
+                combined_result = "\n\n".join(collected)
+                result_length = len(combined_result)
+                logger.info(f"📝 Combined result length: {result_length} characters")
+                logger.info("=" * 60)
+                return combined_result
+            else:
+                logger.warning("⚠️ RAG search completed but found no relevant documents")
+                logger.info("=" * 60)
+                return "No relevant documents found for the query."
 
         except Exception as e:
-            error_msg = f"RAG search failed: {str(e)}"
-            logger.error(error_msg)
             logger.error("=" * 60)
-            return f"Error retrieving relevant documents: {str(e)}"
+            logger.error("❌ RAG SEARCH CRITICAL ERROR")
+            logger.error("=" * 60)
+            logger.error(f"🚨 Error: {str(e)}")
+            logger.error(f"🔍 Query: {query}")
+            logger.error(f"👤 User ID: {user_id}")
+            logger.error(f"🏷️  Namespaces: {namespaces}")
+            logger.error(f"🤖 Embedding Model: {embedding_model_of_chatbot_caller}")
+            
+            # Production error recovery: Try to provide helpful user message
+            if "namespace" in str(e).lower():
+                error_response = "Unable to access document knowledge base. Please try again or contact support if the issue persists."
+            elif "embedding" in str(e).lower():
+                error_response = "Document search service is temporarily unavailable. Please try again in a moment."
+            elif "pinecone" in str(e).lower():
+                error_response = "Search index is temporarily unavailable. Please try again or contact support."
+            else:
+                error_response = "An unexpected error occurred while searching documents. Please try again."
+            
+            logger.error(f"📤 User-facing error message: {error_response}")
+            logger.error("=" * 60)
+            return error_response
 
 
 if __name__ == "__main__":

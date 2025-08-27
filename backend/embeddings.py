@@ -33,6 +33,84 @@ except ImportError:
     logger.warning("Transformers not available. Install 'transformers' and 'torch' to use multilingual-e5-large model.")
 
 
+# =============================================================================
+# NAMESPACE-SPECIFIC VECTOR ID UTILITIES
+# =============================================================================
+
+def generate_namespace_vector_id(chunk_id: str, namespace: str) -> str:
+    """
+    Generate unique vector ID for a chunk in a specific namespace.
+    
+    This ensures each chatbot gets its own vector ID even when sharing documents.
+    Format: {chunk_id}_{namespace_hash}
+    
+    Args:
+        chunk_id: MongoDB ObjectId of the chunk
+        namespace: Chatbot namespace (e.g., "chatbot1|user123")
+        
+    Returns:
+        Unique vector ID for this chunk in this namespace
+    """
+    import hashlib
+    
+    # Create a short hash of the namespace to keep vector IDs manageable
+    namespace_hash = hashlib.md5(namespace.encode()).hexdigest()[:8]
+    vector_id = f"{chunk_id}_{namespace_hash}"
+    
+    logger.debug(f"Generated vector ID: {vector_id} for chunk {chunk_id} in namespace {namespace}")
+    return vector_id
+
+
+def extract_chunk_id_from_vector_id(vector_id: str) -> str:
+    """
+    Extract the original chunk ID from a namespace-specific vector ID.
+    
+    Args:
+        vector_id: Namespace-specific vector ID (format: chunk_id_namespace_hash)
+        
+    Returns:
+        Original MongoDB chunk ObjectId as string
+        
+    Raises:
+        ValueError: If vector_id format is invalid
+    """
+    try:
+        # Split by underscore and take the first part (chunk_id)
+        parts = vector_id.split('_')
+        if len(parts) < 2:
+            # Fallback for old format vector IDs (direct chunk IDs)
+            logger.warning(f"Old format vector ID detected: {vector_id}")
+            return vector_id
+        
+        chunk_id = parts[0]
+        logger.debug(f"Extracted chunk ID: {chunk_id} from vector ID: {vector_id}")
+        return chunk_id
+        
+    except Exception as e:
+        logger.error(f"Failed to extract chunk ID from vector ID '{vector_id}': {e}")
+        raise ValueError(f"Invalid vector ID format: {vector_id}")
+
+
+def extract_namespace_hash_from_vector_id(vector_id: str) -> str:
+    """
+    Extract the namespace hash from a namespace-specific vector ID.
+    
+    Args:
+        vector_id: Namespace-specific vector ID (format: chunk_id_namespace_hash)
+        
+    Returns:
+        Namespace hash portion of the vector ID
+    """
+    try:
+        parts = vector_id.split('_')
+        if len(parts) >= 2:
+            namespace_hash = '_'.join(parts[1:])  # Join in case there are multiple underscores
+            return namespace_hash
+        return ""
+    except Exception:
+        return ""
+
+
 class EmbeddingService:
     """
     Service class for creating embeddings from text chunks.
@@ -624,13 +702,17 @@ class EmbeddingService:
             logger.error(f"Error creating embeddings for chunks: {e}")
             return {}
 
-    def prepare_pinecone_vectors(self, chunks: List[Chunks], chunk_embeddings: Dict[str, List[float]]) -> List[Dict]:
+    def prepare_pinecone_vectors(self, chunks: List[Chunks], chunk_embeddings: Dict[str, List[float]], namespace: str) -> List[Dict]:
         """
         Prepare vector data with metadata for Pinecone.
+        
+        UPDATED FOR NAMESPACE-SPECIFIC VECTOR IDS:
+        Now generates namespace-specific vector IDs for proper document sharing.
 
         Args:
             chunks: List of Chunks objects
             chunk_embeddings: Dict mapping chunk_id to embedding vector
+            namespace: Target namespace for generating namespace-specific vector IDs
 
         Returns:
             List of vector dictionaries ready for Pinecone upsert
@@ -654,8 +736,11 @@ class EmbeddingService:
                 "created_at": chunk.created_at.isoformat() if chunk.created_at else ""
             }
 
+            # FIXED: Use namespace-specific vector ID for proper document sharing
+            namespace_vector_id = generate_namespace_vector_id(chunk_id, namespace)
+            
             vector_data = {
-                "id": chunk_id,  # Use MongoDB chunk._id as Pinecone vector ID
+                "id": namespace_vector_id,  # Use namespace-specific vector ID
                 "values": chunk_embeddings[chunk_id],
                 "metadata": metadata
             }
@@ -734,9 +819,13 @@ class EmbeddingService:
     def update_chunks_with_vector_ids(self, successful_vector_ids: List[str]) -> int:
         """
         Update MongoDB chunks with Pinecone vector IDs.
+        
+        UPDATED FOR NAMESPACE-SPECIFIC VECTOR IDS:
+        Now handles namespace-specific vector IDs by extracting the original chunk ID
+        and setting chunk.vector_id to the chunk's own ID for compatibility.
 
         Args:
-            successful_vector_ids: List of chunk IDs that were successfully uploaded to Pinecone
+            successful_vector_ids: List of namespace-specific vector IDs that were successfully uploaded to Pinecone
 
         Returns:
             Count of successfully updated chunks
@@ -747,26 +836,37 @@ class EmbeddingService:
                 return 0
             
             updated_count = 0
+            processed_chunks = set()  # Track processed chunks to avoid duplicates
 
-            for chunk_id in successful_vector_ids:
+            for namespace_vector_id in successful_vector_ids:
                 try:
+                    # Extract original chunk ID from namespace-specific vector ID
+                    chunk_id = extract_chunk_id_from_vector_id(namespace_vector_id)
+                    
+                    # Skip if we've already processed this chunk
+                    if chunk_id in processed_chunks:
+                        continue
+                    
                     # Find and update the chunk
                     chunk = Chunks.objects(id=chunk_id).first()
                     if chunk:
-                        chunk.vector_id = chunk_id  # Use the chunk's own ID as vector_id
+                        # Set vector_id to the original chunk ID for compatibility
+                        # The namespace-specific mapping happens during RAG retrieval
+                        chunk.vector_id = chunk_id
                         chunk.save()
                         updated_count += 1
+                        processed_chunks.add(chunk_id)
                         logger.debug(
-                            f"Updated chunk {chunk_id} with vector_id")
+                            f"Updated chunk {chunk_id} with vector_id (from namespace vector: {namespace_vector_id})")
                     else:
-                        logger.warning(f"Chunk with ID {chunk_id} not found")
+                        logger.warning(f"Chunk with ID {chunk_id} not found (extracted from: {namespace_vector_id})")
 
                 except Exception as e:
-                    logger.error(f"Failed to update chunk {chunk_id}: {e}")
+                    logger.error(f"Failed to update chunk for vector ID {namespace_vector_id}: {e}")
                     continue
 
             logger.info(
-                f"Successfully updated {updated_count}/{len(successful_vector_ids)} chunks with vector IDs")
+                f"Successfully updated {updated_count} unique chunks from {len(successful_vector_ids)} namespace-specific vector IDs")
             return updated_count
 
         except Exception as e:
@@ -990,7 +1090,7 @@ class EmbeddingService:
                 if not chunk_embeddings:
                     results["errors"].append(f"Failed to create embeddings for batch {i//batch_size+1}")
                     continue
-                vectors = self.prepare_pinecone_vectors(batch, chunk_embeddings)
+                vectors = self.prepare_pinecone_vectors(batch, chunk_embeddings, namespace)
                 successful_vector_ids = self.upsert_to_pinecone_namespace(vectors, namespace, pinecone_index, embedding_model)
                 total_embedded += len(successful_vector_ids)
                 # Keep chunk vector_id updated (idempotent)
@@ -1123,7 +1223,7 @@ class EmbeddingService:
 
                         # Step 3b: Prepare vectors for Pinecone
                         vectors = self.prepare_pinecone_vectors(
-                            batch, chunk_embeddings)
+                            batch, chunk_embeddings, namespace)
                         if not vectors:
                             error_msg = f"Failed to prepare vectors for batch {batch_num} in namespace '{namespace}'"
                             namespace_result["errors"].append(error_msg)

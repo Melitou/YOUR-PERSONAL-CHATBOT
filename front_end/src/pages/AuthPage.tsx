@@ -3,6 +3,7 @@ import { authApi } from '../utils/api';
 import UserAuthStore from '../stores/UserAuthStore';
 import ViewStore from '../stores/ViewStore';
 import SignupPage from './SignupPage';
+import AIbyDNA from "../Photos/AIbyDNA.png";
 
 const AuthPage: React.FC = () => {
     const [isSignupMode, setIsSignupMode] = useState(false);
@@ -148,10 +149,11 @@ const AuthPage: React.FC = () => {
                     </p>
                 </div>
 
-                <div className="mt-8 text-center">
-                    <p className="text-xs glass-text opacity-70">
+                <div className="mt-8 text-center flex items-center justify-center space-x-2">
+                    <img src={AIbyDNA} alt="AIbyDNA" className="w-8 h-8 rounded-md" />
+                    <span className="text-xs glass-text opacity-70">
                         Powered by AIbyDNA
-                    </p>
+                    </span>
                 </div>
             </div>
         </div>

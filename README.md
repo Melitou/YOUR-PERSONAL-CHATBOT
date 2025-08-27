@@ -67,10 +67,6 @@ Before we start we should download MongoDB locally from https://www.mongodb.com/
 
 Before we start with the main application we should add some clients in our local MongoDB.
 
-```bash
-cd backend
-python db_service.py
-```
 This will make a local host in your local MongoDB. 
 To add Users or Super Users you will have to run a **curl** command
 
@@ -99,7 +95,7 @@ python main.py
 Now we open another terminal and run the code shown below so that we can initialize the front end:
 ```bash
 cd front_end
-npm install  # This installs all frontend dependencies including markdown rendering
+npm install  
 npm run dev
 ```
 When the app is ready you will be able to login your user.

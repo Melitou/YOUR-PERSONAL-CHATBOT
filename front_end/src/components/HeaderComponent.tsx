@@ -54,7 +54,7 @@ const HeaderComponent = () => {
                         aria-label="Navigate to home page"
                         title="Go to home page"
                     >
-                        Your Personal Chatbot
+                        BotGenesis
                     </h1>
                 </div>
 

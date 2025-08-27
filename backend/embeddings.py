@@ -512,11 +512,18 @@ class EmbeddingService:
             else:
                 user_object_id = user_id
 
-            # Query chunks where vector_id is None or empty string
-            chunks = Chunks.objects(
-                user=user_object_id,
-                vector_id__in=[None, ""]
-            )
+            # NEW: Query chunks that don't have vector mappings yet
+            from db_service import ChunkVectorMappings
+            
+            # Get all chunks for this user
+            all_chunks = Chunks.objects(user=user_object_id)
+            
+            # Get chunks that already have vector mappings
+            existing_mappings = ChunkVectorMappings.objects(user=user_object_id)
+            mapped_chunk_ids = {str(mapping.chunk.id) for mapping in existing_mappings}
+            
+            # Filter to get only unembedded chunks (no vector mappings)
+            chunks = [chunk for chunk in all_chunks if str(chunk.id) not in mapped_chunk_ids]
 
             logger.info(
                 f"Found {len(chunks)} unembedded chunks for user {user_id}")
@@ -816,26 +823,32 @@ class EmbeddingService:
                 f"Error upserting vectors to Pinecone namespace '{namespace}': {e}")
             return []
 
-    def update_chunks_with_vector_ids(self, successful_vector_ids: List[str]) -> int:
+    def create_vector_mappings(self, successful_vector_ids: List[str], chatbot, user, embedding_model: str, pinecone_index: str) -> int:
         """
-        Update MongoDB chunks with Pinecone vector IDs.
+        Create ChunkVectorMappings entries for successfully embedded chunks.
         
-        UPDATED FOR NAMESPACE-SPECIFIC VECTOR IDS:
-        Now handles namespace-specific vector IDs by extracting the original chunk ID
-        and setting chunk.vector_id to the chunk's own ID for compatibility.
+        This replaces the old update_chunks_with_vector_ids method and supports the new
+        vector mappings architecture for multi-chatbot, multi-model document sharing.
 
         Args:
             successful_vector_ids: List of namespace-specific vector IDs that were successfully uploaded to Pinecone
+            chatbot: ChatBot object that the embeddings belong to
+            user: User object for security isolation
+            embedding_model: Name of the embedding model used (e.g., "text-embedding-3-small")
+            pinecone_index: Name of the Pinecone index (e.g., "chatbot-vectors-openai-1536")
 
         Returns:
-            Count of successfully updated chunks
+            Count of successfully created vector mappings
         """
         try:
             if not successful_vector_ids:
-                logger.warning("No vector IDs to update")
+                logger.warning("No vector IDs to create mappings for")
                 return 0
             
-            updated_count = 0
+            from db_service import ChunkVectorMappings, Chunks
+            from datetime import datetime
+            
+            created_count = 0
             processed_chunks = set()  # Track processed chunks to avoid duplicates
 
             for namespace_vector_id in successful_vector_ids:
@@ -847,31 +860,462 @@ class EmbeddingService:
                     if chunk_id in processed_chunks:
                         continue
                     
-                    # Find and update the chunk
+                    # Find the chunk
                     chunk = Chunks.objects(id=chunk_id).first()
-                    if chunk:
-                        # Set vector_id to the original chunk ID for compatibility
-                        # The namespace-specific mapping happens during RAG retrieval
-                        chunk.vector_id = chunk_id
-                        chunk.save()
-                        updated_count += 1
-                        processed_chunks.add(chunk_id)
-                        logger.debug(
-                            f"Updated chunk {chunk_id} with vector_id (from namespace vector: {namespace_vector_id})")
-                    else:
+                    if not chunk:
                         logger.warning(f"Chunk with ID {chunk_id} not found (extracted from: {namespace_vector_id})")
+                        continue
+                    
+                    # Check if mapping already exists (idempotent operation)
+                    existing_mapping = ChunkVectorMappings.objects(
+                        chunk=chunk,
+                        chatbot=chatbot
+                    ).first()
+                    
+                    if existing_mapping:
+                        # Update existing mapping with new vector details
+                        existing_mapping.embedding_model = embedding_model
+                        existing_mapping.pinecone_index = pinecone_index
+                        existing_mapping.vector_id = namespace_vector_id
+                        existing_mapping.updated_at = datetime.now()
+                        existing_mapping.save()
+                        logger.debug(f"Updated existing vector mapping for chunk {chunk_id}, chatbot {chatbot.name}")
+                    else:
+                        # Create new mapping
+                        mapping = ChunkVectorMappings(
+                            chunk=chunk,
+                            chatbot=chatbot,
+                            user=user,
+                            embedding_model=embedding_model,
+                            pinecone_index=pinecone_index,
+                            vector_id=namespace_vector_id,
+                            created_at=datetime.now()
+                        )
+                        mapping.save()
+                        logger.debug(f"Created new vector mapping for chunk {chunk_id}, chatbot {chatbot.name}")
+                    
+                    created_count += 1
+                    processed_chunks.add(chunk_id)
 
                 except Exception as e:
-                    logger.error(f"Failed to update chunk for vector ID {namespace_vector_id}: {e}")
+                    logger.error(f"Failed to create mapping for vector ID {namespace_vector_id}: {e}")
                     continue
 
             logger.info(
-                f"Successfully updated {updated_count} unique chunks from {len(successful_vector_ids)} namespace-specific vector IDs")
-            return updated_count
+                f"Successfully created/updated {created_count} vector mappings from {len(successful_vector_ids)} vector IDs for chatbot {chatbot.name}")
+            return created_count
 
         except Exception as e:
-            logger.error(f"Error updating chunks with vector IDs: {e}")
+            logger.error(f"Error creating vector mappings: {e}")
             return 0
+    
+    def get_vector_id_for_chunk(self, chunk_id: str, chatbot) -> str:
+        """
+        Get the vector ID for a specific chunk in a specific chatbot.
+        
+        Args:
+            chunk_id: MongoDB chunk ID
+            chatbot: ChatBot object
+            
+        Returns:
+            Vector ID string if mapping exists, None otherwise
+        """
+        try:
+            from db_service import ChunkVectorMappings, Chunks
+            
+            # Find the chunk
+            chunk = Chunks.objects(id=chunk_id).first()
+            if not chunk:
+                logger.warning(f"Chunk {chunk_id} not found")
+                return None
+            
+            # Find the vector mapping
+            mapping = ChunkVectorMappings.objects(
+                chunk=chunk,
+                chatbot=chatbot
+            ).first()
+            
+            if mapping:
+                logger.debug(f"Found vector ID {mapping.vector_id} for chunk {chunk_id}, chatbot {chatbot.name}")
+                return mapping.vector_id
+            else:
+                logger.warning(f"No vector mapping found for chunk {chunk_id}, chatbot {chatbot.name}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting vector ID for chunk {chunk_id}: {e}")
+            return None
+    
+    def get_vector_ids_for_chunks(self, chunk_ids: List[str], chatbot) -> Dict[str, str]:
+        """
+        Get vector IDs for multiple chunks in a specific chatbot.
+        
+        Args:
+            chunk_ids: List of MongoDB chunk IDs
+            chatbot: ChatBot object
+            
+        Returns:
+            Dictionary mapping chunk_id -> vector_id for found mappings
+        """
+        try:
+            from db_service import ChunkVectorMappings, Chunks
+            from bson import ObjectId
+            
+            # Convert string IDs to ObjectIds
+            chunk_object_ids = [ObjectId(cid) for cid in chunk_ids]
+            
+            # Find all chunks
+            chunks = Chunks.objects(id__in=chunk_object_ids)
+            chunk_dict = {str(chunk.id): chunk for chunk in chunks}
+            
+            # Find all vector mappings for this chatbot
+            mappings = ChunkVectorMappings.objects(
+                chunk__in=list(chunk_dict.values()),
+                chatbot=chatbot
+            )
+            
+            # Build result dictionary
+            result = {}
+            for mapping in mappings:
+                chunk_id = str(mapping.chunk.id)
+                result[chunk_id] = mapping.vector_id
+            
+            logger.debug(f"Found {len(result)} vector mappings for {len(chunk_ids)} chunks, chatbot {chatbot.name}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting vector IDs for chunks: {e}")
+            return {}
+    
+    def get_all_vector_ids_for_chatbot(self, chatbot) -> List[str]:
+        """
+        Get all vector IDs for a specific chatbot.
+        Useful for chatbot deletion or migration operations.
+        
+        Args:
+            chatbot: ChatBot object
+            
+        Returns:
+            List of vector IDs
+        """
+        try:
+            from db_service import ChunkVectorMappings
+            
+            mappings = ChunkVectorMappings.objects(chatbot=chatbot)
+            vector_ids = [mapping.vector_id for mapping in mappings]
+            
+            logger.info(f"Found {len(vector_ids)} vector IDs for chatbot {chatbot.name}")
+            return vector_ids
+            
+        except Exception as e:
+            logger.error(f"Error getting all vector IDs for chatbot {chatbot.name}: {e}")
+            return []
+    
+    def get_chatbots_using_chunk(self, chunk_id: str) -> List:
+        """
+        Get all chatbots that have embeddings for a specific chunk.
+        Useful for understanding document sharing relationships.
+        
+        Args:
+            chunk_id: MongoDB chunk ID
+            
+        Returns:
+            List of ChatBot objects
+        """
+        try:
+            from db_service import ChunkVectorMappings, Chunks
+            
+            # Find the chunk
+            chunk = Chunks.objects(id=chunk_id).first()
+            if not chunk:
+                logger.warning(f"Chunk {chunk_id} not found")
+                return []
+            
+            # Find all mappings for this chunk
+            mappings = ChunkVectorMappings.objects(chunk=chunk)
+            chatbots = [mapping.chatbot for mapping in mappings]
+            
+            logger.debug(f"Found {len(chatbots)} chatbots using chunk {chunk_id}")
+            return chatbots
+            
+        except Exception as e:
+            logger.error(f"Error getting chatbots for chunk {chunk_id}: {e}")
+            return []
+    
+    # === PRODUCTION-GRADE CLEANUP UTILITIES ===
+    
+    def find_orphaned_vector_mappings(self) -> Dict:
+        """
+        Find vector mappings that reference non-existent chatbots, chunks, or users.
+        Critical for database integrity maintenance.
+        
+        Returns:
+            Dictionary with orphaned mapping details and counts
+        """
+        try:
+            from db_service import ChunkVectorMappings, ChatBots, Chunks, User_Auth_Table
+            
+            results = {
+                "orphaned_chatbot_refs": [],
+                "orphaned_chunk_refs": [],  
+                "orphaned_user_refs": [],
+                "total_mappings": 0,
+                "total_orphaned": 0
+            }
+            
+            # Get all vector mappings
+            all_mappings = ChunkVectorMappings.objects()
+            results["total_mappings"] = all_mappings.count()
+            
+            logger.info(f"🔍 Checking {results['total_mappings']} vector mappings for orphaned references...")
+            
+            for mapping in all_mappings:
+                is_orphaned = False
+                
+                # Check if chatbot exists
+                if not ChatBots.objects(id=mapping.chatbot.id).first():
+                    results["orphaned_chatbot_refs"].append({
+                        "mapping_id": str(mapping.id),
+                        "chatbot_id": str(mapping.chatbot.id),
+                        "chunk_id": str(mapping.chunk.id),
+                        "vector_id": mapping.vector_id
+                    })
+                    is_orphaned = True
+                
+                # Check if chunk exists  
+                if not Chunks.objects(id=mapping.chunk.id).first():
+                    results["orphaned_chunk_refs"].append({
+                        "mapping_id": str(mapping.id),
+                        "chunk_id": str(mapping.chunk.id),
+                        "chatbot_id": str(mapping.chatbot.id),
+                        "vector_id": mapping.vector_id
+                    })
+                    is_orphaned = True
+                
+                # Check if user exists
+                if not User_Auth_Table.objects(id=mapping.user.id).first():
+                    results["orphaned_user_refs"].append({
+                        "mapping_id": str(mapping.id),
+                        "user_id": str(mapping.user.id),
+                        "chatbot_id": str(mapping.chatbot.id),
+                        "vector_id": mapping.vector_id
+                    })
+                    is_orphaned = True
+                
+                if is_orphaned:
+                    results["total_orphaned"] += 1
+            
+            logger.info(f"📊 Found {results['total_orphaned']} orphaned mappings:")
+            logger.info(f"   - Orphaned chatbot refs: {len(results['orphaned_chatbot_refs'])}")
+            logger.info(f"   - Orphaned chunk refs: {len(results['orphaned_chunk_refs'])}")
+            logger.info(f"   - Orphaned user refs: {len(results['orphaned_user_refs'])}")
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error finding orphaned vector mappings: {e}")
+            return {"error": str(e)}
+    
+    def cleanup_orphaned_vector_mappings(self, dry_run: bool = True) -> Dict:
+        """
+        Clean up orphaned vector mappings that reference non-existent records.
+        
+        Args:
+            dry_run: If True, only report what would be deleted (default: True)
+            
+        Returns:
+            Cleanup results and statistics
+        """
+        try:
+            results = {
+                "dry_run": dry_run,
+                "deleted_mappings": 0,
+                "deleted_mapping_ids": [],
+                "errors": []
+            }
+            
+            # First find orphaned mappings
+            orphaned = self.find_orphaned_vector_mappings()
+            if "error" in orphaned:
+                results["errors"].append(orphaned["error"])
+                return results
+            
+            total_orphaned = orphaned["total_orphaned"]
+            if total_orphaned == 0:
+                logger.info("✅ No orphaned vector mappings found")
+                return results
+            
+            logger.info(f"🧹 {'DRY RUN: Would delete' if dry_run else 'Deleting'} {total_orphaned} orphaned vector mappings")
+            
+            if not dry_run:
+                from db_service import ChunkVectorMappings
+                from bson import ObjectId
+                
+                # Collect all orphaned mapping IDs
+                orphaned_ids = []
+                for category in ["orphaned_chatbot_refs", "orphaned_chunk_refs", "orphaned_user_refs"]:
+                    for item in orphaned[category]:
+                        mapping_id = item["mapping_id"]
+                        if mapping_id not in orphaned_ids:
+                            orphaned_ids.append(mapping_id)
+                
+                # Delete orphaned mappings
+                for mapping_id in orphaned_ids:
+                    try:
+                        mapping = ChunkVectorMappings.objects(id=ObjectId(mapping_id)).first()
+                        if mapping:
+                            mapping.delete()
+                            results["deleted_mappings"] += 1
+                            results["deleted_mapping_ids"].append(mapping_id)
+                            logger.debug(f"Deleted orphaned mapping: {mapping_id}")
+                    except Exception as e:
+                        error_msg = f"Failed to delete mapping {mapping_id}: {e}"
+                        results["errors"].append(error_msg)
+                        logger.error(error_msg)
+            
+            logger.info(f"{'🔍 DRY RUN COMPLETE' if dry_run else '✅ CLEANUP COMPLETE'}: {results['deleted_mappings']} mappings {'would be' if dry_run else ''} deleted")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error cleaning up orphaned vector mappings: {e}")
+            return {"error": str(e)}
+    
+    def verify_vector_mappings_integrity(self) -> Dict:
+        """
+        Comprehensive integrity check for the vector mappings system.
+        Validates consistency between MongoDB and expected Pinecone state.
+        
+        Returns:
+            Detailed integrity report
+        """
+        try:
+            from db_service import ChunkVectorMappings, ChatBots
+            
+            results = {
+                "total_mappings": 0,
+                "chatbots_checked": 0,
+                "integrity_issues": [],
+                "recommendations": [],
+                "summary": {
+                    "healthy_mappings": 0,
+                    "problematic_mappings": 0,
+                    "missing_chatbots": 0,
+                    "inconsistent_models": 0
+                }
+            }
+            
+            logger.info("🔍 Starting comprehensive vector mappings integrity check...")
+            
+            # Get all vector mappings
+            all_mappings = ChunkVectorMappings.objects()
+            results["total_mappings"] = all_mappings.count()
+            
+            # Group mappings by chatbot
+            chatbot_mappings = {}
+            for mapping in all_mappings:
+                chatbot_id = str(mapping.chatbot.id)
+                if chatbot_id not in chatbot_mappings:
+                    chatbot_mappings[chatbot_id] = []
+                chatbot_mappings[chatbot_id].append(mapping)
+            
+            results["chatbots_checked"] = len(chatbot_mappings)
+            
+            # Check each chatbot's mappings
+            for chatbot_id, mappings in chatbot_mappings.items():
+                try:
+                    # Verify chatbot exists
+                    chatbot = ChatBots.objects(id=chatbot_id).first()
+                    if not chatbot:
+                        issue = {
+                            "type": "missing_chatbot",
+                            "chatbot_id": chatbot_id,
+                            "affected_mappings": len(mappings),
+                            "severity": "high"
+                        }
+                        results["integrity_issues"].append(issue)
+                        results["summary"]["missing_chatbots"] += 1
+                        continue
+                    
+                    # Check embedding model consistency
+                    mapping_models = set(m.embedding_model for m in mappings)
+                    if len(mapping_models) > 1:
+                        issue = {
+                            "type": "inconsistent_embedding_models",
+                            "chatbot_id": chatbot_id,
+                            "chatbot_name": chatbot.name,
+                            "chatbot_model": chatbot.embedding_model,
+                            "mapping_models": list(mapping_models),
+                            "severity": "medium"
+                        }
+                        results["integrity_issues"].append(issue)
+                        results["summary"]["inconsistent_models"] += 1
+                    
+                    # Check if mapping model matches chatbot model
+                    if chatbot.embedding_model not in mapping_models:
+                        issue = {
+                            "type": "model_mismatch",
+                            "chatbot_id": chatbot_id,
+                            "chatbot_name": chatbot.name,
+                            "expected_model": chatbot.embedding_model,
+                            "found_models": list(mapping_models),
+                            "severity": "high"
+                        }
+                        results["integrity_issues"].append(issue)
+                    
+                    # If no issues found, count as healthy
+                    if not any(issue["chatbot_id"] == chatbot_id for issue in results["integrity_issues"]):
+                        results["summary"]["healthy_mappings"] += len(mappings)
+                    else:
+                        results["summary"]["problematic_mappings"] += len(mappings)
+                        
+                except Exception as e:
+                    issue = {
+                        "type": "check_error",
+                        "chatbot_id": chatbot_id,
+                        "error": str(e),
+                        "severity": "high"
+                    }
+                    results["integrity_issues"].append(issue)
+            
+            # Generate recommendations
+            if results["summary"]["missing_chatbots"] > 0:
+                results["recommendations"].append(
+                    f"Run cleanup_orphaned_vector_mappings() to remove {results['summary']['missing_chatbots']} mappings with missing chatbots"
+                )
+            
+            if results["summary"]["inconsistent_models"] > 0:
+                results["recommendations"].append(
+                    "Review chatbots with inconsistent embedding models - may indicate migration issues"
+                )
+            
+            if not results["integrity_issues"]:
+                results["recommendations"].append("✅ Vector mappings system is healthy - no issues found")
+            
+            logger.info(f"🔍 Integrity check complete:")
+            logger.info(f"   - Total mappings: {results['total_mappings']}")
+            logger.info(f"   - Healthy mappings: {results['summary']['healthy_mappings']}")
+            logger.info(f"   - Problematic mappings: {results['summary']['problematic_mappings']}")
+            logger.info(f"   - Issues found: {len(results['integrity_issues'])}")
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error verifying vector mappings integrity: {e}")
+            return {"error": str(e)}
+
+    # DEPRECATED: Keep for backward compatibility during migration
+    def update_chunks_with_vector_ids(self, successful_vector_ids: List[str]) -> int:
+        """
+        DEPRECATED: This method is deprecated in favor of create_vector_mappings.
+        
+        For backward compatibility during migration, this method will log a warning
+        and return 0. Update calling code to use create_vector_mappings instead.
+        """
+        logger.warning(
+            f"DEPRECATED: update_chunks_with_vector_ids called with {len(successful_vector_ids)} vector IDs. "
+            f"Please update calling code to use create_vector_mappings method instead."
+        )
+        return 0
 
     def delete_namespace(self, index_name: str, namespace: str) -> bool:
         """
@@ -999,8 +1443,14 @@ class EmbeddingService:
                         )
                         
                         if vector_ids:
-                            # Update chunks with new vector IDs (each chatbot might have different vector IDs)
-                            self.update_chunks_with_vector_ids(batch, vector_ids)
+                            # Create vector mappings for the successfully embedded chunks
+                            self.create_vector_mappings(
+                                successful_vector_ids=vector_ids,
+                                chatbot=chatbot,
+                                user=mapping.user,
+                                embedding_model=embedding_model,
+                                pinecone_index=pinecone_index
+                            )
                             chatbot_result["chunks_embedded"] += len(vector_ids)
                             results["total_chunks_embedded"] += len(vector_ids)
                             logger.info(f"  ✅ Embedded {len(vector_ids)} chunks in namespace '{namespace}'")
@@ -1093,9 +1543,15 @@ class EmbeddingService:
                 vectors = self.prepare_pinecone_vectors(batch, chunk_embeddings, namespace)
                 successful_vector_ids = self.upsert_to_pinecone_namespace(vectors, namespace, pinecone_index, embedding_model)
                 total_embedded += len(successful_vector_ids)
-                # Keep chunk vector_id updated (idempotent)
+                # Create vector mappings for the successfully embedded chunks
                 if successful_vector_ids:
-                    self.update_chunks_with_vector_ids(successful_vector_ids)
+                    self.create_vector_mappings(
+                        successful_vector_ids=successful_vector_ids,
+                        chatbot=chatbot,
+                        user=document.user,  # Get user from document
+                        embedding_model=embedding_model,
+                        pinecone_index=pinecone_index
+                    )
             results["chunks_embedded"] = total_embedded
             results["success"] = total_embedded > 0
         except Exception as e:
@@ -1236,9 +1692,34 @@ class EmbeddingService:
                         namespace_result["chunks_embedded"] += len(
                             successful_vector_ids)
 
-                        # Step 3d: Update MongoDB
-                        updated_count = self.update_chunks_with_vector_ids(
-                            successful_vector_ids)
+                        # Step 3d: Create vector mappings
+                        try:
+                            from db_service import ChatBots, User_Auth_Table
+                            from bson import ObjectId
+                            
+                            # Find chatbot by namespace
+                            chatbot = ChatBots.objects(namespace=namespace).first()
+                            if not chatbot:
+                                logger.warning(f"No chatbot found for namespace '{namespace}' - cannot create vector mappings")
+                                updated_count = 0
+                            else:
+                                # Find user
+                                user = User_Auth_Table.objects(id=ObjectId(user_id)).first()
+                                if not user:
+                                    logger.warning(f"User {user_id} not found - cannot create vector mappings")
+                                    updated_count = 0
+                                else:
+                                    # Create vector mappings
+                                    updated_count = self.create_vector_mappings(
+                                        successful_vector_ids=successful_vector_ids,
+                                        chatbot=chatbot,
+                                        user=user,
+                                        embedding_model=embedding_model,
+                                        pinecone_index=pinecone_index
+                                    )
+                        except Exception as e:
+                            logger.error(f"Error creating vector mappings for namespace '{namespace}': {e}")
+                            updated_count = 0
                         namespace_result["chunks_updated"] += updated_count
 
                         logger.info(

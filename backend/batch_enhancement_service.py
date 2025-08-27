@@ -269,9 +269,20 @@ class BatchEnhancementService:
 								logger.info(f"Updated chunk {chunk.id} with AI-enhanced summary with chunk summary length {len(chunk.summary)}")
 
 								# Now, update redo the embedding of the chunks, also update the embeddings in Pinecone
-								# Start with deleting the vector from Pinecone
+								# Start with deleting the vector from Pinecone for this specific chatbot
 								embedding_service = EmbeddingService()
-								embedding_service.delete_vector_from_pinecone(chunk.vector_id)
+								
+								# Get the vector ID for this chunk in this chatbot's namespace
+								vector_id = embedding_service.get_vector_id_for_chunk(
+									chunk_id=str(chunk.id),
+									chatbot=chatbot
+								)
+								
+								if vector_id:
+									embedding_service.delete_vector_from_pinecone(vector_id)
+									logger.info(f"Deleted old vector {vector_id} for chunk {chunk.id}")
+								else:
+									logger.warning(f"No vector mapping found for chunk {chunk.id} in chatbot {chatbot.name}")
 
 								# Now, redo the embedding
 								# Get the chatbot and document info for re-embedding

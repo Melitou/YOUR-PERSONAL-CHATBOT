@@ -504,31 +504,41 @@ class RAGService:
 
             from db_service import Documents, Chunks, ChatBots
             
-            # PRODUCTION-READY FIX: Validate chatbot namespaces instead of document namespaces
-            # The old code used Documents.namespace which breaks when original chatbot is deleted
-            # New approach: Validate that chatbot namespaces have embeddings in Pinecone
+            # PRODUCTION-READY FIX: Validate chatbot namespaces with comprehensive checks
+            # Enhanced validation for the new vector mappings architecture
             
             total_valid_namespaces = 0
             invalid_namespaces = []
             
             for full_ns in full_namespaces:
-                # Validate chatbot exists for this namespace
+                # Step 1: Validate chatbot exists for this namespace
                 chatbot = ChatBots.objects(namespace=full_ns).first()
                 if not chatbot:
                     logger.warning(f"⚠️ No chatbot found for namespace: {full_ns}")
                     invalid_namespaces.append(full_ns)
                     continue
                 
-                # Validate chatbot has document mappings (shared documents)
-                from db_service import ChatbotDocumentsMapper
-                doc_mappings = ChatbotDocumentsMapper.objects(chatbot=chatbot).count()
+                # Step 2: Validate chatbot has document mappings (shared documents)
+                from db_service import ChatbotDocumentsMapper, ChunkVectorMappings
+                doc_mappings_count = ChatbotDocumentsMapper.objects(chatbot=chatbot).count()
                 
-                if doc_mappings > 0:
-                    total_valid_namespaces += 1
-                    logger.info(f"✅ Valid namespace '{full_ns}' with {doc_mappings} document(s)")
-                else:
+                if doc_mappings_count == 0:
                     logger.warning(f"⚠️ Namespace '{full_ns}' has no document mappings")
                     invalid_namespaces.append(full_ns)
+                    continue
+                
+                # Step 3: Validate chatbot has vector mappings (actual embeddings)
+                vector_mappings_count = ChunkVectorMappings.objects(chatbot=chatbot).count()
+                
+                if vector_mappings_count == 0:
+                    logger.warning(f"⚠️ Namespace '{full_ns}' has no vector mappings - embeddings may not be ready")
+                    invalid_namespaces.append(full_ns)
+                    continue
+                
+                # Step 4: All validations passed
+                total_valid_namespaces += 1
+                logger.info(f"✅ Valid namespace '{full_ns}' with {doc_mappings_count} document(s) and {vector_mappings_count} vector(s)")
+                logger.debug(f"   📊 Chatbot: {chatbot.name}, Model: {chatbot.embedding_model}")
             
             if invalid_namespaces:
                 logger.warning(f"⚠️ Found {len(invalid_namespaces)} invalid namespace(s): {invalid_namespaces}")

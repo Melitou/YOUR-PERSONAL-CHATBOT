@@ -154,7 +154,7 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
             logger.info(f"Reranking failed, using original results: {rerank_error}")
             reranked_matches = [(match, match.score) for match in query_response.matches[:top_reranked]]
             chunk_ids = [match.id for match in query_response.matches[:top_reranked]]
-            return format_results_without_reranking(query_response.matches[:top_reranked], chunk_dict)
+            return format_results_without_reranking(query_response.matches[:top_reranked], chunk_dict, vector_to_chunk_mapping)
 
         # Get chunk IDs for MongoDB retrieval
         chunk_ids = []
@@ -170,11 +170,16 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
         # Format results with full content and summary
         results = []
         for i, (original_match, score) in enumerate(reranked_matches):
-            chunk_id = original_match.id
+            vector_id = original_match.id
             metadata = original_match.metadata or {}
 
-            # Get full chunk data from MongoDB
-            chunk = chunk_dict.get(chunk_id)
+            # FIXED: Extract the actual chunk ID from the namespace-specific vector ID
+            extracted_chunk_id = vector_to_chunk_mapping.get(vector_id)
+            if not extracted_chunk_id:
+                continue  # Skip if chunk ID extraction failed
+
+            # Get full chunk data from MongoDB using the extracted chunk ID
+            chunk = chunk_dict.get(extracted_chunk_id)
             if not chunk:
                 continue  # Skip if chunk not found in MongoDB
 
@@ -213,24 +218,30 @@ def search_rag(query: str, namespace: str, index_name: str = "chatbot-vectors-go
         return f"Error performing search: {str(e)}"
 
 
-def format_results_without_reranking(matches, chunk_dict):
+def format_results_without_reranking(matches, chunk_dict, vector_to_chunk_mapping):
     """
     Format results without reranking when the reranking service is unavailable
     
     Args:
         matches: List of Pinecone matches
         chunk_dict: Dictionary of chunk data from MongoDB
+        vector_to_chunk_mapping: Dictionary mapping vector IDs to chunk IDs
         
     Returns:
         Formatted string with chunk information
     """
     results = []
     for i, match in enumerate(matches):
-        chunk_id = match.id
+        vector_id = match.id
         metadata = match.metadata or {}
 
-        # Get full chunk data from MongoDB
-        chunk = chunk_dict.get(chunk_id)
+        # FIXED: Extract the actual chunk ID from the namespace-specific vector ID
+        extracted_chunk_id = vector_to_chunk_mapping.get(vector_id)
+        if not extracted_chunk_id:
+            continue  # Skip if chunk ID extraction failed
+
+        # Get full chunk data from MongoDB using the extracted chunk ID
+        chunk = chunk_dict.get(extracted_chunk_id)
         if not chunk:
             continue  # Skip if chunk not found in MongoDB
 

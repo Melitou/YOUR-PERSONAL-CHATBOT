@@ -7,11 +7,15 @@ from openai import OpenAI
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+ 
 from fastapi import FastAPI, HTTPException, status, Depends, UploadFile, File, Form, Query, Request, BackgroundTasks, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.websockets import WebSocket, WebSocketDisconnect
 import os
+
+load_dotenv()
 
 from api_models import (
     CreateAgentResponse, LoginRequest, LoginResponse,
@@ -416,8 +420,11 @@ async def get_chatbot_health(chatbot_id: str, current_user: User_Auth_Table = De
             # Chunks are stored once per document (not per-namespace). For health, compare
             # Pinecone namespace vector count against total chunks of mapped documents.
             total_chunks = Chunks.objects(document__in=doc_ids).count()
-            embedded_chunks = Chunks.objects(
-                document__in=doc_ids, vector_id__ne=None).count()
+            
+            # NEW: Count embedded chunks using vector mappings
+            from db_service import ChunkVectorMappings
+            chunk_ids = [str(chunk.id) for chunk in Chunks.objects(document__in=doc_ids)]
+            embedded_chunks = ChunkVectorMappings.objects(chunk__in=chunk_ids).count()
         else:
             total_chunks = 0
             embedded_chunks = 0
@@ -1711,14 +1718,25 @@ async def delete_chatbot(chatbot_id: str, current_user: User_Auth_Table = Depend
             Messages.objects(conversation_id__in=conv_ids).delete()
             conversations.delete()
 
-        # Delete mapping rows (docs remain for other chatbots)
-        ChatbotDocumentsMapper.objects(
+        # Delete document mapping rows (docs remain for other chatbots)
+        doc_mappings_deleted = ChatbotDocumentsMapper.objects(
             chatbot=chatbot, user=current_user).delete()
+        logger.info(f"Deleted {doc_mappings_deleted} document mappings for chatbot {chatbot.name}")
 
-        # Delete Pinecone namespace
+        # Delete vector mappings for this chatbot (critical for new architecture)
+        from db_service import ChunkVectorMappings
+        vector_mappings_deleted = ChunkVectorMappings.objects(
+            chatbot=chatbot, user=current_user).delete()
+        logger.info(f"Deleted {vector_mappings_deleted} vector mappings for chatbot {chatbot.name}")
+
+        # Delete Pinecone namespace (this removes the actual vector embeddings)
         es = EmbeddingService()
         index_name = es.get_pinecone_index_for_model(chatbot.embedding_model)
-        es.delete_namespace(index_name, chatbot.namespace)
+        namespace_deleted = es.delete_namespace(index_name, chatbot.namespace)
+        if namespace_deleted:
+            logger.info(f"Deleted Pinecone namespace '{chatbot.namespace}' in index '{index_name}'")
+        else:
+            logger.warning(f"Failed to delete Pinecone namespace '{chatbot.namespace}' - may not exist")
 
         # Delete the chatbot itself
         chatbot.delete()

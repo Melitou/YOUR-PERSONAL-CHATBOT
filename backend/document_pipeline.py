@@ -583,9 +583,11 @@ class DocumentPipeline:
                 doc_chunks = Chunks.objects(document=doc, namespace=namespace)
                 total_chunks += doc_chunks.count()
 
-                # Count embedded chunks (have vector_id)
-                embedded_doc_chunks = doc_chunks.filter(vector_id__ne=None)
-                embedded_chunks += embedded_doc_chunks.count()
+                # NEW: Count embedded chunks using vector mappings
+                from db_service import ChunkVectorMappings
+                doc_chunk_ids = [str(chunk.id) for chunk in doc_chunks]
+                embedded_count = ChunkVectorMappings.objects(chunk__in=doc_chunk_ids).count()
+                embedded_chunks += embedded_count
 
             # Determine if chatbot is complete (all chunks have embeddings)
             is_complete = total_chunks > 0 and embedded_chunks == total_chunks
@@ -635,7 +637,11 @@ class DocumentPipeline:
                 # Count chunks for this document
                 doc_chunks = Chunks.objects(document=doc, namespace=namespace)
                 total_chunks = doc_chunks.count()
-                embedded_chunks = doc_chunks.filter(vector_id__ne=None).count()
+                
+                # NEW: Count embedded chunks using vector mappings
+                from db_service import ChunkVectorMappings
+                doc_chunk_ids = [str(chunk.id) for chunk in doc_chunks]
+                embedded_chunks = ChunkVectorMappings.objects(chunk__in=doc_chunk_ids).count()
 
                 inventory.append({
                     'file_name': doc.file_name,

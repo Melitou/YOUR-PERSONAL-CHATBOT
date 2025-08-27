@@ -246,7 +246,12 @@ class BatchSummarizationJob(Document):
 
 
 class Chunks(Document):
-    """Chunks table for document text chunks with vector IDs"""
+    """
+    Chunks table for document text chunks.
+    
+    Note: Vector IDs are now stored in ChunkVectorMappings table to support
+    multiple embeddings per chunk (different chatbots with different models).
+    """
     document = ReferenceField(Documents, required=True)
     user = ReferenceField(User_Auth_Table, required=True)
     namespace = StringField(required=True)
@@ -272,8 +277,6 @@ class Chunks(Document):
     # Chunking method used to generate this chunk
     chunking_method = StringField(required=False, choices=[
         'token', 'semantic', 'line', 'recursive'], default='token')
-    # Pinecone vector ID, Initially null, populated after embedding
-    vector_id = StringField(required=False)
     created_at = DateTimeField(required=True)
 
     meta = {
@@ -281,7 +284,6 @@ class Chunks(Document):
         'indexes': [
             {'fields': ['document']},
             {'fields': ['user']},
-            {'fields': ['vector_id']},
             {'fields': ['chunking_method']},
             # enforce one chunk per (document, chunk_index)
             {'fields': [('document', 1), ('chunk_index', 1)], 'unique': True}
@@ -289,7 +291,7 @@ class Chunks(Document):
     }
 
     def __str__(self) -> str:
-        return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, file_name={self.file_name}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, vector_id={self.vector_id}, created_at={self.created_at})"
+        return f"Chunks(document={self.document}, user={self.user}, namespace={self.namespace}, file_name={self.file_name}, chunk_index={self.chunk_index}, chunking_method={self.chunking_method}, created_at={self.created_at})"
 
 
 class UserNotification(Document):
@@ -367,6 +369,68 @@ class ChatbotClientMapper(Document):
 
     def __str__(self) -> str:
         return f"ChatbotClientMapper(chatbot={self.chatbot}, client={self.client}, assigned_by={self.assigned_by}, is_active={self.is_active})"
+
+
+class ChunkVectorMappings(Document):
+    """
+    Maps chunks to their vector representations in different chatbots.
+    
+    This table enables:
+    - Same chunk content to have different vector embeddings for different chatbots
+    - Different embedding models (OpenAI vs Gemini) for the same content  
+    - Independent chatbot operations and deletions
+    - Production-grade data integrity and performance
+    """
+    
+    # Core Relationships
+    chunk = ReferenceField(Chunks, required=True)
+    chatbot = ReferenceField(ChatBots, required=True) 
+    user = ReferenceField(User_Auth_Table, required=True)  # For security isolation
+    
+    # Embedding Details
+    embedding_model = StringField(required=True)  # e.g., "text-embedding-3-small"
+    pinecone_index = StringField(required=True)   # e.g., "chatbot-vectors-openai-1536"
+    vector_id = StringField(required=True)        # e.g., "chunk123_abc_def456"
+    
+    # Metadata
+    created_at = DateTimeField(required=True)
+    updated_at = DateTimeField()  # For re-embedding tracking
+    
+    meta = {
+        'collection': 'chunk_vector_mappings',
+        'indexes': [
+            # PRIMARY: Unique mapping per chunk+chatbot
+            {'fields': [('chunk', 1), ('chatbot', 1)], 'unique': True},
+            
+            # PERFORMANCE: Fast chatbot lookups
+            {'fields': ['chatbot']},
+            
+            # PERFORMANCE: Fast chunk lookups (find all chatbots using this chunk)
+            {'fields': ['chunk']},
+            
+            # PERFORMANCE: User isolation
+            {'fields': ['user']},
+            
+            # PERFORMANCE: Model-specific queries
+            {'fields': ['embedding_model']},
+            
+            # OPERATIONS: Pinecone vector management
+            {'fields': ['vector_id']},
+            {'fields': ['pinecone_index']},
+            
+            # CLEANUP: Find mappings by creation date
+            {'fields': ['created_at']},
+            
+            # COMPOSITE: Fast user+chatbot queries
+            {'fields': [('user', 1), ('chatbot', 1)]},
+            
+            # COMPOSITE: Find all vectors for user+model combination
+            {'fields': [('user', 1), ('embedding_model', 1)]}
+        ]
+    }
+
+    def __str__(self) -> str:
+        return f"ChunkVectorMappings(chunk={self.chunk}, chatbot={self.chatbot}, embedding_model={self.embedding_model}, vector_id={self.vector_id})"
 
 
 def upload_file_to_gridfs(fs: GridFS, file_content: bytes, filename: str, content_type: str = "text/plain") -> ObjectId:
@@ -449,7 +513,6 @@ def create_sample_data(client, db, fs):
                         summary=sentence.strip()[
                             # Simple summary
                             :100] + "..." if len(sentence.strip()) > 100 else sentence.strip(),
-                        vector_id=None,  # Initially null, will be populated after embedding
                         created_at=datetime.now()
                     )
                     chunk.save()

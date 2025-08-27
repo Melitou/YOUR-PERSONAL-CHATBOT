@@ -516,7 +516,6 @@ Answer only with the succinct context and nothing else.
                         content=chunk_info['content'],
                         summary=chunk_info['summary'],
                         chunking_method=self.chunking_method,
-                        vector_id=None,  # Initially null, populated later by embedding pipeline
                         created_at=datetime.now()
                     )
 

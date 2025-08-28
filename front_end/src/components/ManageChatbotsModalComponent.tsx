@@ -28,6 +28,7 @@ const ManageChatbotsModalComponent = ({
     const [expandedChatbot, setExpandedChatbot] = useState<string | null>(null);
     const [assignClientsModalOpen, setAssignClientsModalOpen] = useState(false);
     const [selectedChatbotForAssignment, setSelectedChatbotForAssignment] = useState<CreatedChatbot | null>(null);
+    const [enhancingChatbotId, setEnhancingChatbotId] = useState<string | null>(null);
     const { setLoadedChatbot } = LoadedChatbotStore((state: any) => state);
     // const [health, setHealth] = useState<Record<string, { ready: boolean; vectors: number }>>({});
     const { addError, addInfo } = ViewStore();
@@ -229,9 +230,10 @@ const ManageChatbotsModalComponent = ({
                                                                             {health[chatbot.id]?.ready ? 'Ready' : 'Preparing…'}
                                                                         </span> */}
                                                                         </h3>
-                                                                        <button 
+                                                                        <button
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
+                                                                                setEnhancingChatbotId(chatbot.id);
                                                                                 enhanceChatbot(chatbot.id).then((res) => {
                                                                                     if (res.message) {
                                                                                         addInfo(res.message);
@@ -241,12 +243,22 @@ const ManageChatbotsModalComponent = ({
                                                                                 }).catch((error) => {
                                                                                     console.error('Enhance chatbot error:', error);
                                                                                     addError('Failed to enhance chatbot. Please try again.');
+                                                                                }).finally(() => {
+                                                                                    setEnhancingChatbotId(null);
                                                                                 });
-                                                                            }} 
-                                                                            className="p-1 text-[#88b999] hover:text-[#33b849] hover:bg-[#88b999]/10 rounded-md transition-colors"
-                                                                            title="Enhance this chatbot"
+                                                                            }}
+                                                                            disabled={enhancingChatbotId === chatbot.id}
+                                                                            className={`p-1 rounded-md transition-colors ${enhancingChatbotId === chatbot.id
+                                                                                ? 'text-gray-400 cursor-not-allowed'
+                                                                                : 'text-[#88b999] hover:text-[#33b849] hover:bg-[#88b999]/10'
+                                                                                }`}
+                                                                            title={enhancingChatbotId === chatbot.id ? "Enhancing..." : "Enhance this chatbot"}
                                                                         >
-                                                                            <span className="material-symbols-outlined text-lg">auto_fix_high</span>
+                                                                            {enhancingChatbotId === chatbot.id ? (
+                                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                                                                            ) : (
+                                                                                <span className="material-symbols-outlined text-lg">auto_fix_high</span>
+                                                                            )}
                                                                         </button>
                                                                     </div>
                                                                     {chatbot.description && (
@@ -281,16 +293,24 @@ const ManageChatbotsModalComponent = ({
                                                                             setSelectedChatbotForAssignment(chatbot);
                                                                             setAssignClientsModalOpen(true);
                                                                         }}
-                                                                        className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-md hover:bg-green-200 transition-colors"
-                                                                        title="Assign to clients"
+                                                                        disabled={enhancingChatbotId === chatbot.id}
+                                                                        className={`px-3 py-1 text-xs rounded-md transition-colors ${enhancingChatbotId === chatbot.id
+                                                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                            : 'bg-green-100 text-green-800 hover:bg-green-200'
+                                                                            }`}
+                                                                        title={enhancingChatbotId === chatbot.id ? "Enhancement in progress..." : "Assign to clients"}
                                                                     >
                                                                         Assign Clients
                                                                     </button>
                                                                 )}
                                                                 <button
                                                                     onClick={(e) => handleDeleteChatbot(e, chatbot.id, chatbot.name)}
-                                                                    className="px-3 py-1 bg-red-100 text-red-800 text-xs rounded-md hover:bg-red-200 transition-colors"
-                                                                    title="Delete chatbot"
+                                                                    disabled={enhancingChatbotId === chatbot.id}
+                                                                    className={`px-3 py-1 text-xs rounded-md transition-colors ${enhancingChatbotId === chatbot.id
+                                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                        : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                                                        }`}
+                                                                    title={enhancingChatbotId === chatbot.id ? "Enhancement in progress..." : "Delete chatbot"}
                                                                 >
                                                                     Delete
                                                                 </button>
@@ -299,7 +319,12 @@ const ManageChatbotsModalComponent = ({
                                                                         e.stopPropagation();
                                                                         handleSelectChatbot(chatbot);
                                                                     }}
-                                                                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                                                                    disabled={enhancingChatbotId === chatbot.id}
+                                                                    className={`px-3 py-1 text-sm rounded-md transition-colors ${enhancingChatbotId === chatbot.id
+                                                                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                                        }`}
+                                                                    title={enhancingChatbotId === chatbot.id ? "Enhancement in progress..." : "Select chatbot"}
                                                                 >
                                                                     Select
                                                                 </button>

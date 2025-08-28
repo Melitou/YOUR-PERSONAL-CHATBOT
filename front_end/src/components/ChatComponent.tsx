@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import LoadedChatbotStore from '../stores/LoadedChatbotStore';
+import ViewStore from '../stores/ViewStore';
 import { InlineThinkingComponent } from './ThoughtVisualizerComponent';
 import TypewriterMarkdown from './TypewriterMarkdown';
 
@@ -154,6 +155,21 @@ const ChatComponent = () => {
             });
         }
     }, [conversationMessages?.conversation_id, isThinking]);
+
+    useEffect(() => {
+        // Auto-open sidebar when a chatbot is loaded/selected
+        if (loadedChatbot) {
+            ViewStore.getState().setSidebarOpen(true);
+        }
+    }, [loadedChatbot]);
+
+
+    useEffect(() => {
+        // Auto-open thought visualizer when a conversation is loaded/selected
+        if (conversationMessages?.conversation_id) {
+            ViewStore.getState().setThoughtVisualizerOpen(true);
+        }
+    }, [conversationMessages?.conversation_id]);
 
     const handleSendMessage = () => {
         if (!inputMessage.trim()) return; // Don't send empty messages

@@ -11,7 +11,7 @@ from typing import List, Dict, Optional
 from openai import AsyncOpenAI
 from db_service import (
 	Chunks, ChatBots, BatchSummarizationJob, UserNotification,
-	User_Auth_Table, ChatbotClientMapper
+	User_Auth_Table, ChatbotClientMapper, ChunkVectorMappings
 )
 from embeddings import EmbeddingService
 from notification_service import NotificationService
@@ -54,13 +54,19 @@ class BatchEnhancementService:
 			batch_ids = []
 			for namespace in namespaces:
 				try:
-					# Target only basic summaries for enhancement
-					chunks: List[Chunks] = list(Chunks.objects(
-						namespace=namespace,
+					# We need to take the chunks ids that have as namespace the namespace of the initial chatbot
+					# but also are only included in the chatbot that reuse them (if it does)
+					chunks_ids = []
+					chunk_vector_mappings = ChunkVectorMappings.objects(
 						user=user,
-						summary_type="basic",
-					).order_by("chunk_index"))
-					
+						chatbot=chatbot # original
+					)
+
+					# Get the chunks from the chunk_vector_mappings
+					chunks = []
+					for mapping in chunk_vector_mappings:
+						chunks.append(mapping.chunk)
+
 					if not chunks:
 						logger.info(f"No basic summaries found for chatbot {chatbot_id}")
 						raise ValueError(f"No basic summaries available to enhance for the chatbot {chatbot_id} for the user {user_id} with namespace {chatbot.namespace}")

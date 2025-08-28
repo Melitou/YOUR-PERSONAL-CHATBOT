@@ -251,7 +251,6 @@ async def authenticate_websocket(websocket: WebSocket, token: str) -> User_Auth_
             detail="Invalid authentication token"
         )
 
-
 # ==============================================ENDPOINTS==============================================
 
 @app.post("/chatbot/enhancement", tags=["Chatbot"], status_code=status.HTTP_202_ACCEPTED)
@@ -277,11 +276,15 @@ async def enhance_chatbot(
         if not chatbot:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Chatbot not found")
+        
+        logger.info(f"Chatbot requested the enhancement: {chatbot.name} -> {chatbot.namespace}")
 
         mappings = ChatbotDocumentsMapper.objects(
             chatbot=chatbot, user=current_user)
         namespaces = list(
             {m.document.namespace for m in mappings if getattr(m, "document", None)})
+        
+        logger.info(f"Namespaces found: {namespaces}")
 
         # TODO: USE VECTOR MAPPER
 
@@ -566,8 +569,6 @@ async def create_agent(
     """Create a new agent with document processing and embedding generation"""
     try:
 
-        # TODO: DELETE THIS
-        # For testing purposes, we will set use_basic_summaries to False to see the basic summaries
         use_basic_summaries = True
 
         # Log the request
@@ -620,6 +621,12 @@ async def create_agent(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Normal users cannot specify chunking_method or embedding_model"
                 )
+        
+        if not user_namespace.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Namespace cannot be empty"
+            )
 
         # Validate user_namespace
         if '_' in user_namespace:
@@ -632,12 +639,6 @@ async def create_agent(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Namespace prefix too long (max 50 characters)"
-            )
-
-        if not user_namespace.strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Namespace cannot be empty"
             )
 
         # Use the authenticated user (no need to create a new user)

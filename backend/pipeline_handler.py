@@ -153,6 +153,9 @@ class PipelineHandler:
 
         if not user_namespace.strip():
             raise ValueError("Namespace cannot be empty")
+        
+        # Make the namepsace lowercased
+        user_namespace = user_namespace.lower()
 
         # Clean the namespace by removing spaces and normalizing
         clean_namespace = "".join(user_namespace.strip().split())
@@ -207,16 +210,42 @@ class PipelineHandler:
         temp_dir, file_metadata = await self.save_files_to_temp_directory(files)
 
         try:
+            
+            logger.info(f"Original namespace (before cleaning): {user_namespace}")
+            try:
+                # Clean the namepsace from any special characters
+                user_namespace = "".join(ch for ch in user_namespace if ch.isalnum())
+                # Remove any numbers from the namespace
+                user_namespace = "".join(ch for ch in user_namespace if not ch.isdigit())
+            except Exception as e:
+                logger.error(f"Error cleaning namespace: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Namespace cannot contain special characters"
+                )
+            logger.info(f"Cleaned namespace: {user_namespace}")
+
             # Generate unique namespace using user input and user ID
             namespace = self.create_unique_namespace(user_namespace, user)
+            logger.info(f"Complete namespace: {namespace}")
 
-            # Check if namespace already exists
-            # We check the final namespace, {name}_{user_id}
+            logger.info("Checking if namespace exists in the Documents table")
+            # Check also of the namespace exists in the Documents table
+            if Documents.objects(namespace=namespace).first():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Namespace already exists in the Documents table"
+                )
+
+            logger.info("Checking if namespace exists in the ChatBots table")
+            # Check if namespace already exists in the ChatBots table
+            # because a chatbot maybe is not original
             if ChatBots.objects(namespace=namespace).first():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Namespace already exists"
                 )
+            logger.info("SUCCESS: Namespace is unique")
 
             # Determine settings for normal users
             if agent_provider is not None:  # Normal user

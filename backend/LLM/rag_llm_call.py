@@ -265,7 +265,7 @@ def get_system_prompt(chatbot_description: str = None) -> str:
         "- Use code blocks (```language```) for any code or technical content\n"
         "- Break up long paragraphs into shorter, focused sections\n"
         "- If information is not found in documents, clearly state this\n"
-        "- Stay accurate to source material while being helpful and conversational\n\n"
+    "- Stay accurate to source material while being helpful and conversational\n\n"
 
         "## EXAMPLES\n\n"
 

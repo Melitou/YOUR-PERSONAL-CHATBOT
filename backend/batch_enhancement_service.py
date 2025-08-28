@@ -11,7 +11,7 @@ from typing import List, Dict, Optional
 from openai import AsyncOpenAI
 from db_service import (
 	Chunks, ChatBots, BatchSummarizationJob, UserNotification,
-	User_Auth_Table, ChatbotClientMapper, ChunkVectorMappings
+	User_Auth_Table, ChatbotClientMapper, ChunkVectorMappings, ChunkVectorMappings
 )
 from embeddings import EmbeddingService
 from notification_service import NotificationService
@@ -277,6 +277,11 @@ class BatchEnhancementService:
 								# Now, update redo the embedding of the chunks, also update the embeddings in Pinecone
 								# Start with deleting the vector from Pinecone for this specific chatbot
 								embedding_service = EmbeddingService()
+
+								# Get the chatbot and document info for re-embedding
+								# use the metadata of the batch job
+								chatbot_id = metadata.get("chatbot_id") # In case of a chatbot that reuses a file this is NOT the initial chatbot
+								chatbot = ChatBots.objects(id=chatbot_id).first()
 								
 								# Get the vector ID for this chunk in this chatbot's namespace
 								vector_id = embedding_service.get_vector_id_for_chunk(

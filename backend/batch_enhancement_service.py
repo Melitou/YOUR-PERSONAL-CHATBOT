@@ -90,7 +90,7 @@ class BatchEnhancementService:
 							"chatbot_id": chatbot_id, 
 							"user_id": user_id,
 							"namespace": namespace,
-							"chunk_ids": chunk_ids
+							# "chunk_ids": chunk_ids
 						}
 					)
 					

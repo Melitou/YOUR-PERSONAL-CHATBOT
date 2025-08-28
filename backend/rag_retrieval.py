@@ -573,6 +573,9 @@ class RAGService:
                 embedding_model_of_namespace = chatbot.embedding_model
                 provider = model_providers.get(embedding_model_of_namespace, "other")
 
+                logger.info(f"🔍 (RAG_SEARCH) Embedding model of namespace: {embedding_model_of_namespace}")
+                logger.info(f"🔍 (RAG_SEARCH) Provider: {provider}")
+
                 if provider == "google":
                     pinecone_index = self.embedding_service.get_pinecone_index_for_model(embedding_model_of_namespace)
                     logger.info(f"📊 Using Google/Gemini search pipeline with index: {pinecone_index} and namespace embedding model: {embedding_model_of_namespace}")

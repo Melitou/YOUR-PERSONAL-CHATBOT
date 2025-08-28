@@ -283,6 +283,8 @@ async def enhance_chatbot(
         namespaces = list(
             {m.document.namespace for m in mappings if getattr(m, "document", None)})
 
+        # TODO: USE VECTOR MAPPER
+
         # Fallback to chatbot's own namespace if present
         if not namespaces and getattr(chatbot, "namespace", None):
             namespaces = [chatbot.namespace]
@@ -1743,6 +1745,8 @@ async def delete_chatbot(chatbot_id: str, current_user: User_Auth_Table = Depend
 
         # Delete the chatbot itself
         chatbot.delete()
+        
+        logger.info(f"✅ Successfully deleted chatbot '{chatbot.name}' and all associated data")
         return {"deleted": True}
     except HTTPException:
         raise

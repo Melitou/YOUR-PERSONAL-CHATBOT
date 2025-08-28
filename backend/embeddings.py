@@ -495,15 +495,57 @@ class EmbeddingService:
         else:
             return False
 
-    def get_unembedded_chunks_by_user(self, user_id: str) -> List[Chunks]:
+    def get_unembedded_chunks_for_chatbot(self, chatbot) -> List[Chunks]:
         """
-        Get all chunks for a specific user where vector_id is empty or null.
+        Get chunks that need embedding for a specific chatbot.
+        Only returns chunks from documents that are mapped to this chatbot
+        and don't already have vector mappings for this chatbot.
 
         Args:
-            user_id: MongoDB ObjectId string of the user
+            chatbot: ChatBot object
 
         Returns:
-            List of Chunks objects that need embedding
+            List of Chunks objects that need embedding for this specific chatbot
+        """
+        try:
+            from db_service import ChunkVectorMappings, ChatbotDocumentsMapper
+            
+            # Get documents mapped to this specific chatbot
+            document_mappings = ChatbotDocumentsMapper.objects(chatbot=chatbot)
+            mapped_document_ids = {mapping.document.id for mapping in document_mappings}
+            
+            if not mapped_document_ids:
+                logger.info(f"No document mappings found for chatbot {chatbot.name}")
+                return []
+            
+            # Get all chunks for this chatbot's documents
+            all_chunks = Chunks.objects(
+                user=chatbot.user_id, 
+                document__in=list(mapped_document_ids)
+            )
+            
+            # Get chunks that already have vector mappings for THIS chatbot
+            existing_mappings = ChunkVectorMappings.objects(chatbot=chatbot)
+            mapped_chunk_ids = {str(mapping.chunk.id) for mapping in existing_mappings}
+            
+            # Filter to get only unembedded chunks for this chatbot
+            chunks = [chunk for chunk in all_chunks if str(chunk.id) not in mapped_chunk_ids]
+
+            logger.info(
+                f"Found {len(chunks)} unembedded chunks for chatbot {chatbot.name} (from {len(mapped_document_ids)} documents)")
+            return list(chunks)
+
+        except Exception as e:
+            logger.error(
+                f"Error querying unembedded chunks for chatbot {chatbot.name}: {e}")
+            return []
+
+    def get_unembedded_chunks_by_user(self, user_id: str) -> List[Chunks]:
+        """
+        DEPRECATED: Use get_unembedded_chunks_for_chatbot instead.
+        
+        This method is kept for backward compatibility but should not be used
+        for new chatbot creation as it can include orphaned chunks.
         """
         try:
             # Convert string to ObjectId if needed
@@ -512,21 +554,28 @@ class EmbeddingService:
             else:
                 user_object_id = user_id
 
-            # NEW: Query chunks that don't have vector mappings yet
-            from db_service import ChunkVectorMappings
+            from db_service import ChunkVectorMappings, ChatbotDocumentsMapper
             
-            # Get all chunks for this user
-            all_chunks = Chunks.objects(user=user_object_id)
+            # Get all active document mappings for this user
+            active_mappings = ChatbotDocumentsMapper.objects(user=user_object_id)
+            active_document_ids = {mapping.document.id for mapping in active_mappings}
+            
+            if not active_document_ids:
+                logger.info(f"No active document mappings found for user {user_id}")
+                return []
+            
+            # Get all chunks for active documents only
+            all_chunks = Chunks.objects(user=user_object_id, document__in=list(active_document_ids))
             
             # Get chunks that already have vector mappings
             existing_mappings = ChunkVectorMappings.objects(user=user_object_id)
             mapped_chunk_ids = {str(mapping.chunk.id) for mapping in existing_mappings}
             
-            # Filter to get only unembedded chunks (no vector mappings)
+            # Filter to get only unembedded chunks (no vector mappings) from active documents
             chunks = [chunk for chunk in all_chunks if str(chunk.id) not in mapped_chunk_ids]
 
             logger.info(
-                f"Found {len(chunks)} unembedded chunks for user {user_id}")
+                f"Found {len(chunks)} unembedded chunks for user {user_id} (from {len(active_document_ids)} active documents)")
             return list(chunks)
 
         except Exception as e:
@@ -1625,10 +1674,30 @@ class EmbeddingService:
                 logger.error(error_msg)
                 return results
 
-            # Step 1: Get all unembedded chunks for user
-            logger.info("\n📋 Step 1: Getting unembedded chunks...")
-            chunks = self.get_unembedded_chunks_by_user(user_id)
+            # Step 1: Get all unembedded chunks for user's active chatbots
+            logger.info("\n📋 Step 1: Getting unembedded chunks for active chatbots...")
+            
+            # Get all active chatbots for this user
+            from db_service import ChatBots
+            from bson import ObjectId
+            user_chatbots = ChatBots.objects(user_id=ObjectId(user_id))
+            
+            # Collect chunks from all active chatbots
+            all_chunks = []
+            for chatbot in user_chatbots:
+                chatbot_chunks = self.get_unembedded_chunks_for_chatbot(chatbot)
+                all_chunks.extend(chatbot_chunks)
+            
+            # Remove duplicates (in case same chunk is needed by multiple chatbots)
+            seen_chunk_ids = set()
+            chunks = []
+            for chunk in all_chunks:
+                if str(chunk.id) not in seen_chunk_ids:
+                    chunks.append(chunk)
+                    seen_chunk_ids.add(str(chunk.id))
+            
             results["total_chunks_found"] = len(chunks)
+            logger.info(f"Found {len(chunks)} unique unembedded chunks across {len(user_chatbots)} active chatbots")
 
             if not chunks:
                 logger.info("✅ No unembedded chunks found for this user")

@@ -7,6 +7,7 @@ from gridfs import GridFS
 import hashlib
 
 
+# def initialize_db(db_url: str = "mongodb://admin:Aibydna123!@5.9.63.207:27017/admin"):
 def initialize_db(db_url: str = "mongodb://localhost:27017/"):
     """Initialize MongoDB connection and create necessary indexes"""
     try:
@@ -248,7 +249,7 @@ class BatchSummarizationJob(Document):
 class Chunks(Document):
     """
     Chunks table for document text chunks.
-    
+
     Note: Vector IDs are now stored in ChunkVectorMappings table to support
     multiple embeddings per chunk (different chatbots with different models).
     """
@@ -374,56 +375,59 @@ class ChatbotClientMapper(Document):
 class ChunkVectorMappings(Document):
     """
     Maps chunks to their vector representations in different chatbots.
-    
+
     This table enables:
     - Same chunk content to have different vector embeddings for different chatbots
     - Different embedding models (OpenAI vs Gemini) for the same content  
     - Independent chatbot operations and deletions
     - Production-grade data integrity and performance
     """
-    
+
     # Core Relationships
     chunk = ReferenceField(Chunks, required=True)
-    chatbot = ReferenceField(ChatBots, required=True) 
-    user = ReferenceField(User_Auth_Table, required=True)  # For security isolation
-    
+    chatbot = ReferenceField(ChatBots, required=True)
+    # For security isolation
+    user = ReferenceField(User_Auth_Table, required=True)
+
     # Embedding Details
-    embedding_model = StringField(required=True)  # e.g., "text-embedding-3-small"
-    pinecone_index = StringField(required=True)   # e.g., "chatbot-vectors-openai-1536"
+    # e.g., "text-embedding-3-small"
+    embedding_model = StringField(required=True)
+    # e.g., "chatbot-vectors-openai-1536"
+    pinecone_index = StringField(required=True)
     vector_id = StringField(required=True)        # e.g., "chunk123_abc_def456"
-    
+
     # Metadata
     created_at = DateTimeField(required=True)
     updated_at = DateTimeField()  # For re-embedding tracking
-    
+
     meta = {
         'collection': 'chunk_vector_mappings',
         'indexes': [
             # PRIMARY: Unique mapping per chunk+chatbot
             {'fields': [('chunk', 1), ('chatbot', 1)], 'unique': True},
-            
+
             # PERFORMANCE: Fast chatbot lookups
             {'fields': ['chatbot']},
-            
+
             # PERFORMANCE: Fast chunk lookups (find all chatbots using this chunk)
             {'fields': ['chunk']},
-            
+
             # PERFORMANCE: User isolation
             {'fields': ['user']},
-            
+
             # PERFORMANCE: Model-specific queries
             {'fields': ['embedding_model']},
-            
+
             # OPERATIONS: Pinecone vector management
             {'fields': ['vector_id']},
             {'fields': ['pinecone_index']},
-            
+
             # CLEANUP: Find mappings by creation date
             {'fields': ['created_at']},
-            
+
             # COMPOSITE: Fast user+chatbot queries
             {'fields': [('user', 1), ('chatbot', 1)]},
-            
+
             # COMPOSITE: Find all vectors for user+model combination
             {'fields': [('user', 1), ('embedding_model', 1)]}
         ]

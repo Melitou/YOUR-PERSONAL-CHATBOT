@@ -29,6 +29,8 @@ const ManageChatbotsModalComponent = ({
     const [assignClientsModalOpen, setAssignClientsModalOpen] = useState(false);
     const [selectedChatbotForAssignment, setSelectedChatbotForAssignment] = useState<CreatedChatbot | null>(null);
     const [enhancingChatbotId, setEnhancingChatbotId] = useState<string | null>(null);
+    const [deletingAllChatbots, setDeletingAllChatbots] = useState(false);
+    const [deletionProgress, setDeletionProgress] = useState<{ completed: number; total: number; failed: string[] }>({ completed: 0, total: 0, failed: [] });
     const { setLoadedChatbot } = LoadedChatbotStore((state: any) => state);
     // const [health, setHealth] = useState<Record<string, { ready: boolean; vectors: number }>>({});
     const { addError, addInfo } = ViewStore();
@@ -137,6 +139,62 @@ const ManageChatbotsModalComponent = ({
         }
     };
 
+    const handleDeleteAllChatbots = async () => {
+        const chatbotCount = chatbots.length;
+
+        if (chatbotCount === 0) {
+            addInfo('No chatbots to delete.');
+            return;
+        }
+
+        // First confirmation
+        const firstConfirm = window.confirm(
+            `Are you sure you want to delete ALL chatbots? This will delete ${chatbotCount} chatbot${chatbotCount === 1 ? '' : 's'}.`
+        );
+
+        if (!firstConfirm) return;
+
+        // Second confirmation for extra safety
+        const secondConfirm = window.confirm(
+            `This action cannot be undone. Are you absolutely sure you want to delete all ${chatbotCount} chatbot${chatbotCount === 1 ? '' : 's'}?`
+        );
+
+        if (!secondConfirm) return;
+
+        // Initialize deletion process
+        setDeletingAllChatbots(true);
+        setDeletionProgress({ completed: 0, total: chatbotCount, failed: [] });
+
+        const failures: string[] = [];
+        let completed = 0;
+
+        // Delete chatbots sequentially to avoid overwhelming the backend
+        for (const chatbot of chatbots) {
+            try {
+                await removeChatbot(chatbot.id);
+                completed++;
+                setDeletionProgress(prev => ({ ...prev, completed }));
+            } catch (error) {
+                console.error(`Failed to delete chatbot "${chatbot.name}":`, error);
+                failures.push(chatbot.name);
+                setDeletionProgress(prev => ({ ...prev, failed: [...prev.failed, chatbot.name] }));
+            }
+        }
+
+        // Show final results
+        if (failures.length === 0) {
+            addInfo(`Successfully deleted all ${completed} chatbot${completed === 1 ? '' : 's'}.`);
+        } else if (completed === 0) {
+            addError(`Failed to delete all chatbots. Failed: ${failures.join(', ')}`);
+        } else {
+            addInfo(`Deleted ${completed} chatbot${completed === 1 ? '' : 's'}. Failed to delete ${failures.length}: ${failures.join(', ')}`);
+        }
+
+        // Reset state
+        setDeletingAllChatbots(false);
+        setDeletionProgress({ completed: 0, total: 0, failed: [] });
+    };
+
     return (
         <>
             <Modal
@@ -158,13 +216,48 @@ const ManageChatbotsModalComponent = ({
                                     <h2 className="text-xl font-semibold glass-text">
                                         My Chatbots ({chatbots.length})
                                     </h2>
+                                    {deletingAllChatbots && (
+                                        <div className="flex items-center space-x-2 text-sm glass-text opacity-70">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                                            <span>Deleting {deletionProgress.completed} of {deletionProgress.total}...</span>
+                                        </div>
+                                    )}
                                 </div>
-                                <button
-                                    onClick={onClose}
-                                    className="glass-text opacity-60 hover:opacity-80 transition-colors"
-                                >
-                                    <span className="material-symbols-outlined">close</span>
-                                </button>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={handleDeleteAllChatbots}
+                                        disabled={
+                                            chatbots.length === 0 ||
+                                            isLoading ||
+                                            enhancingChatbotId !== null ||
+                                            deletingAllChatbots
+                                        }
+                                        className={`flex items-center space-x-1 px-3 py-1 text-sm rounded-md transition-colors ${chatbots.length === 0 || isLoading || enhancingChatbotId !== null || deletingAllChatbots
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                            }`}
+                                        title={
+                                            deletingAllChatbots
+                                                ? "Deleting all chatbots..."
+                                                : chatbots.length === 0
+                                                    ? "No chatbots to delete"
+                                                    : "Delete all chatbots"
+                                        }
+                                    >
+                                        {deletingAllChatbots ? (
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                                        ) : (
+                                            <span className="material-symbols-outlined text-sm">delete_forever</span>
+                                        )}
+                                        <span>Delete All</span>
+                                    </button>
+                                    <button
+                                        onClick={onClose}
+                                        className="glass-text opacity-60 hover:opacity-80 transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -247,12 +340,12 @@ const ManageChatbotsModalComponent = ({
                                                                                     setEnhancingChatbotId(null);
                                                                                 });
                                                                             }}
-                                                                            disabled={enhancingChatbotId === chatbot.id}
-                                                                            className={`p-1 rounded-md transition-colors ${enhancingChatbotId === chatbot.id
+                                                                            disabled={enhancingChatbotId === chatbot.id || deletingAllChatbots}
+                                                                            className={`p-1 rounded-md transition-colors ${(enhancingChatbotId === chatbot.id || deletingAllChatbots)
                                                                                 ? 'text-gray-400 cursor-not-allowed'
                                                                                 : 'text-[#88b999] hover:text-[#33b849] hover:bg-[#88b999]/10'
                                                                                 }`}
-                                                                            title={enhancingChatbotId === chatbot.id ? "Enhancing..." : "Enhance this chatbot"}
+                                                                            title={enhancingChatbotId === chatbot.id ? "Enhancing..." : deletingAllChatbots ? "Bulk deletion in progress..." : "Enhance this chatbot"}
                                                                         >
                                                                             {enhancingChatbotId === chatbot.id ? (
                                                                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
@@ -293,24 +386,24 @@ const ManageChatbotsModalComponent = ({
                                                                             setSelectedChatbotForAssignment(chatbot);
                                                                             setAssignClientsModalOpen(true);
                                                                         }}
-                                                                        disabled={enhancingChatbotId === chatbot.id}
-                                                                        className={`px-3 py-1 text-xs rounded-md transition-colors ${enhancingChatbotId === chatbot.id
+                                                                        disabled={enhancingChatbotId === chatbot.id || deletingAllChatbots}
+                                                                        className={`px-3 py-1 text-xs rounded-md transition-colors ${(enhancingChatbotId === chatbot.id || deletingAllChatbots)
                                                                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                                             : 'bg-green-100 text-green-800 hover:bg-green-200'
                                                                             }`}
-                                                                        title={enhancingChatbotId === chatbot.id ? "Enhancement in progress..." : "Assign to clients"}
+                                                                        title={enhancingChatbotId === chatbot.id ? "Enhancement in progress..." : deletingAllChatbots ? "Bulk deletion in progress..." : "Assign to clients"}
                                                                     >
                                                                         Assign Clients
                                                                     </button>
                                                                 )}
                                                                 <button
                                                                     onClick={(e) => handleDeleteChatbot(e, chatbot.id, chatbot.name)}
-                                                                    disabled={enhancingChatbotId === chatbot.id}
-                                                                    className={`px-3 py-1 text-xs rounded-md transition-colors ${enhancingChatbotId === chatbot.id
+                                                                    disabled={enhancingChatbotId === chatbot.id || deletingAllChatbots}
+                                                                    className={`px-3 py-1 text-xs rounded-md transition-colors ${(enhancingChatbotId === chatbot.id || deletingAllChatbots)
                                                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                                         : 'bg-red-100 text-red-800 hover:bg-red-200'
                                                                         }`}
-                                                                    title={enhancingChatbotId === chatbot.id ? "Enhancement in progress..." : "Delete chatbot"}
+                                                                    title={enhancingChatbotId === chatbot.id ? "Enhancement in progress..." : deletingAllChatbots ? "Bulk deletion in progress..." : "Delete chatbot"}
                                                                 >
                                                                     Delete
                                                                 </button>
@@ -319,12 +412,12 @@ const ManageChatbotsModalComponent = ({
                                                                         e.stopPropagation();
                                                                         handleSelectChatbot(chatbot);
                                                                     }}
-                                                                    disabled={enhancingChatbotId === chatbot.id}
-                                                                    className={`px-3 py-1 text-sm rounded-md transition-colors ${enhancingChatbotId === chatbot.id
+                                                                    disabled={enhancingChatbotId === chatbot.id || deletingAllChatbots}
+                                                                    className={`px-3 py-1 text-sm rounded-md transition-colors ${(enhancingChatbotId === chatbot.id || deletingAllChatbots)
                                                                         ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                                                                         : 'bg-blue-600 text-white hover:bg-blue-700'
                                                                         }`}
-                                                                    title={enhancingChatbotId === chatbot.id ? "Enhancement in progress..." : "Select chatbot"}
+                                                                    title={enhancingChatbotId === chatbot.id ? "Enhancement in progress..." : deletingAllChatbots ? "Bulk deletion in progress..." : "Select chatbot"}
                                                                 >
                                                                     Select
                                                                 </button>

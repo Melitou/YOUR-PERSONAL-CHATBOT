@@ -7,16 +7,19 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const nameInputRef = useRef<HTMLInputElement>(null);
+    const preparationTimeoutRef = useRef<number | null>(null);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [aiProvider, setAiProvider] = useState("Gemini");
     const [errorMessage, setErrorMessage] = useState("");
     const [duplicateNameError, setDuplicateNameError] = useState(false);
     const [showRetryButton, setShowRetryButton] = useState(false);
+    const [isPreparing, setIsPreparing] = useState(false);
+    const [shouldResetForm, setShouldResetForm] = useState(true);
     const { isLoading } = ChatbotManagerStore();
 
     useEffect(() => {
-        if (open) {
+        if (open && shouldResetForm) {
             setName("");
             setDescription("");
             setAiProvider("Gemini");
@@ -24,12 +27,30 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
             setErrorMessage("");
             setDuplicateNameError(false);
             setShowRetryButton(false);
+            setIsPreparing(false);
+            setShouldResetForm(false);
 
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
         }
-    }, [open]);
+
+        // Always clear error states when modal opens (even if form isn't reset)
+        if (open) {
+            setErrorMessage("");
+            setDuplicateNameError(false);
+            setShowRetryButton(false);
+            setIsPreparing(false);
+        }
+
+        // Cleanup preparation timeout when modal closes
+        return () => {
+            if (preparationTimeoutRef.current) {
+                clearTimeout(preparationTimeoutRef.current);
+                preparationTimeoutRef.current = null;
+            }
+        };
+    }, [open, shouldResetForm]);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         try {
@@ -146,14 +167,19 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
 
             const result = await ChatbotManagerStore.getState().createChatbotNormalUser(data);
             if (result) {
-                onClose();
-                setName("");
-                setDescription("");
-                setAiProvider("Gemini");
-                setSelectedFiles([]);
+                // Start preparation phase instead of immediately closing
+                setIsPreparing(true);
                 setErrorMessage("");
                 setDuplicateNameError(false);
                 setShowRetryButton(false);
+
+                // Set 10-second timeout for preparation
+                preparationTimeoutRef.current = setTimeout(() => {
+                    setIsPreparing(false);
+                    setShouldResetForm(true);
+                    onClose();
+                    preparationTimeoutRef.current = null;
+                }, 10000);
             } else {
                 // Get the error from the store
                 const storeError = ChatbotManagerStore.getState().error || "Failed to create normal user chatbot";
@@ -177,6 +203,8 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                     setErrorMessage(storeError);
                     setDuplicateNameError(false);
                     setShowRetryButton(false);
+                    // For non-duplicate errors, we might want to reset form on next open
+                    // But let's preserve form data for now to let user try again
                 }
             }
             return;
@@ -222,6 +250,7 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                 className={`w-full p-2 sm:p-3 glass-input text-xs sm:text-sm glass-text rounded-md focus:outline-none focus:ring-2 focus:border-transparent placeholder-gray-300 ${duplicateNameError ? 'focus:ring-red-500 border-red-500' : 'focus:ring-blue-500'
                                     }`}
                                 value={name}
+                                disabled={isLoading || isPreparing}
                                 onChange={(e) => {
                                     setName(e.target.value);
                                     // Clear duplicate name error when user starts typing new name
@@ -242,6 +271,7 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                 placeholder="Enter chatbot description"
                                 className="w-full p-2 sm:p-3 glass-input text-xs sm:text-sm glass-text rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-300"
                                 value={description}
+                                disabled={isLoading || isPreparing}
                                 onChange={(e) => setDescription(e.target.value)}
                             />
                         </div>
@@ -258,6 +288,7 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                         value="Gemini"
                                         className="mr-2"
                                         defaultChecked
+                                        disabled={isLoading || isPreparing}
                                         onChange={(e) => setAiProvider(e.target.value)}
                                     />
                                     <label htmlFor="Gemini" className="text-xs sm:text-sm glass-text cursor-pointer">Gemini</label>
@@ -269,6 +300,7 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                         name="aiProvider"
                                         value="OpenAI"
                                         className="mr-2"
+                                        disabled={isLoading || isPreparing}
                                         onChange={(e) => setAiProvider(e.target.value)}
                                     />
                                     <label htmlFor="OpenAI" className="text-xs sm:text-sm glass-text cursor-pointer">OpenAI</label>
@@ -288,10 +320,11 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                                     accept=".pdf,.doc,.docx,.csv,.txt"
                                     className="sr-only"
                                     id="file-upload"
+                                    disabled={isLoading || isPreparing}
                                 />
                                 <label
                                     htmlFor="file-upload"
-                                    className="w-full p-2 sm:p-3 glass-input text-xs sm:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer flex items-center gap-2 hover:glass-light transition-colors"
+                                    className={`w-full p-2 sm:p-3 glass-input text-xs sm:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center gap-2 transition-colors ${isLoading || isPreparing ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:glass-light'}`}
                                 >
                                     <span className="material-symbols-outlined glass-text opacity-70">upload_file</span>
                                     <span className="glass-text text-xs sm:text-base truncate">Choose files (PDF, DOC, CSV, TXT)</span>
@@ -314,12 +347,12 @@ const CreateBotUserModalComponent = ({ open, onClose }: { open: boolean, onClose
                         <button
                             className="w-full sm:w-auto text-xs sm:text-sm px-8 py-3 glass-button glass-text rounded-md hover:glass-light transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             onClick={showRetryButton ? handleRetry : () => handleSubmit(name, description, selectedFiles, aiProvider)}
-                            disabled={isLoading}
+                            disabled={isLoading || isPreparing}
                         >
-                            {isLoading && (
+                            {(isLoading || isPreparing) && (
                                 <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
                             )}
-                            {isLoading ? "Creating..." : showRetryButton ? "Try Again" : "Create Agent"}
+                            {isLoading ? "Creating..." : isPreparing ? "Preparing..." : showRetryButton ? "Try Again" : "Create Agent"}
                         </button>
                     </div>
                 </div>

@@ -378,18 +378,18 @@ chroma_db/
 faiss_index/
 
 # Uploaded files
-Upload/
-Uploads/
-documents/
-files/
-test_files_for_local_db/
-test_uploads/
+# Upload/
+# Uploads/
+# documents/
+# files/
+# test_files_for_local_db/
+# test_uploads/
 
 # Personal Notes
 Notes/
 
 # Photos
-photos/
+# photos/
 
 # Docker production files
 Dockerfile.prod

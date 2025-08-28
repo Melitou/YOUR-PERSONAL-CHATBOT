@@ -31,9 +31,9 @@ const ManageChatbotsModalComponent = ({
     const [enhancingChatbotId, setEnhancingChatbotId] = useState<string | null>(null);
     const [deletingAllChatbots, setDeletingAllChatbots] = useState(false);
     const [deletionProgress, setDeletionProgress] = useState<{ completed: number; total: number; failed: string[] }>({ completed: 0, total: 0, failed: [] });
-    const { setLoadedChatbot } = LoadedChatbotStore((state: any) => state);
+    const { setLoadedChatbot, loadedChatbot } = LoadedChatbotStore((state: any) => state);
     // const [health, setHealth] = useState<Record<string, { ready: boolean; vectors: number }>>({});
-    const { addError, addInfo } = ViewStore();
+    const { addError, addInfo, navigateToHome } = ViewStore();
     const { user } = UserAuthStore();
     const { enhanceChatbot } = chatbotApi;
     // Fetch real chatbots when modal opens
@@ -131,6 +131,11 @@ const ManageChatbotsModalComponent = ({
         if (window.confirm(`Are you sure you want to delete "${chatbotName}"? This action cannot be undone.`)) {
             try {
                 await removeChatbot(chatbotId);
+
+                // Check if the deleted chatbot was currently loaded
+                if (loadedChatbot?.id === chatbotId) {
+                    navigateToHome();
+                }
             } catch (error) {
                 const errorMsg = `Failed to delete chatbot "${chatbotName}"`;
                 console.error('Delete chatbot error:', error);
@@ -167,10 +172,16 @@ const ManageChatbotsModalComponent = ({
 
         const failures: string[] = [];
         let completed = 0;
+        let currentChatbotDeleted = false;
 
         // Delete chatbots sequentially to avoid overwhelming the backend
         for (const chatbot of chatbots) {
             try {
+                // Check if this chatbot is currently loaded before deleting
+                if (loadedChatbot?.id === chatbot.id) {
+                    currentChatbotDeleted = true;
+                }
+
                 await removeChatbot(chatbot.id);
                 completed++;
                 setDeletionProgress(prev => ({ ...prev, completed }));
@@ -188,6 +199,11 @@ const ManageChatbotsModalComponent = ({
             addError(`Failed to delete all chatbots. Failed: ${failures.join(', ')}`);
         } else {
             addInfo(`Deleted ${completed} chatbot${completed === 1 ? '' : 's'}. Failed to delete ${failures.length}: ${failures.join(', ')}`);
+        }
+
+        // Navigate to home if the currently loaded chatbot was deleted
+        if (currentChatbotDeleted) {
+            navigateToHome();
         }
 
         // Reset state

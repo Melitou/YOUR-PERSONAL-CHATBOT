@@ -8,7 +8,8 @@ import hashlib
 
 
 # def initialize_db(db_url: str = "mongodb://admin:Aibydna123!@5.9.63.207:27017/admin"):
-def initialize_db(db_url: str = "mongodb://localhost:27017/"):
+# def initialize_db(db_url: str = "mongodb://localhost:27017/"):
+def initialize_db(db_url: str = "mongodb://admin:Aibydna123!@5.9.63.207:27017/admin"):
     """Initialize MongoDB connection and create necessary indexes"""
     try:
         database_name = "your_personal_chatbot_db"
